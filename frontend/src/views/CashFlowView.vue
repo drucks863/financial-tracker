@@ -30,8 +30,7 @@ const collapsed = reactive<Record<string, boolean>>({})
 const totals = computed(() => monthTotals(ui.year)[ui.month])
 const TYPES = computed<{ label: string; value: EntryType; total: number }[]>(() => [
   { label: 'Expenses', value: 'expense', total: totals.value.expense },
-  { label: 'Income', value: 'income', total: totals.value.income },
-  { label: 'Savings', value: 'savings', total: totals.value.saved }
+  { label: 'Income', value: 'income', total: totals.value.income }
 ])
 
 // Category → subcategory → entries, in the category order from the sheet.

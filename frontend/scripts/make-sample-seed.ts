@@ -24,9 +24,7 @@ const categories: Category[] = [
   { id: 'exp-travel', type: 'expense', name: 'Travel', essential: false, subcategories: ['Airfare', 'Hotels', 'Food', 'Transportation', 'Entertainment', 'Other'] },
   { id: 'exp-utilities', type: 'expense', name: 'Utilities', essential: true, subcategories: ['Phone', 'Internet', 'Electricity', 'Water'] },
   { id: 'exp-rent-mortgage', type: 'expense', name: 'Rent/Mortgage', essential: true, subcategories: ['Rent/Mortgage'] },
-  { id: 'exp-subscriptions', type: 'expense', name: 'Subscriptions', essential: false, subcategories: ['TV', 'Gym', 'Music', 'Amazon', 'Games'] },
-  { id: 'sav-auto', type: 'savings', name: 'Auto withdrawals', fromPaycheck: true, subcategories: ['Roth 401k', 'HSA'] },
-  { id: 'sav-savings', type: 'savings', name: 'Savings', fromPaycheck: false, subcategories: ['Roth IRA', 'HYSA'] }
+  { id: 'exp-subscriptions', type: 'expense', name: 'Subscriptions', essential: false, subcategories: ['TV', 'Gym', 'Music', 'Amazon', 'Games'] }
 ]
 
 // [category, subcategory, description pool, min, max, times per month]
@@ -71,9 +69,6 @@ for (let m = 1; m <= 10; m++) {
   if (m === 6) add(day(21), 'expense', 'Travel', 'Hotels', 'Beach hotel', 540)
   if (m === 6) add(day(20), 'expense', 'Travel', 'Airfare', 'Flights', 380)
   if (m === 8) add(day(17), 'expense', 'Home', 'Projects', 'Garden beds', 210)
-  add(day(1), 'savings', 'Auto withdrawals', 'Roth 401k', '', 600)
-  add(day(1), 'savings', 'Auto withdrawals', 'HSA', '', 150)
-  if (m % 3 === 0) add(day(25), 'savings', 'Savings', 'HYSA', '', 500)
 }
 
 const accounts: Account[] = [
@@ -107,6 +102,6 @@ const subscriptions: Subscription[] = [
 
 writeFileSync(
   new URL('../src/data/seed.sample.json', import.meta.url),
-  JSON.stringify({ version: 1, sample: true, categories, entries, netWorth: { accounts, snapshots }, subscriptions } satisfies FinanceData)
+  JSON.stringify({ version: 2, sample: true, categories, entries, netWorth: { accounts, snapshots }, subscriptions } satisfies FinanceData)
 )
 console.log(`sample seed: ${entries.length} entries, ${snapshots.length} snapshots`)

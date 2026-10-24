@@ -4,12 +4,11 @@ import Button from 'primevue/button'
 import MonthStrip from '../components/MonthStrip.vue'
 import BaseChart from '../components/BaseChart.vue'
 import { ui, selectedYm, categoryColor, categoryRank } from '../store/ui'
-import { state, monthTotals, avgNonZero, categoryTotals, netWorthSeries, categoriesOf } from '../store/finance'
+import { state, monthTotals, avgNonZero, categoryTotals, netWorthSeries } from '../store/finance'
 import { money, signedMoney, pct, MONTHS, monthLabel, shortDate } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
 import type { ChartBuilder } from '../lib/chart-types'
-import type { Entry } from '../types'
 
 const emit = defineEmits<{ navigate: [view: string] }>()
 
@@ -47,22 +46,6 @@ const catAvg = computed(() => {
   return out
 })
 
-const saved = computed(() => {
-  const ym = selectedYm.value
-  const yr = String(ui.year)
-  return categoriesOf('savings').flatMap((cat) =>
-    cat.subcategories.map((sub) => {
-      const match = (e: Entry) => e.type === 'savings' && e.category === cat.name && e.subcategory === sub
-      return {
-        name: sub,
-        group: cat.name,
-        month: state.entries.filter((e) => match(e) && e.date.startsWith(ym)).reduce((a, e) => a + e.amount, 0),
-        ytd: state.entries.filter((e) => match(e) && e.date.startsWith(yr) && e.date.slice(0, 7) <= ym).reduce((a, e) => a + e.amount, 0)
-      }
-    })
-  )
-})
-const savedTotal = computed(() => saved.value.reduce((a, s) => a + s.month, 0))
 
 const nw = computed(() => netWorthSeries())
 const nwLast = computed(() => nw.value.at(-1))
@@ -263,34 +246,6 @@ const nwSpark = computed<ChartBuilder>(() => {
         <p v-else class="empty">Nothing spent yet this month.</p>
       </section>
 
-      <div class="stack">
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Saved and invested</h2>
-              <p class="muted">{{ money(savedTotal) }} this month</p>
-            </div>
-          </div>
-          <table class="mini-table">
-            <thead>
-              <tr>
-                <th scope="col">Account</th>
-                <th scope="col" class="r">This month</th>
-                <th scope="col" class="r">Year to date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in saved" :key="s.group + s.name">
-                <td>
-                  {{ s.name }} <small class="muted">{{ s.group === 'Auto withdrawals' ? 'from paycheck' : '' }}</small>
-                </td>
-                <td class="r num">{{ money(s.month) }}</td>
-                <td class="r num muted">{{ money(s.ytd) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
         <section class="panel nw-card">
           <div class="panel-head">
             <div>
@@ -307,10 +262,9 @@ const nwSpark = computed<ChartBuilder>(() => {
                 {{ money(Math.abs(nwLast.total - nwPrev.total)) }} vs prior month
               </span>
             </div>
-            <BaseChart :build="nwSpark" height="64px" label="Net worth trend" class="spark" />
+            <BaseChart :build="nwSpark" height="160px" label="Net worth trend" class="spark" />
           </div>
         </section>
-      </div>
     </div>
   </div>
 </template>
@@ -427,30 +381,9 @@ const nwSpark = computed<ChartBuilder>(() => {
 .amt {
   font-weight: 500;
 }
-.mini-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-.mini-table th {
-  font-weight: 500;
-  font-size: 0.75rem;
-  color: var(--muted);
-  text-align: left;
-  padding: 0 0 6px;
-}
-.mini-table td {
-  padding: 7px 0;
-  border-top: 1px solid var(--line);
-}
-.r {
-  text-align: right !important;
-}
 .nw-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
-  align-items: center;
 }
 .nw-num {
   font-size: 1.75rem;

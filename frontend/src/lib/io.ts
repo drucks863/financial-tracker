@@ -37,7 +37,7 @@ export async function saveFile(filename: string, data: FileData): Promise<'saved
 /* ================= export ================= */
 
 const ENTRY_COLUMNS = ['Date', 'Type', 'Category', 'Subcategory', 'Description', 'Amount']
-const TYPE_LABEL: Record<EntryType, string> = { income: 'Income', expense: 'Expense', savings: 'Savings' }
+const TYPE_LABEL: Record<EntryType, string> = { income: 'Income', expense: 'Expense' }
 
 type Row = (string | number)[]
 
@@ -83,11 +83,11 @@ export function workbookBytes({ includeNetWorth = true } = {}): ArrayBuffer {
   entries['!cols'] = [{ wch: 11 }, { wch: 9 }, { wch: 18 }, { wch: 22 }, { wch: 28 }, { wch: 11 }]
   XLSX.utils.book_append_sheet(wb, entries, 'Entries')
 
-  const summary: Row[] = [['Month', 'Income', 'Expenses', 'Essentials', 'Discretionary', 'Net', 'Saved & invested']]
+  const summary: Row[] = [['Month', 'Income', 'Expenses', 'Essentials', 'Discretionary', 'Net']]
   for (const y of yearsAvailable().sort()) {
     for (const r of monthTotals(y)) {
       if (!r.count) continue
-      summary.push([`${MONTHS[r.month]} ${y}`, round2(r.income), round2(r.expense), round2(r.essential), round2(r.discretionary), round2(r.net), round2(r.saved)])
+      summary.push([`${MONTHS[r.month]} ${y}`, round2(r.income), round2(r.expense), round2(r.essential), round2(r.discretionary), round2(r.net)])
     }
   }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary')
@@ -162,7 +162,6 @@ function toIsoDate(v: Cell): string | null {
 function typeOf(v: Cell, amount: number): EntryType {
   const t = norm(v)
   if (t.startsWith('inc')) return 'income'
-  if (t.startsWith('sav') || t.startsWith('inv') || t.startsWith('trans')) return 'savings'
   if (t.startsWith('exp')) return 'expense'
   return amount < 0 ? 'income' : 'expense'
 }
@@ -276,22 +275,6 @@ export async function parseCashFlowWorkbook(file: File, year: number): Promise<P
       if (ri < 17 || !r[0] || ['card', 'amazon'].includes(norm(r[0]))) return
       if (findCat(r[0])) heads.push(ri)
     })
-    // top block: Auto Withdrawals (label in J, amount in K) and Savings (label in G, amount in H)
-    const paid = (income || []).some((c) => Object.values(c.totals).some((t) => Math.abs(t[mi]) > 0.004))
-    if (paid) {
-      for (const r of rows.slice(0, 16)) {
-        const blocks: [number, number, string][] = [
-          [9, 10, 'Auto withdrawals'],
-          [6, 7, 'Savings']
-        ]
-        for (const [lc, vc, category] of blocks) {
-          const label = String(r[lc] ?? '').trim()
-          const amt = num(r[vc])
-          if (label && !/total/i.test(label) && amt)
-            entries.push({ date: `${year}-${pad(mi + 1)}-01`, type: 'savings', category, subcategory: label, description: '', amount: amt })
-        }
-      }
-    }
     heads.forEach((ri, hi) => {
       const cat = findCat(rows[ri][0])!
       const end = heads[hi + 1] ?? rows.length

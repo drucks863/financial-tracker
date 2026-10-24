@@ -36,8 +36,7 @@ docs/       these notes, the todo list, architecture
 
 ## Data model (prototype, mirrors planned DynamoDB items)
 
-- **Category**: `type` income | expense | savings, `name`, `subcategories[]`,
-  `essential` (expenses), `fromPaycheck` (savings).
+- **Category**: `type` income | expense, `name`, `subcategories[]`, `essential` (expenses).
 - **Entry**: `date`, `type`, `category`, `subcategory`, `description`, `amount`.
 - **Account**: `name`, `group` Cash | Investments | Other assets | Debt.
 - **Snapshot**: month-end `date` + balance per account.
@@ -49,6 +48,8 @@ docs/       these notes, the todo list, architecture
 - Month tabs: top block has expense totals per category, income, "Disposable income",
   Auto withdrawals (Roth 401k, HSA, taken from the paycheck) and Savings (Roth IRA, HYSA).
   Below that, each category has subcategory columns with itemized lines (description + amount).
+- The Auto withdrawals / Savings boxes on the month tabs are only Devin's reminder of monthly
+  contributions. **Not tracked in the app** (decided 2026-10-24); the import skips them.
 - Summary tab: Income, Expenses, Expenses (Discretionary), Net savings, Ending balance per month.
 - **Essentials** = Rent/Mortgage + Utilities. Discretionary = everything else.
 - **Averages skip zero months** (the sheet's Average column does this). The app does the same.
