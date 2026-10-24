@@ -21,7 +21,7 @@ export const ui = reactive({
 
 /** Tabs on the financial profile page (opened from the avatar). */
 export const PROFILE_TABS = [
-  { id: 'plan', label: 'Pay & bills', note: 'Your pay, contributions, taxes, bills and loans. The rest of the app plans from these.' },
+  { id: 'plan', label: 'Budget setup', note: 'Your pay, contributions, taxes, bills and loans. The rest of the app plans from these.' },
   { id: 'categories', label: 'Categories', note: 'The categories and subcategories entries are filed under.' },
   { id: 'subscriptions', label: 'Subscriptions', note: 'Recurring charges and what they cost each month and year.' },
   { id: 'files', label: 'Import & export', note: 'Bring in past years from your sheets, or download everything.' }

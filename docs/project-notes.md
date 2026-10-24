@@ -64,7 +64,7 @@ docs/       these notes, the todo list, architecture
   account page; it is not in the main nav. Renamed from "My numbers" (Devin, 2026-10-24).
 - Google SSO is planned: the avatar will be the Google photo and the name the Google account
   name. Until then the name is typed at the top of the page and the avatar shows initials.
-- The profile is tabbed: Pay & bills (the plan), Categories, Subscriptions, Import & export
+- The profile is tabbed: Budget setup (the plan; was "Pay & bills"), Categories, Subscriptions, Import & export
   (also the prototype reset). There is no separate Data page; `#data` links open Import & export.
 - Fields other screens read carry a small link marker (`components/UsedBy.vue`); hover or tap
   lists where they're used. The lists live in `USES` in PlanView; keep them in step when a
