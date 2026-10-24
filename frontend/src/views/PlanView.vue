@@ -240,7 +240,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
               <ToggleSwitch v-model="takeHomeActual" />
               <span>Use my actual take-home<UsedBy :where="USES.takeHome" /></span>
             </label>
-            <InputNumber v-if="takeHomeActual" :model-value="p.takeHome" @update:model-value="(v: number | null) => (p.takeHome = v ?? 0)" mode="currency" currency="USD" locale="en-US" aria-label="Take-home per paycheck" class="th-input" />
+            <InputNumber v-if="takeHomeActual" :model-value="p.takeHome" @update:model-value="(amount: number | null) => (p.takeHome = amount ?? 0)" mode="currency" currency="USD" locale="en-US" aria-label="Take-home per paycheck" class="th-input" />
             <span class="muted small">
               {{ takeHomeActual ? `per paycheck · estimate would be ${money2(n.paycheck.estTakeHome)}` : `Estimated ${money2(n.paycheck.estTakeHome)} a paycheck, ${freqLabel}` }}
             </span>

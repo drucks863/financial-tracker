@@ -266,8 +266,11 @@ export async function parseCashFlowWorkbook(file: File, year: number): Promise<P
   // Exact name, or a shared prefix of 4+ letters ("Health" ~ "Health/medical"). Short cells like
   // "-" or "E" must not count as category headers.
   const findCat = (name: Cell) => {
-    const n = norm(name)
-    return expense.find((c) => norm(c.name) === n || (n.length >= 4 && norm(c.name).startsWith(n.slice(0, 6))))
+    const normalizedName = norm(name)
+    return expense.find(
+      (category) =>
+        norm(category.name) === normalizedName || (normalizedName.length >= 4 && norm(category.name).startsWith(normalizedName.slice(0, 6)))
+    )
   }
 
   // 2) itemized month tabs

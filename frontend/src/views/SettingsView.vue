@@ -72,11 +72,11 @@ async function onFile(ev: Event): Promise<void> {
   await parse()
 }
 // Each run gets a number; a slower earlier run (e.g. a previous year) can't overwrite a newer one.
-let parseRun = 0
+let latestParseRun = 0
 async function parse() {
   const file = imp.file
   if (!file) return
-  const run = ++parseRun
+  const thisRun = ++latestParseRun
   imp.busy = true
   imp.error = null
   imp.result = null
@@ -87,11 +87,11 @@ async function parse() {
         : imp.kind === 'cashflow'
           ? { kind: 'entries', data: await parseCashFlowWorkbook(file, imp.year) }
           : { kind: 'networth', data: await parseNetWorthWorkbook(file) }
-    if (run === parseRun) imp.result = result
+    if (thisRun === latestParseRun) imp.result = result
   } catch (e) {
-    if (run === parseRun) imp.error = `Could not read ${file.name}. Use a .csv or .xlsx file. (${e instanceof Error ? e.message : String(e)})`
+    if (thisRun === latestParseRun) imp.error = `Could not read ${file.name}. Use a .csv or .xlsx file. (${e instanceof Error ? e.message : String(e)})`
   } finally {
-    if (run === parseRun) imp.busy = false
+    if (thisRun === latestParseRun) imp.busy = false
   }
 }
 
@@ -109,8 +109,8 @@ const preview = computed(() => {
     if (!cat) newCats.add(`${e.category}`)
     else if (!cat.subcategories.includes(e.subcategory)) newCats.add(`${e.category} › ${e.subcategory}`)
   }
-  const covered = new Set(r.entries.map((e) => `${e.type}|${e.date.slice(0, 7)}`))
-  const existing = state.entries.filter((e) => covered.has(`${e.type}|${e.date.slice(0, 7)}`)).length
+  const importedTypeMonths = new Set(r.entries.map((entry) => `${entry.type}|${entry.date.slice(0, 7)}`))
+  const existing = state.entries.filter((entry) => importedTypeMonths.has(`${entry.type}|${entry.date.slice(0, 7)}`)).length
   const sum = (t: EntryType) => r.entries.filter((e) => e.type === t).reduce((a, e) => a + e.amount, 0)
   return {
     networth: false as const,
@@ -148,8 +148,8 @@ function commitImport(): void {
     if (r.categories) for (const c of r.categories) for (const s of c.subcategories) ensureCategory(c.type, c.name, s)
     const months = new Set(r.entries.map((e) => e.date.slice(0, 7)))
     // Replace only what the file covers: a month's income stays if the file has none for it.
-    const covered = new Set(r.entries.map((e) => `${e.type}|${e.date.slice(0, 7)}`))
-    if (imp.replace) state.entries = state.entries.filter((e) => !covered.has(`${e.type}|${e.date.slice(0, 7)}`))
+    const importedTypeMonths = new Set(r.entries.map((entry) => `${entry.type}|${entry.date.slice(0, 7)}`))
+    if (imp.replace) state.entries = state.entries.filter((entry) => !importedTypeMonths.has(`${entry.type}|${entry.date.slice(0, 7)}`))
     for (const e of r.entries) {
       ensureCategory(e.type, e.category, e.subcategory)
       state.entries.push({ ...e, id: uid() })
@@ -202,16 +202,16 @@ function tryRemoveCat(cat: Category): void {
 const subsMonthly = computed(() =>
   state.subscriptions.reduce((a, s) => {
     const p = typeof s.price === 'number' ? s.price : 0
-    return a + p * perMonth(s.frequency)
+    return a + p * chargesPerMonth(s.frequency)
   }, 0)
 )
 // How many times a month each billing frequency charges (sheet values are free text).
-function perMonth(frequency: string): number {
-  const f = (frequency || '').toLowerCase()
-  if (f.startsWith('year') || f.startsWith('annual')) return 1 / 12
-  if (f.startsWith('semi')) return 1 / 6
-  if (f.startsWith('quarter')) return 1 / 3
-  if (f.startsWith('week')) return 52 / 12
+function chargesPerMonth(frequency: string): number {
+  const normalized = (frequency || '').toLowerCase()
+  if (normalized.startsWith('year') || normalized.startsWith('annual')) return 1 / 12
+  if (normalized.startsWith('semi')) return 1 / 6
+  if (normalized.startsWith('quarter')) return 1 / 3
+  if (normalized.startsWith('week')) return 52 / 12
   return 1
 }
 

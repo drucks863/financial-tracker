@@ -196,8 +196,8 @@ const flowChart = computed<ChartBuilder>(() => {
 })
 
 const topCats = computed(() => categoryRank.value.slice(0, 6))
-const REST = '\u0000rest'
-const restLabel = computed(() => (topCats.value.includes('Other') ? 'Everything else' : 'Other'))
+const CATCH_ALL_KEY = '\u0000rest'
+const catchAllLabel = computed(() => (topCats.value.includes('Other') ? 'Everything else' : 'Other'))
 const spendChart = computed<ChartBuilder>(() => {
   const yr = String(ui.year)
   const top = topCats.value
@@ -205,18 +205,18 @@ const spendChart = computed<ChartBuilder>(() => {
   for (const e of state.entries) {
     if (e.type !== 'expense' || !e.date.startsWith(yr)) continue
     // The catch-all gets its own key so a real category called "Other" isn't merged into it.
-    const k = top.includes(e.category) ? e.category : REST
-    ;(grid[k] ??= Array<number>(12).fill(0))[+e.date.slice(5, 7) - 1] += e.amount
+    const bucketKey = top.includes(e.category) ? e.category : CATCH_ALL_KEY
+    ;(grid[bucketKey] ??= Array<number>(12).fill(0))[+e.date.slice(5, 7) - 1] += e.amount
   }
-  const names = [...top.filter((n) => grid[n]), ...(grid[REST] ? [REST] : [])]
+  const names = [...top.filter((n) => grid[n]), ...(grid[CATCH_ALL_KEY] ? [CATCH_ALL_KEY] : [])]
   return (dark, c) => ({
     type: 'bar',
     data: {
       labels: MONTHS,
       datasets: names.map((n) => ({
-        label: n === REST ? restLabel.value : n,
+        label: n === CATCH_ALL_KEY ? catchAllLabel.value : n,
         data: grid[n],
-        backgroundColor: n === REST ? otherColor(dark) : categoryColor(n, dark),
+        backgroundColor: n === CATCH_ALL_KEY ? otherColor(dark) : categoryColor(n, dark),
         borderColor: c.surface,
         borderWidth: { top: 1 },
         borderSkipped: false as const,
@@ -235,7 +235,7 @@ const spendChart = computed<ChartBuilder>(() => {
 })
 const spendLegend = computed(() => [
   ...topCats.value.map((n) => ({ name: n, color: categoryColor(n, isDark.value) })),
-  { name: restLabel.value, color: otherColor(isDark.value) }
+  { name: catchAllLabel.value, color: otherColor(isDark.value) }
 ])
 
 /* ---------- recent activity ---------- */

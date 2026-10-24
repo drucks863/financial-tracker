@@ -120,3 +120,9 @@ saved in the browser only.
 - Dark by default; light only when `data-theme="light"` is set on `<html>`.
 - The year select sits above the month scroller on every screen size.
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
+
+## Code conventions
+
+- Prefer long, descriptive variable names over short abbreviations, including for services
+  (`financeService: FinanceService`, not `fs`). Devin, 2026-10-24. Apply to new and touched code.
+- Branch names are plain and descriptive (`ui-review-fixes`), never `claude/...`.

@@ -22,17 +22,17 @@ export const monthLabel = (ym: string): string => {
 /** "Oct 2026" from "2026-10"; a dash for none. */
 export const ymLabel = (ym: string | null): string => {
   if (!ym) return '—'
-  const [y, m] = ym.split('-').map(Number)
-  return `${MONTHS[m - 1]} ${y}`
+  const [year, month] = ym.split('-').map(Number)
+  return `${MONTHS[month - 1]} ${year}`
 }
 /** "Oct 4" from "2026-10-04". */
-export const dayLabel = (iso: string): string => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
+export const dayLabel = (isoDate: string): string => `${MONTHS[+isoDate.slice(5, 7) - 1]} ${+isoDate.slice(8, 10)}`
 
 // Dates in the viewer's own time zone. toISOString() is UTC, which in the US turns into
 // tomorrow (or next month) during the evening.
-const pad = (n: number) => String(n).padStart(2, '0')
-export const localIso = (d: Date = new Date()): string => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-export const localYm = (d: Date = new Date()): string => localIso(d).slice(0, 7)
+const twoDigits = (value: number) => String(value).padStart(2, '0')
+export const localIso = (date: Date = new Date()): string => `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`
+export const localYm = (date: Date = new Date()): string => localIso(date).slice(0, 7)
 
 export const shortDate = (iso: string): string => {
   const [y, m] = iso.split('-').map(Number)
