@@ -82,11 +82,14 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
           <template v-if="initials">{{ initials }}</template>
           <i v-else class="pi pi-user"></i>
         </span>
-        <InputText v-model="p.name" placeholder="Your name" aria-label="Your name" class="name-input" />
+        <div class="who-text">
+          <InputText v-model="p.name" placeholder="Your name" aria-label="Your name" class="name-input" />
+          <small class="muted">Your Google name and photo will show here once sign-in is added.</small>
+        </div>
       </div>
       <div>
-        <h1>My numbers</h1>
-        <p class="muted">Your current pay, contributions, taxes and rent in one place.</p>
+        <h1>Financial profile</h1>
+        <p class="muted">Your pay, contributions, taxes, bills and loans. The rest of the app plans from these.</p>
       </div>
     </header>
 
@@ -321,13 +324,27 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 .who {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  width: 100%;
+  padding-bottom: 20px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.who-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.who-text small {
+  padding-left: 8px;
+  font-size: 0.75rem;
 }
 .avatar-lg {
   display: grid;
   place-items: center;
   width: 48px;
   height: 48px;
+  flex: none;
   border-radius: 50%;
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -335,9 +352,20 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
   font-size: 1.05rem;
   color: var(--ink);
 }
+/* Reads as the account name; looks like an input only on hover or focus. */
 .name-input {
-  width: 220px;
-  font-weight: 600;
+  width: min(260px, 100%);
+  padding-inline: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+.name-input:hover,
+.name-input:focus {
+  border-color: var(--line);
+  background: var(--panel);
 }
 .layout {
   display: grid;

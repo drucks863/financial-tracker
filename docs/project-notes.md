@@ -58,7 +58,12 @@ docs/       these notes, the todo list, architecture
   Roth IRA, 401k, HSA, REIT (investments); Other assets and Debt sections are empty so far.
 - Older years exist as separate files: Cash Flow '22, '23, '24, '25.
 
-## My numbers (plan)
+## Financial profile (plan)
+
+- Opened from the user's avatar at the bottom of the sidebar (last tab on phones), like an
+  account page; it is not in the main nav. Renamed from "My numbers" (Devin, 2026-10-24).
+- Google SSO is planned: the avatar will be the Google photo and the name the Google account
+  name. Until then the name is typed at the top of the page and the avatar shows initials.
 
 - The app does the math. Inputs: yearly salary, pay frequency (weekly, every two weeks, twice
   a month, monthly), effective tax rate, your 401k % and company 401k %, other paycheck
@@ -69,7 +74,7 @@ docs/       these notes, the todo list, architecture
   Other screens should read `planned`, not recompute. Used by: Overview "Plan check" widget,
   Net worth "Expected each month", Add entry amount prefill (matched by subcategory name),
   Trends planned lines.
-- Loans (amount, rate, term, first payment month, extra/month) live on My numbers;
+- Loans (amount, rate, term, first payment month, extra/month) live on the financial profile;
   `lib/loan.ts` amortizes them. Net worth adds each loan's balance as debt for every snapshot
   month (owed from the month before the first payment), so loans are never typed into snapshots.
 - A loan can carry the property it bought (name, conservative market value, valued-as-of month,

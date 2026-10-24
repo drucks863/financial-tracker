@@ -249,7 +249,7 @@ export function netWorthSeries(): NetWorthPoint[] {
     const byGroup = Object.fromEntries(NW_GROUPS.map((g) => [g, 0])) as Record<AccountGroup, number>
     // Debt balances count as amounts owed whichever sign they were entered with.
     for (const a of accounts) byGroup[a.group] += a.group === 'Debt' ? Math.abs(s.values[a.id] || 0) : s.values[a.id] || 0
-    // Loans from My numbers add their balance for that month, and the property they bought
+    // Loans from the financial profile add their balance for that month, and the property they bought
     // (valued conservatively) counts under Other assets.
     const loans: Record<string, number> = {}
     const properties: Record<string, number> = {}

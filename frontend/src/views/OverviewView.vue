@@ -270,7 +270,7 @@ const mix = computed(() => {
 })
 const essentials = computed(() => spend.value.filter((c) => c.essential).reduce((a, c) => a + c.total, 0))
 
-/* ---------- plan check: this period against My numbers ---------- */
+/* ---------- plan check: this period against your profile ---------- */
 // Year mode scales the monthly plan by the months that have entries, so a partial year compares fairly.
 const planMonths = computed(() => (mode.value === 'month' ? 1 : year.value.filter((r) => r.count).length))
 const planRows = computed(() => {
@@ -567,7 +567,7 @@ const pageItems = computed(() => [
         <div class="panel-head">
           <div>
             <h2 id="plan-title">Plan check</h2>
-            <p class="muted small">{{ periodLabel }} against My numbers{{ mode === 'year' ? ` (${planMonths} months)` : '' }}</p>
+            <p class="muted small">{{ periodLabel }} against your profile{{ mode === 'year' ? ` (${planMonths} months)` : '' }}</p>
           </div>
           <Button label="Edit" text size="small" @click="emit('navigate', 'plan')" />
         </div>
@@ -585,7 +585,7 @@ const pageItems = computed(() => [
             </small>
           </li>
         </ul>
-        <p v-else-if="!hasPlan" class="empty">Fill in My numbers to compare each month to your plan.</p>
+        <p v-else-if="!hasPlan" class="empty">Fill in your financial profile to compare each month to your plan.</p>
         <p v-else class="empty">Nothing recorded for {{ periodLabel }}.</p>
       </section>
     </div>

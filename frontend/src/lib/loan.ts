@@ -1,6 +1,6 @@
 import type { Loan } from '../types'
 
-// Standard amortization, month by month. Pure functions so Net worth, My numbers and charts agree.
+// Standard amortization, month by month. Pure functions so Net worth, the financial profile and charts agree.
 
 export interface LoanRow {
   /** YYYY-MM */

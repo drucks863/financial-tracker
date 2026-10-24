@@ -3,7 +3,7 @@ import { state, uid } from './finance'
 import { loanSummary } from '../lib/loan'
 import type { Loan, PayDeduction, PayFrequency, SharedCost } from '../types'
 
-// The My numbers page: steady-state pay, contributions, taxes and housing. Mirrors the
+// The financial profile page: steady-state pay, contributions, taxes and housing. Mirrors the
 // "Misc. Calculations" tab of the Net Worth / Retirement workbook. Other screens read
 // `planned` instead of recomputing these figures.
 

@@ -33,11 +33,11 @@ const stats = computed(() => {
   }
 })
 
-/* ---- planned amounts from My numbers ---- */
+/* ---- planned amounts from the financial profile ---- */
 const planTakeHome = computed(() => planned.value.monthly.takeHome)
 const norm = (v: string) => v.toLowerCase().replace(/[^a-z]/g, '')
 const sameName = (a: string, b: string) => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
-/** Planned monthly amount for one category, when My numbers has one (wages, rent, bills, loans). */
+/** Planned monthly amount for one category, when the financial profile has one (wages, rent, bills, loans). */
 function planFor(type: EntryType, name: string): number {
   const n = planned.value
   if (type === 'income') return norm(name).includes('wage') ? n.monthly.takeHome : 0
@@ -289,7 +289,7 @@ const yoy = computed(() => {
         <div class="legend">
           <span><i class="swatch" :style="{ background: trendType === 'expense' ? categoryColor(trendName, isDark) : 'var(--series-income)' }"></i>{{ trendName }}</span>
           <span><i class="swatch line" style="background: var(--ink-2)"></i>Monthly average</span>
-          <span v-if="trend.plan > 0"><i class="swatch line" style="background: var(--ink)"></i>Planned {{ money(trend.plan) }} (My numbers)</span>
+          <span v-if="trend.plan > 0"><i class="swatch line" style="background: var(--ink)"></i>Planned {{ money(trend.plan) }} (your profile)</span>
         </div>
       </section>
 

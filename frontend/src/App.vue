@@ -16,7 +16,7 @@ const VIEWS = [
   { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView },
   { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
   // opened from the avatar, not listed in the nav
-  { id: 'plan', label: 'My numbers', icon: 'pi pi-calculator', component: PlanView, hidden: true },
+  { id: 'plan', label: 'Financial profile', icon: 'pi pi-calculator', component: PlanView, hidden: true },
   { id: 'data', label: 'Data', icon: 'pi pi-sliders-h', component: SettingsView }
 ]
 
@@ -75,14 +75,14 @@ onMounted(() => {
         <i :class="v.icon" aria-hidden="true"></i>
         <span class="full">{{ v.label }}</span>
       </button>
-      <button type="button" class="me" :aria-current="current === 'plan' ? 'page' : undefined" :aria-label="`${me.name || 'You'}: My numbers`" @click="go('plan')">
+      <button type="button" class="me" :aria-current="current === 'plan' ? 'page' : undefined" :aria-label="`${me.name || 'You'}: financial profile`" @click="go('plan')">
         <span class="avatar" aria-hidden="true">
           <template v-if="me.initials">{{ me.initials }}</template>
           <i v-else class="pi pi-user"></i>
         </span>
         <span class="me-text">
           <span class="me-name">{{ me.name || 'You' }}</span>
-          <span class="me-sub">My numbers</span>
+          <span class="me-sub">Financial profile</span>
         </span>
       </button>
     </nav>
@@ -158,7 +158,7 @@ onMounted(() => {
   color: var(--accent);
 }
 
-/* Avatar: opens My numbers. A tab on phones, the bottom-left corner of the rail on desktop. */
+/* Avatar: opens the financial profile. A tab on phones, the bottom-left corner of the rail on desktop. */
 .me {
   flex: 1;
   display: grid;
@@ -217,7 +217,7 @@ onMounted(() => {
     gap: 2px;
     border-top: 0;
     border-right: 1px solid var(--line);
-    padding: 16px 12px;
+    padding: 16px 12px 22px;
   }
   .brand {
     display: flex;
@@ -283,7 +283,7 @@ onMounted(() => {
     gap: 10px;
     height: auto;
     margin-top: 10px;
-    padding: 12px 8px 0;
+    padding: 14px 8px 10px;
     border-top: 1px solid var(--line);
     border-radius: 0;
     text-align: left;

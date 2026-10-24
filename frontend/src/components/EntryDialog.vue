@@ -67,7 +67,7 @@ watch(
 const categoryOptions = computed(() => categoriesOf(form.type).map((c) => c.name))
 const subOptions = computed(() => findCategory(form.type, form.category)?.subcategories || [])
 
-// Suggested amount from My numbers for the picked category: paycheck take-home for wage income,
+// Suggested amount from the financial profile for the picked category: paycheck take-home for wage income,
 // your share for a rent or bill item, or a loan payment. Matched by name.
 const norm = (v: string | null | undefined) => (v || '').toLowerCase().replace(/[^a-z]/g, '')
 const sameName = (a: string, b: string) => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
@@ -206,7 +206,7 @@ function remove(): void {
             autofocus
           />
           <small v-if="errors.amount" class="err">{{ errors.amount }}</small>
-          <small v-else-if="prefilled && suggestion && form.amount === suggestion.amount" class="hint">From My numbers: {{ suggestion.label }}</small>
+          <small v-else-if="prefilled && suggestion && form.amount === suggestion.amount" class="hint">From your profile: {{ suggestion.label }}</small>
           <button v-else-if="!form.id && suggestion && form.amount !== suggestion.amount" type="button" class="link hint-btn" @click="form.amount = suggestion.amount">
             Use {{ money2(suggestion.amount) }} ({{ suggestion.label }})
           </button>

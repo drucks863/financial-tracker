@@ -28,7 +28,7 @@ const yearAgo = computed(() => {
 })
 const first = computed(() => all.value[0])
 // Percent change only makes sense against a positive starting value.
-// Expected monthly growth from My numbers: contributions (yours, company, paycheck deductions)
+// Expected monthly growth from the financial profile: contributions (yours, company, paycheck deductions)
 // plus loan principal paid down. Market moves come on top of this.
 const expected = computed(() => {
   const m = planned.value.monthly
@@ -149,7 +149,7 @@ const accountRows = computed(() => {
       return { ...a, debt, value, change, note }
     })
     .concat(
-      // Loans from My numbers appear as debt rows; their balances are worked out, not entered.
+      // Loans from the financial profile appear as debt rows; their balances are worked out, not entered.
       (state.plan?.loans ?? [])
         .filter((ln) => (l.loans[ln.id] || 0) > 0)
         .map((ln) => {
@@ -162,7 +162,7 @@ const accountRows = computed(() => {
             debt: true,
             value,
             change: before === null ? null : before - value,
-            note: 'from My numbers'
+            note: 'from your profile'
           }
         }),
       // ...and the property each loan bought, at its conservative value.
@@ -366,7 +366,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
       <div class="legend">
         <span><i class="swatch" style="background: var(--nw-cash)"></i>Principal</span>
         <span><i class="swatch" style="background: var(--nw-debt)"></i>Interest</span>
-        <span class="muted">Faded bars are past years · {{ money(loan.interestTotal) }} interest over the whole loan · edit it on My numbers</span>
+        <span class="muted">Faded bars are past years · {{ money(loan.interestTotal) }} interest over the whole loan · edit it in your profile</span>
       </div>
     </section>
 
@@ -435,7 +435,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
           <span>Month-end date</span>
           <DatePicker v-model="dlg.date" input-id="snap-date" date-format="M d, yy" fluid :disabled="dlg.editing" />
         </label>
-        <p class="muted small">Balances start from your last snapshot. For debts, enter what you still owe; it's subtracted. Loans set up on My numbers are added for you.</p>
+        <p class="muted small">Balances start from your last snapshot. For debts, enter what you still owe; it's subtracted. Loans set up in your financial profile are added for you.</p>
         <div v-for="g in NW_GROUPS" :key="g" class="grp">
           <template v-if="state.netWorth.accounts.some((a) => a.group === g)">
             <h3>{{ g }}</h3>
