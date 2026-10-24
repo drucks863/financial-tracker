@@ -14,7 +14,7 @@ const keep = head
   .replace(/<meta charset[^>]*>/i, '')
   .replace(/<meta name="viewport"[^>]*>/i, '')
   .trim()
-const title = keep.match(/<title>[\s\S]*?<\/title>/i)[0]
+const title = keep.match(/<title>[\s\S]*?<\/title>/i)?.[0] ?? ''
 const rest = keep.replace(title, '')
 // title first so it lands in the first 8KB; scripts after the mount point
 const scripts = [...rest.matchAll(/<script[\s\S]*?<\/script>/gi)].map((m) => m[0])

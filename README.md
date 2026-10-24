@@ -7,7 +7,7 @@ Monorepo:
 
 | Folder | What |
 |---|---|
-| `frontend/` | Vue 3 + PrimeVue app (Vite, npm) |
+| `frontend/` | Vue 3 + PrimeVue app (TypeScript, Vite, npm) |
 | `backend/` | Spring Boot + Kotlin API (Gradle). Not started yet. |
 | `docs/` | Project notes and the todo list |
 
@@ -25,7 +25,8 @@ Data tab.
 
 Other scripts:
 
-- `npm run build` builds for hosting (this is what will be bundled into the Spring Boot jar).
+- `npm run typecheck` type-checks the app and scripts.
+- `npm run build` type-checks and builds for hosting (this is what will be bundled into the Spring Boot jar).
 - `npm run build:preview` builds one self-contained HTML file for sharing the prototype.
 - `npm run sample-seed` regenerates the sample data.
 

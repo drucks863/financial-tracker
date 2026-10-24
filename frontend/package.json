@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:preview": "vite build --mode preview && node scripts/to-artifact.mjs",
-    "sample-seed": "node scripts/make-sample-seed.mjs",
-    "preview": "vite preview"
+    "build": "vue-tsc --build && vite build",
+    "build:preview": "vue-tsc --build && vite build --mode preview && node scripts/to-artifact.ts",
+    "sample-seed": "node scripts/make-sample-seed.ts",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --build"
   },
   "dependencies": {
     "@primeuix/themes": "2.0.3",
@@ -19,8 +20,12 @@
     "xlsx": "0.18.5"
   },
   "devDependencies": {
+    "@types/node": "22.20.5",
     "@vitejs/plugin-vue": "6.0.9",
+    "@vue/tsconfig": "0.9.1",
+    "typescript": "6.0.3",
     "vite": "8.3.1",
-    "vite-plugin-singlefile": "2.3.3"
+    "vite-plugin-singlefile": "2.3.3",
+    "vue-tsc": "3.3.12"
   }
 }

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
@@ -24,20 +24,24 @@ import {
 } from '../store/finance'
 import { saveFile, entriesCsv, workbookBytes, netWorthCsv, parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook } from '../lib/io'
 import { money, money2, shortDate } from '../lib/format'
+import type { ParsedEntries, ParsedNetWorth, SaveError } from '../lib/io'
+import type { Category, EntryType } from '../types'
 
 const toast = useToast()
 
 /* ---------- export ---------- */
-const exporting = ref(null)
+type ExportKind = 'csv' | 'xlsx' | 'nw'
+const exporting = ref<ExportKind | null>(null)
 const stamp = () => new Date().toISOString().slice(0, 10)
-async function doExport(kind) {
+async function doExport(kind: ExportKind): Promise<void> {
   exporting.value = kind
   try {
     if (kind === 'csv') await saveFile(`entries-${stamp()}.csv`, entriesCsv())
     if (kind === 'xlsx') await saveFile(`financial-tracker-${stamp()}.xlsx`, new Blob([workbookBytes()]))
     if (kind === 'nw') await saveFile(`net-worth-${stamp()}.csv`, netWorthCsv())
     toast.add({ severity: 'success', summary: 'Export ready', detail: 'Check your downloads.', life: 2500 })
-  } catch (e) {
+  } catch (err) {
+    const e = err as Partial<SaveError>
     if (e?.code !== 'declined') toast.add({ severity: 'warn', summary: 'Export not saved', detail: e?.message || 'Saving files is not available here.', life: 4000 })
   } finally {
     exporting.value = null
@@ -45,20 +49,32 @@ async function doExport(kind) {
 }
 
 /* ---------- import ---------- */
-const KINDS = [
+type ImportKind = 'entries' | 'cashflow' | 'networth'
+type ImportResult = { kind: 'entries'; data: ParsedEntries } | { kind: 'networth'; data: ParsedNetWorth }
+
+const KINDS: { label: string; value: ImportKind }[] = [
   { label: 'Entries file', value: 'entries' },
   { label: 'Cash Flow workbook', value: 'cashflow' },
   { label: 'Net worth tracker', value: 'networth' }
 ]
-const imp = reactive({ kind: 'entries', year: new Date().getFullYear() - 1, file: null, result: null, replace: true, busy: false, error: null })
-const fileInput = ref(null)
+const imp = reactive({
+  kind: 'entries' as ImportKind,
+  year: new Date().getFullYear() - 1,
+  file: null as File | null,
+  result: null as ImportResult | null,
+  replace: true,
+  busy: false,
+  error: null as string | null
+})
+const fileInput = ref<HTMLInputElement | null>(null)
 
 function pick() {
   fileInput.value?.click()
 }
-async function onFile(ev) {
-  const f = ev.target.files?.[0]
-  ev.target.value = ''
+async function onFile(ev: Event): Promise<void> {
+  const input = ev.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = ''
   if (!f) return
   imp.file = f
   await parse()
@@ -69,32 +85,34 @@ async function parse() {
   imp.error = null
   imp.result = null
   try {
-    if (imp.kind === 'entries') imp.result = await parseEntriesFile(imp.file)
-    else if (imp.kind === 'cashflow') imp.result = await parseCashFlowWorkbook(imp.file, imp.year)
-    else imp.result = await parseNetWorthWorkbook(imp.file)
+    if (imp.kind === 'entries') imp.result = { kind: 'entries', data: await parseEntriesFile(imp.file) }
+    else if (imp.kind === 'cashflow') imp.result = { kind: 'entries', data: await parseCashFlowWorkbook(imp.file, imp.year) }
+    else imp.result = { kind: 'networth', data: await parseNetWorthWorkbook(imp.file) }
   } catch (e) {
-    imp.error = `Could not read ${imp.file.name}. Use a .csv or .xlsx file. (${e.message || e})`
+    imp.error = `Could not read ${imp.file.name}. Use a .csv or .xlsx file. (${e instanceof Error ? e.message : String(e)})`
   } finally {
     imp.busy = false
   }
 }
 
 const preview = computed(() => {
-  const r = imp.result
-  if (!r) return null
-  if (imp.kind === 'networth') {
-    return { networth: true, accounts: r.accounts, dates: r.dates || [], problems: r.problems }
+  if (!imp.result) return null
+  if (imp.result.kind === 'networth') {
+    const r = imp.result.data
+    return { networth: true as const, accounts: r.accounts, dates: r.dates, problems: r.problems }
   }
+  const r = imp.result.data
   const months = [...new Set(r.entries.map((e) => e.date.slice(0, 7)))].sort()
-  const newCats = new Set()
+  const newCats = new Set<string>()
   for (const e of r.entries) {
     const cat = state.categories.find((c) => c.type === e.type && c.name === e.category)
     if (!cat) newCats.add(`${e.category}`)
     else if (!cat.subcategories.includes(e.subcategory)) newCats.add(`${e.category} › ${e.subcategory}`)
   }
   const existing = state.entries.filter((e) => months.includes(e.date.slice(0, 7))).length
-  const sum = (t) => r.entries.filter((e) => e.type === t).reduce((a, e) => a + e.amount, 0)
+  const sum = (t: EntryType) => r.entries.filter((e) => e.type === t).reduce((a, e) => a + e.amount, 0)
   return {
+    networth: false as const,
     count: r.entries.length,
     months,
     newCats: [...newCats],
@@ -106,10 +124,10 @@ const preview = computed(() => {
   }
 })
 
-function commitImport() {
-  const r = imp.result
-  if (!r) return
-  if (imp.kind === 'networth') {
+function commitImport(): void {
+  if (!imp.result) return
+  if (imp.result.kind === 'networth') {
+    const r = imp.result.data
     const accts = state.netWorth.accounts
     for (const a of r.accounts) {
       let acct = accts.find((x) => x.name.toLowerCase() === a.name.toLowerCase())
@@ -125,6 +143,7 @@ function commitImport() {
     }
     toast.add({ severity: 'success', summary: 'Net worth imported', detail: `${r.accounts.length} accounts, ${r.dates.length} months`, life: 3000 })
   } else {
+    const r = imp.result.data
     if (r.categories) for (const c of r.categories) for (const s of c.subcategories) ensureCategory(c.type, c.name, s)
     const months = new Set(r.entries.map((e) => e.date.slice(0, 7)))
     if (imp.replace) state.entries = state.entries.filter((e) => !months.has(e.date.slice(0, 7)))
@@ -139,17 +158,17 @@ function commitImport() {
 }
 
 /* ---------- categories ---------- */
-const catType = ref('expense')
-const CAT_TYPES = [
+const catType = ref<EntryType>('expense')
+const CAT_TYPES: { label: string; value: EntryType }[] = [
   { label: 'Expenses', value: 'expense' },
   { label: 'Income', value: 'income' },
   { label: 'Savings', value: 'savings' }
 ]
 const cats = computed(() => categoriesOf(catType.value))
 const newCat = ref('')
-const newSub = reactive({})
-const editing = reactive({ key: null, value: '' })
-const openCats = reactive({})
+const newSub = reactive<Record<string, string>>({})
+const editing = reactive({ key: null as string | null, value: '' })
+const openCats = reactive<Record<string, boolean>>({})
 
 function createCategory() {
   const c = addCategory({ type: catType.value, name: newCat.value })
@@ -157,23 +176,23 @@ function createCategory() {
   openCats[c.id] = true
   newCat.value = ''
 }
-function createSub(cat) {
+function createSub(cat: Category): void {
   if (!addSubcategory(cat, newSub[cat.id] || '')) return toast.add({ severity: 'warn', summary: 'Type a new subcategory name', life: 2500 })
   newSub[cat.id] = ''
 }
-function startEdit(key, value) {
+function startEdit(key: string, value: string): void {
   editing.key = key
   editing.value = value
 }
-function commitEdit(cat, sub) {
+function commitEdit(cat: Category, sub?: string): void {
   const ok = sub ? renameSubcategory(cat, sub, editing.value) : renameCategory(cat, editing.value)
   if (!ok && editing.value.trim() !== (sub || cat.name)) toast.add({ severity: 'warn', summary: 'That name is empty or already used', life: 2500 })
   editing.key = null
 }
-function tryRemoveSub(cat, sub) {
+function tryRemoveSub(cat: Category, sub: string): void {
   if (!removeSubcategory(cat, sub)) toast.add({ severity: 'warn', summary: `${sub} still has ${entriesUsing(cat, sub)} entries`, detail: 'Move or delete them first.', life: 3500 })
 }
-function tryRemoveCat(cat) {
+function tryRemoveCat(cat: Category): void {
   if (!removeCategory(cat)) toast.add({ severity: 'warn', summary: `${cat.name} still has ${entriesUsing(cat)} entries`, detail: 'Move or delete them first.', life: 3500 })
 }
 
@@ -269,7 +288,7 @@ function reset() {
             <template v-if="preview.networth">
               <p>
                 <strong>{{ preview.accounts.length }} accounts</strong> across <strong>{{ preview.dates.length }} months</strong>
-                <span v-if="preview.dates.length" class="muted"> ({{ shortDate(preview.dates[0]) }} to {{ shortDate(preview.dates.at(-1)) }})</span>
+                <span v-if="preview.dates.length" class="muted"> ({{ shortDate(preview.dates[0]) }} to {{ shortDate(preview.dates[preview.dates.length - 1]) }})</span>
               </p>
               <ul class="small ink2 plain">
                 <li v-for="a in preview.accounts" :key="a.name">{{ a.name }} <span class="muted">· {{ a.group }}</span></li>

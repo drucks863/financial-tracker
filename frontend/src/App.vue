@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Toast from 'primevue/toast'
 import Button from 'primevue/button'
@@ -22,7 +22,7 @@ const VIEWS = [
 const current = ref('overview')
 const view = computed(() => VIEWS.find((v) => v.id === current.value) || VIEWS[0])
 
-function go(id) {
+function go(id: string): void {
   current.value = id
   try {
     history.replaceState(null, '', `#${id}`)

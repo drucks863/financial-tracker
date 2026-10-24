@@ -20,7 +20,8 @@ monthly and yearly averages, and net worth.
 ## Stack
 
 - Backend: Spring Boot, Kotlin, JUnit tests, Gradle.
-- Frontend: Vue 3 + PrimeVue, npm.
+- Frontend: Vue 3 + PrimeVue, **TypeScript**, Vite, npm. Strict mode; `npm run typecheck` runs vue-tsc.
+  Domain types live in `frontend/src/types.ts`.
 - AWS: DynamoDB, S3, Elastic Beanstalk (and whatever else fits).
 - **Monorepo.** The Vue UI gets bundled into the Spring Boot jar for deployment, but must
   also run on its own locally (`npm run dev` in `frontend/`, proxying `/api` to `localhost:8080`).
@@ -28,7 +29,7 @@ monthly and yearly averages, and net worth.
 ## Repo layout
 
 ```
-frontend/   Vue 3 + PrimeVue app (Vite)
+frontend/   Vue 3 + PrimeVue app (TypeScript, Vite)
 backend/    Spring Boot + Kotlin (not started)
 docs/       these notes, the todo list, architecture
 ```

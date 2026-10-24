@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import SelectButton from 'primevue/selectbutton'
 import InputText from 'primevue/inputtext'
@@ -10,13 +10,25 @@ import { ui, selectedYm, openEntry, categoryColor } from '../store/ui'
 import { state, categoriesOf, monthTotals } from '../store/finance'
 import { money, money2, monthLabel, MONTHS } from '../lib/format'
 import { isDark } from '../lib/theme-mode'
+import type { Entry, EntryType } from '../types'
 
-const type = ref('expense')
+interface SubGroup {
+  name: string
+  total: number
+  entries: Entry[]
+}
+interface CatGroup {
+  name: string
+  total: number
+  subs: Record<string, SubGroup>
+}
+
+const type = ref<EntryType>('expense')
 const query = ref('')
-const collapsed = reactive({})
+const collapsed = reactive<Record<string, boolean>>({})
 
 const totals = computed(() => monthTotals(ui.year)[ui.month])
-const TYPES = computed(() => [
+const TYPES = computed<{ label: string; value: EntryType; total: number }[]>(() => [
   { label: 'Expenses', value: 'expense', total: totals.value.expense },
   { label: 'Income', value: 'income', total: totals.value.income },
   { label: 'Savings', value: 'savings', total: totals.value.saved }
@@ -33,11 +45,11 @@ const groups = computed(() => {
       (!q || `${e.description} ${e.category} ${e.subcategory}`.toLowerCase().includes(q))
   )
   const order = categoriesOf(type.value).map((c) => c.name)
-  const byCat = {}
+  const byCat: Record<string, CatGroup> = {}
   for (const e of list) {
-    const c = (byCat[e.category] ||= { name: e.category, total: 0, subs: {} })
+    const c = (byCat[e.category] ??= { name: e.category, total: 0, subs: {} })
     c.total += e.amount
-    const s = (c.subs[e.subcategory] ||= { name: e.subcategory, total: 0, entries: [] })
+    const s = (c.subs[e.subcategory] ??= { name: e.subcategory, total: 0, entries: [] })
     s.total += e.amount
     s.entries.push(e)
   }
@@ -46,7 +58,7 @@ const groups = computed(() => {
     const ib = order.indexOf(b.name)
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
   })
-  const catDef = (name) => categoriesOf(type.value).find((c) => c.name === name)
+  const catDef = (name: string) => categoriesOf(type.value).find((c) => c.name === name)
   return cats.map((c) => {
     const subOrder = catDef(c.name)?.subcategories || []
     return {
@@ -60,8 +72,8 @@ const groups = computed(() => {
 })
 
 const shownTotal = computed(() => groups.value.reduce((a, g) => a + g.total, 0))
-const dayLabel = (iso) => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
-const swatch = (name) => (type.value === 'expense' ? categoryColor(name, isDark.value) : 'var(--series-income)')
+const dayLabel = (iso: string): string => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
+const swatch = (name: string): string => (type.value === 'expense' ? categoryColor(name, isDark.value) : 'var(--series-income)')
 </script>
 
 <template>

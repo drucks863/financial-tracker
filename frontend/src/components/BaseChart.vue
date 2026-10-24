@@ -1,23 +1,21 @@
-<script setup>
+<script setup lang="ts">
 // Thin Chart.js wrapper. `build(dark, chrome)` returns a full Chart.js config, so
 // each chart re-themes itself when the color scheme flips.
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import Chart from 'chart.js/auto'
+import type { ChartOptions, TooltipItem } from 'chart.js'
 import { isDark } from '../lib/theme-mode'
-import { chrome } from '../lib/chart-colors'
+import { chrome, type ChartChrome } from '../lib/chart-colors'
+import type { ChartBuilder } from '../lib/chart-types'
 import { money } from '../lib/format'
 
-const props = defineProps({
-  build: { type: Function, required: true },
-  height: { type: String, default: '240px' },
-  label: { type: String, required: true }
-})
+const props = withDefaults(defineProps<{ build: ChartBuilder; label: string; height?: string }>(), { height: '240px' })
 
 const FONT = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"
-const canvas = ref(null)
-let chart = null
+const canvas = ref<HTMLCanvasElement | null>(null)
+let chart: Chart | null = null
 
-function baseOptions(c) {
+function baseOptions(c: ChartChrome): ChartOptions {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -35,9 +33,9 @@ function baseOptions(c) {
         padding: 10,
         boxPadding: 4,
         usePointStyle: true,
-        titleFont: { family: FONT, weight: '600' },
+        titleFont: { family: FONT, weight: 600 },
         bodyFont: { family: FONT },
-        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.parsed.y ?? ctx.parsed)}` }
+        callbacks: { label: (ctx: TooltipItem<'bar'>) => ` ${ctx.dataset.label}: ${money(typeof ctx.parsed === 'number' ? ctx.parsed : ctx.parsed.y)}` }
       }
     },
     scales: {
@@ -49,21 +47,26 @@ function baseOptions(c) {
       y: {
         grid: { color: c.grid },
         border: { display: false },
-        ticks: { color: c.muted, font: { family: FONT, size: 11 }, maxTicksLimit: 5, callback: (v) => compactTick(v) }
+        ticks: { color: c.muted, font: { family: FONT, size: 11 }, maxTicksLimit: 5, callback: (v) => compactTick(Number(v)) }
       }
     }
   }
 }
 
-function compactTick(v) {
+function compactTick(v: number): string {
   const a = Math.abs(v)
   const s = a >= 1000 ? `$${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}k` : `$${a}`
   return v < 0 ? `−${s}` : s
 }
 
-function merge(base, extra) {
-  for (const [k, v] of Object.entries(extra || {})) {
-    if (v && typeof v === 'object' && !Array.isArray(v) && typeof base[k] === 'object' && base[k] !== null) merge(base[k], v)
+type Plain = Record<string, unknown>
+const isPlain = (v: unknown): v is Plain => !!v && typeof v === 'object' && !Array.isArray(v)
+
+// Deep-merges a chart's own options over the shared defaults.
+function merge(base: Plain, extra: Plain): Plain {
+  for (const [k, v] of Object.entries(extra)) {
+    const b = base[k]
+    if (isPlain(v) && isPlain(b)) merge(b, v)
     else base[k] = v
   }
   return base
@@ -73,8 +76,9 @@ function render() {
   if (!canvas.value) return
   const c = chrome(isDark.value)
   const cfg = props.build(isDark.value, c)
-  cfg.options = merge(baseOptions(c), cfg.options || {})
-  if (cfg.type === 'doughnut') delete cfg.options.scales
+  const options = merge(baseOptions(c) as Plain, (cfg.options ?? {}) as Plain)
+  if (cfg.type === 'doughnut') delete options.scales
+  cfg.options = options
   if (chart) chart.destroy()
   chart = new Chart(canvas.value, cfg)
 }

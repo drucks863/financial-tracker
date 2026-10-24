@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // The month tabs from the sheet, as a strip: each month shows its net cash flow as a
 // small bar above (saved) or below (overspent) a shared baseline.
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
@@ -15,7 +15,7 @@ const years = computed(() => {
   return ys.map((y) => ({ label: String(y), value: y }))
 })
 
-const strip = ref(null)
+const strip = ref<HTMLElement | null>(null)
 function scrollToActive() {
   nextTick(() => {
     const el = strip.value?.querySelector('[aria-pressed="true"]')

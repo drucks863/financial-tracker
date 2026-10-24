@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -12,6 +12,8 @@ import BaseChart from '../components/BaseChart.vue'
 import { state, netWorthSeries, saveSnapshot, deleteSnapshot, addAccount, NW_GROUPS } from '../store/finance'
 import { money, signedMoney, pct, shortDate } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
+import type { ChartBuilder } from '../lib/chart-types'
+import type { AccountGroup, NetWorthPoint } from '../types'
 
 const toast = useToast()
 const all = computed(() => netWorthSeries())
@@ -24,20 +26,23 @@ const yearAgo = computed(() => {
 })
 const first = computed(() => all.value[0])
 
-const range = ref('all')
-const RANGES = [
+const range = ref<number | 'all'>('all')
+const RANGES: { label: string; value: number | 'all' }[] = [
   { label: '6M', value: 6 },
   { label: '1Y', value: 12 },
   { label: 'All', value: 'all' }
 ]
-const shown = computed(() => (range.value === 'all' ? all.value : all.value.slice(-(range.value + 1))))
+const shown = computed(() => {
+  const r = range.value
+  return r === 'all' ? all.value : all.value.slice(-(r + 1))
+})
 
-const GROUP_COLOR = { Cash: ROLE.cash, Investments: ROLE.investments, 'Other assets': ROLE.other, Debt: ROLE.debt }
+const GROUP_COLOR: Record<AccountGroup, number> = { Cash: ROLE.cash, Investments: ROLE.investments, 'Other assets': ROLE.other, Debt: ROLE.debt }
 const groupsInUse = computed(() => NW_GROUPS.filter((g) => state.netWorth.accounts.some((a) => a.group === g)))
 
 // Groups are drawn as stacked areas (pre-summed so the net worth line stays unstacked);
 // tooltips report each group's own balance.
-const chart = computed(() => {
+const chart = computed<ChartBuilder>(() => {
   const pts = shown.value
   const groups = groupsInUse.value.filter((g) => g !== 'Debt')
   let running = pts.map(() => 0)
@@ -62,17 +67,16 @@ const chart = computed(() => {
           tension: 0.25,
           fill: false
         },
-        ...layers.map(({ g, raw, top }, i) => ({
+        ...layers.map(({ g, top }, i) => ({
           label: g,
           data: top,
-          raw,
           borderColor: series(GROUP_COLOR[g], dark),
           backgroundColor: series(GROUP_COLOR[g], dark) + (dark ? '55' : '40'),
           borderWidth: 1.5,
           pointRadius: 0,
           pointHoverRadius: 4,
           tension: 0.25,
-          fill: i === 0 ? 'origin' : '-1'
+          fill: i === 0 ? ('origin' as const) : ('-1' as const)
         }))
       ]
     },
@@ -80,7 +84,8 @@ const chart = computed(() => {
       scales: { y: { beginAtZero: true } },
       plugins: {
         tooltip: {
-          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.dataset.raw ? ctx.dataset.raw[ctx.dataIndex] : ctx.parsed.y)}` }
+          // dataset 0 is the net worth line; the rest are the pre-summed group layers
+          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.datasetIndex ? layers[ctx.datasetIndex - 1].raw[ctx.dataIndex] : ctx.parsed.y)}` }
         }
       }
     }
@@ -102,15 +107,15 @@ const accountRows = computed(() => {
 })
 
 /* ---- snapshot dialog ---- */
-const dlg = reactive({ open: false, date: null, values: {}, editing: false })
-const newAcct = reactive({ name: '', group: 'Investments' })
+const dlg = reactive({ open: false, date: null as Date | null, values: {} as Record<string, number>, editing: false })
+const newAcct = reactive<{ name: string; group: AccountGroup }>({ name: '', group: 'Investments' })
 
-function endOfMonth(d) {
+function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0)
 }
-const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const iso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-function openSnapshot(point = null) {
+function openSnapshot(point: NetWorthPoint | null = null): void {
   if (point) {
     const [y, m, d] = point.date.split('-').map(Number)
     Object.assign(dlg, { open: true, date: new Date(y, m - 1, d), values: { ...point.values }, editing: true })
@@ -134,7 +139,7 @@ function saveDlg() {
 }
 const confirmDelete = ref(false)
 function removeDlg() {
-  deleteSnapshot(iso(dlg.date))
+  if (dlg.date) deleteSnapshot(iso(dlg.date))
   dlg.open = false
   confirmDelete.value = false
   toast.add({ severity: 'info', summary: 'Snapshot deleted', life: 2000 })
@@ -215,7 +220,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
                 <small class="muted">{{ a.group }} · {{ pct(a.share) }} of assets</small>
               </td>
               <td class="r num">{{ money(a.value) }}</td>
-              <td class="r num" :class="a.change > 0 ? 'pos' : a.change < 0 ? 'neg' : 'muted'">{{ a.change === null ? '—' : signedMoney(a.change) }}</td>
+              <td class="r num" :class="a.change === null || a.change === 0 ? 'muted' : a.change > 0 ? 'pos' : 'neg'">{{ a.change === null ? '—' : signedMoney(a.change) }}</td>
             </tr>
           </tbody>
         </table>

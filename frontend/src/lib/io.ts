@@ -1,12 +1,20 @@
 import * as XLSX from 'xlsx'
 import { state, monthTotals, yearGrid, yearsAvailable, netWorthSeries, categoriesOf } from '../store/finance'
+import type { AccountGroup, EntryDraft, EntryType } from '../types'
 import { MONTHS, MONTHS_LONG } from './format'
 
 /* ================= saving files ================= */
 
 // Inside a claude.ai artifact, files go through the viewer's `downloads` capability.
 // Anywhere else (local dev, the real app) a plain blob link does the job.
-export async function saveFile(filename, data) {
+export type FileData = string | Blob | ArrayBuffer
+
+export interface SaveError {
+  code: string
+  message: string
+}
+
+export async function saveFile(filename: string, data: FileData): Promise<'saved'> {
   const claude = window.claude
   if (claude?.use) {
     const downloads = await claude.use('downloads')
@@ -14,7 +22,7 @@ export async function saveFile(filename, data) {
       await downloads.save({ filename, data })
       return 'saved'
     }
-    throw { code: 'unavailable', message: 'Downloads are not available in this view.' }
+    throw { code: 'unavailable', message: 'Downloads are not available in this view.' } satisfies SaveError
   }
   const blob = data instanceof Blob ? data : new Blob([data])
   const url = URL.createObjectURL(blob)
@@ -29,29 +37,31 @@ export async function saveFile(filename, data) {
 /* ================= export ================= */
 
 const ENTRY_COLUMNS = ['Date', 'Type', 'Category', 'Subcategory', 'Description', 'Amount']
-const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings' }
+const TYPE_LABEL: Record<EntryType, string> = { income: 'Income', expense: 'Expense', savings: 'Savings' }
 
-function entryRows(filter = () => true) {
+type Row = (string | number)[]
+
+function entryRows(filter: (e: (typeof state.entries)[number]) => boolean = () => true): Row[] {
   return [...state.entries]
     .filter(filter)
     .sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type) || a.category.localeCompare(b.category))
     .map((e) => [e.date, TYPE_LABEL[e.type], e.category, e.subcategory, e.description, round2(e.amount)])
 }
-const round2 = (v) => Math.round(v * 100) / 100
+const round2 = (v: number): number => Math.round(v * 100) / 100
 
-export function entriesCsv(filter) {
-  const esc = (v) => {
+export function entriesCsv(filter?: Parameters<typeof entryRows>[0]): string {
+  const esc = (v: string | number) => {
     const s = String(v ?? '')
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   return [ENTRY_COLUMNS, ...entryRows(filter)].map((r) => r.map(esc).join(',')).join('\n')
 }
 
-function gridSheet(type, year) {
+function gridSheet(type: EntryType, year: number): XLSX.WorkSheet {
   const g = yearGrid(type, year)
   const order = categoriesOf(type).map((c) => c.name)
-  const rows = [[type === 'expense' ? 'Expenses' : 'Income', '', ...MONTHS, 'Total', 'Average']]
-  const avg = (arr) => {
+  const rows: Row[] = [[type === 'expense' ? 'Expenses' : 'Income', '', ...MONTHS, 'Total', 'Average']]
+  const avg = (arr: number[]) => {
     const nz = arr.filter((v) => Math.abs(v) > 0.004)
     return nz.length ? round2(nz.reduce((a, b) => a + b, 0) / nz.length) : 0
   }
@@ -67,13 +77,13 @@ function gridSheet(type, year) {
   return XLSX.utils.aoa_to_sheet(rows)
 }
 
-export function workbookBytes({ includeNetWorth = true } = {}) {
+export function workbookBytes({ includeNetWorth = true } = {}): ArrayBuffer {
   const wb = XLSX.utils.book_new()
   const entries = XLSX.utils.aoa_to_sheet([ENTRY_COLUMNS, ...entryRows()])
   entries['!cols'] = [{ wch: 11 }, { wch: 9 }, { wch: 18 }, { wch: 22 }, { wch: 28 }, { wch: 11 }]
   XLSX.utils.book_append_sheet(wb, entries, 'Entries')
 
-  const summary = [['Month', 'Income', 'Expenses', 'Essentials', 'Discretionary', 'Net', 'Saved & invested']]
+  const summary: Row[] = [['Month', 'Income', 'Expenses', 'Essentials', 'Discretionary', 'Net', 'Saved & invested']]
   for (const y of yearsAvailable().sort()) {
     for (const r of monthTotals(y)) {
       if (!r.count) continue
@@ -89,16 +99,16 @@ export function workbookBytes({ includeNetWorth = true } = {}) {
 
   if (includeNetWorth) XLSX.utils.book_append_sheet(wb, netWorthSheet(), 'Net Worth')
 
-  const cats = [['Type', 'Category', 'Subcategory', 'Essential']]
+  const cats: Row[] = [['Type', 'Category', 'Subcategory', 'Essential']]
   for (const c of state.categories) for (const s of c.subcategories) cats.push([TYPE_LABEL[c.type], c.name, s, c.essential ? 'Yes' : ''])
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cats), 'Categories')
 
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
 }
 
-function netWorthSheet() {
+function netWorthSheet(): XLSX.WorkSheet {
   const pts = netWorthSeries()
-  const rows = [['Group', 'Account', ...pts.map((p) => p.date)]]
+  const rows: Row[] = [['Group', 'Account', ...pts.map((p) => p.date)]]
   for (const a of state.netWorth.accounts) rows.push([a.group, a.name, ...pts.map((p) => round2(p.values[a.id] || 0))])
   rows.push([])
   rows.push(['', 'Total assets', ...pts.map((p) => round2(p.assets))])
@@ -107,19 +117,21 @@ function netWorthSheet() {
   return XLSX.utils.aoa_to_sheet(rows)
 }
 
-export function netWorthCsv() {
+export function netWorthCsv(): string {
   const sheet = netWorthSheet()
   return XLSX.utils.sheet_to_csv(sheet)
 }
 
 /* ================= import ================= */
 
-async function readWorkbook(file) {
+async function readWorkbook(file: File): Promise<XLSX.WorkBook> {
   const buf = await file.arrayBuffer()
   return XLSX.read(buf, { cellDates: true, type: 'array' })
 }
 
-const num = (v) => {
+type Cell = string | number | boolean | Date | null | undefined
+
+const num = (v: Cell): number | null => {
   if (typeof v === 'number') return v
   if (typeof v === 'string') {
     const s = v.replace(/[$,\s]/g, '').replace(/^\((.*)\)$/, '-$1')
@@ -129,11 +141,11 @@ const num = (v) => {
   }
   return null
 }
-const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
-const pad = (n) => String(n).padStart(2, '0')
+const norm = (s: Cell): string => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+const pad = (n: number | string): string => String(n).padStart(2, '0')
 
-function toIsoDate(v) {
-  if (v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`
+function toIsoDate(v: Cell): string | null {
+  if (v instanceof Date && !isNaN(v.getTime())) return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`
   if (typeof v === 'number') {
     const d = XLSX.SSF.parse_date_code(v)
     return d ? `${d.y}-${pad(d.m)}-${pad(d.d)}` : null
@@ -144,10 +156,10 @@ function toIsoDate(v) {
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
   if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${pad(m[1])}-${pad(m[2])}`
   const d = new Date(s)
-  return isNaN(d) ? null : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return isNaN(d.getTime()) ? null : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-function typeOf(v, amount) {
+function typeOf(v: Cell, amount: number): EntryType {
   const t = norm(v)
   if (t.startsWith('inc')) return 'income'
   if (t.startsWith('sav') || t.startsWith('inv') || t.startsWith('trans')) return 'savings'
@@ -160,14 +172,20 @@ function typeOf(v, amount) {
  * Header names are matched loosely; Type is optional (defaults to Expense).
  * Returns { entries, problems }.
  */
-export async function parseEntriesFile(file) {
+export interface ParsedEntries {
+  entries: EntryDraft[]
+  categories?: { type: EntryType; name: string; subcategories: string[] }[]
+  problems: string[]
+}
+
+export async function parseEntriesFile(file: File): Promise<ParsedEntries> {
   const wb = await readWorkbook(file)
   const sheet = wb.Sheets[wb.SheetNames.find((n) => norm(n) === 'entries') || wb.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, blankrows: false })
+  const rows = XLSX.utils.sheet_to_json<Cell[]>(sheet, { header: 1, raw: true, blankrows: false })
   const headerIdx = rows.findIndex((r) => r.some((c) => norm(c) === 'date') && r.some((c) => norm(c) === 'amount'))
   if (headerIdx < 0) return { entries: [], problems: ['Could not find a header row with Date and Amount columns.'] }
   const head = rows[headerIdx].map(norm)
-  const col = (...names) => head.findIndex((h) => names.includes(h))
+  const col = (...names: string[]) => head.findIndex((h) => names.includes(h))
   const c = {
     date: col('date', 'month'),
     type: col('type', 'kind'),
@@ -176,13 +194,13 @@ export async function parseEntriesFile(file) {
     desc: col('description', 'desc', 'merchant', 'payee', 'note', 'notes'),
     amount: col('amount', 'value', 'total')
   }
-  const entries = []
-  const problems = []
+  const entries: EntryDraft[] = []
+  const problems: string[] = []
   rows.slice(headerIdx + 1).forEach((r, i) => {
     const amount = num(r[c.amount])
     const date = toIsoDate(r[c.date])
     if (amount == null && !date) return
-    if (amount == null || !date) {
+    if (amount === null || !date) {
       problems.push(`Row ${headerIdx + i + 2}: ${!date ? 'unreadable date' : 'missing amount'}, skipped`)
       return
     }
@@ -205,19 +223,27 @@ export async function parseEntriesFile(file) {
  * subcategory columns. Itemized rows are used where present; anything the month tabs
  * don't itemize is filled from the Expenses/Income totals so monthly totals always match.
  */
-export async function parseCashFlowWorkbook(file, year) {
+export async function parseCashFlowWorkbook(file: File, year: number): Promise<ParsedEntries> {
   const wb = await readWorkbook(file)
-  const problems = []
-  const get = (name) => wb.Sheets[wb.SheetNames.find((n) => norm(n) === norm(name))]
-  const aoa = (sheet) => XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null })
+  const problems: string[] = []
+  const get = (name: string): XLSX.WorkSheet | undefined => {
+    const found = wb.SheetNames.find((n) => norm(n) === norm(name))
+    return found ? wb.Sheets[found] : undefined
+  }
+  const aoa = (sheet: XLSX.WorkSheet) => XLSX.utils.sheet_to_json<Cell[]>(sheet, { header: 1, raw: true, defval: null })
 
   // 1) category trees + monthly truth from Expenses / Income tabs
-  function readTree(name) {
+  interface SheetCategory {
+    name: string
+    subs: string[]
+    totals: Record<string, number[]>
+  }
+  function readTree(name: string): SheetCategory[] | null {
     const sheet = get(name)
     if (!sheet) return null
     const rows = aoa(sheet)
-    const cats = []
-    let cur = null
+    const cats: SheetCategory[] = []
+    let cur: SheetCategory | null = null
     for (const r of rows) {
       const a = r[0]
       const c = r[2]
@@ -236,16 +262,16 @@ export async function parseCashFlowWorkbook(file, year) {
   const income = readTree('Income')
   if (!expense) return { entries: [], categories: [], problems: ['This workbook has no “Expenses” tab.'] }
 
-  const entries = []
-  const found = {}
-  const findCat = (name) => expense.find((c) => norm(c.name) === norm(name) || norm(c.name).startsWith(norm(name).slice(0, 6)))
+  const entries: EntryDraft[] = []
+  const found: Record<string, number> = {}
+  const findCat = (name: Cell) => expense.find((c) => norm(c.name) === norm(name) || norm(c.name).startsWith(norm(name).slice(0, 6)))
 
   // 2) itemized month tabs
   MONTHS_LONG.forEach((monthName, mi) => {
     const sheet = get(monthName)
     if (!sheet) return
     const rows = aoa(sheet)
-    const heads = []
+    const heads: number[] = []
     rows.forEach((r, ri) => {
       if (ri < 17 || !r[0] || ['card', 'amazon'].includes(norm(r[0]))) return
       if (findCat(r[0])) heads.push(ri)
@@ -254,7 +280,11 @@ export async function parseCashFlowWorkbook(file, year) {
     const paid = (income || []).some((c) => Object.values(c.totals).some((t) => Math.abs(t[mi]) > 0.004))
     if (paid) {
       for (const r of rows.slice(0, 16)) {
-        for (const [lc, vc, category] of [[9, 10, 'Auto withdrawals'], [6, 7, 'Savings']]) {
+        const blocks: [number, number, string][] = [
+          [9, 10, 'Auto withdrawals'],
+          [6, 7, 'Savings']
+        ]
+        for (const [lc, vc, category] of blocks) {
           const label = String(r[lc] ?? '').trim()
           const amt = num(r[vc])
           if (label && !/total/i.test(label) && amt)
@@ -263,14 +293,14 @@ export async function parseCashFlowWorkbook(file, year) {
       }
     }
     heads.forEach((ri, hi) => {
-      const cat = findCat(rows[ri][0])
+      const cat = findCat(rows[ri][0])!
       const end = heads[hi + 1] ?? rows.length
       const cols = rows[ri].map((v, ci) => (ci >= 2 && v ? ci : -1)).filter((ci) => ci >= 0)
       const paired = cols.length < 2 || cols[1] - cols[0] === 2
       if (!paired) return // single-column header rows (rent, subscriptions, utilities) only carry totals
       cols.forEach((ci, k) => {
         const label = String(rows[ri][ci]).trim()
-        const sub = cat.subs.find((s) => norm(s) === norm(label)) || cat.subs[k] || cat.subs.at(-1)
+        const sub = cat.subs.find((s) => norm(s) === norm(label)) ?? cat.subs[k] ?? cat.subs.at(-1) ?? 'Other'
         for (let rr = ri + 2; rr < end; rr++) {
           const d = rows[rr]?.[ci]
           const amt = num(rows[rr]?.[ci + 1])
@@ -303,9 +333,9 @@ export async function parseCashFlowWorkbook(file, year) {
   }
   if (!income) problems.push('No “Income” tab found, so only expenses were read.')
 
-  const categories = [
-    ...expense.map((c) => ({ type: 'expense', name: c.name, subcategories: c.subs })),
-    ...(income || []).map((c) => ({ type: 'income', name: c.name, subcategories: c.subs }))
+  const categories: ParsedEntries['categories'] = [
+    ...expense.map((c) => ({ type: 'expense' as const, name: c.name, subcategories: c.subs })),
+    ...(income || []).map((c) => ({ type: 'income' as const, name: c.name, subcategories: c.subs }))
   ]
   return { entries, categories, problems }
 }
@@ -314,16 +344,22 @@ export async function parseCashFlowWorkbook(file, year) {
  * The "Net Worth Tracker" tab: one row of month-end dates, then account rows
  * (name in column C) under section headings in column B.
  */
-export async function parseNetWorthWorkbook(file) {
+export interface ParsedNetWorth {
+  accounts: { name: string; group: AccountGroup; values: Record<string, number> }[]
+  dates: string[]
+  problems: string[]
+}
+
+export async function parseNetWorthWorkbook(file: File): Promise<ParsedNetWorth> {
   const wb = await readWorkbook(file)
   const name = wb.SheetNames.find((n) => norm(n).includes('networth')) || wb.SheetNames[0]
-  const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null })
+  const rows = XLSX.utils.sheet_to_json<Cell[]>(wb.Sheets[name], { header: 1, raw: true, defval: null })
   const dateRowIdx = rows.findIndex((r) => r.filter((v) => v instanceof Date || (typeof v === 'string' && toIsoDate(v) && /\d/.test(v))).length >= 2)
-  if (dateRowIdx < 0) return { accounts: [], snapshots: [], problems: ['Could not find a row of dates.'] }
+  if (dateRowIdx < 0) return { accounts: [], dates: [], problems: ['Could not find a row of dates.'] }
   const dateCols = rows[dateRowIdx]
     .map((v, ci) => ({ ci, date: v instanceof Date || typeof v === 'string' ? toIsoDate(v) : null }))
-    .filter((d) => d.date && d.ci > 1)
-  const sectionGroup = (label) => {
+    .filter((d): d is { ci: number; date: string } => !!d.date && d.ci > 1)
+  const sectionGroup = (label: Cell): AccountGroup | null => {
     const l = norm(label)
     if (l.startsWith('cash')) return 'Cash'
     if (l.startsWith('invest')) return 'Investments'
@@ -331,8 +367,8 @@ export async function parseNetWorthWorkbook(file) {
     if (l.startsWith('debt')) return 'Debt'
     return null
   }
-  let group = 'Cash'
-  const accounts = []
+  let group: AccountGroup = 'Cash'
+  const accounts: ParsedNetWorth['accounts'] = []
   for (const r of rows.slice(dateRowIdx + 1)) {
     const g = sectionGroup(r[1])
     if (g) group = g

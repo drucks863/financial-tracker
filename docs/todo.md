@@ -13,6 +13,7 @@
 - [x] Data: import (entries CSV/XLSX, Cash Flow workbook layout, Net Worth tracker layout)
 - [x] Data: category manager (add, rename, remove, essential flag), subscriptions list
 - [x] Keep real numbers out of the public repo (local seed + generated sample seed)
+- [x] Convert the frontend to TypeScript (strict, vue-tsc type-check in the build)
 - [ ] Devin reviews the preview and sends tweaks
 
 ## Next

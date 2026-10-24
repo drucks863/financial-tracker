@@ -2,13 +2,14 @@
 // the real data, so the repo (which is public) never carries real finances.
 // Real data lives in src/data/seed.local.json, which is gitignored.
 import { writeFileSync } from 'node:fs'
+import type { Account, Category, Entry, EntryType, FinanceData, Snapshot, Subscription } from '../src/types.ts'
 
 let s = 42
 const rand = () => ((s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31)
-const between = (a, b) => Math.round((a + rand() * (b - a)) * 100) / 100
-const pad = (n) => String(n).padStart(2, '0')
+const between = (a: number, b: number): number => Math.round((a + rand() * (b - a)) * 100) / 100
+const pad = (n: number): string => String(n).padStart(2, '0')
 
-const categories = [
+const categories: Category[] = [
   { id: 'inc-wages', type: 'income', name: 'Wages', subcategories: ['Paycheck', 'Other'] },
   { id: 'inc-other', type: 'income', name: 'Other', subcategories: ['Gifts', 'Refunds', 'Other'] },
   { id: 'exp-entertainment', type: 'expense', name: 'Entertainment', essential: false, subcategories: ['Entertainment', 'Hobby/Toys'] },
@@ -29,7 +30,7 @@ const categories = [
 ]
 
 // [category, subcategory, description pool, min, max, times per month]
-const SPEND = [
+const SPEND: [category: string, subcategory: string, descriptions: string[], min: number, max: number, perMonth: number][] = [
   ['Food', 'Groceries', ['Grocery store', 'Farmers market', 'Warehouse club'], 40, 140, 4],
   ['Food', 'Restaurants', ['Taco place', 'Coffee shop', 'Pizza', 'Burger joint', 'Sushi'], 12, 70, 6],
   ['Entertainment', 'Entertainment', ['Movie tickets', 'Concert', 'Mini golf'], 15, 90, 1],
@@ -44,15 +45,15 @@ const SPEND = [
   ['Gifts', 'Gifts', ['Birthday gift', 'Thank-you gift'], 20, 80, 1]
 ]
 
-const entries = []
+const entries: Entry[] = []
 let id = 0
-const add = (date, type, category, subcategory, description, amount) =>
+const add = (date: string, type: EntryType, category: string, subcategory: string, description: string, amount: number) =>
   entries.push({ id: `e${++id}`, date, type, category, subcategory, description, amount })
 
 const YEAR = 2026
 for (let m = 1; m <= 10; m++) {
   const ym = `${YEAR}-${pad(m)}`
-  const day = (d) => `${ym}-${pad(d)}`
+  const day = (d: number) => `${ym}-${pad(d)}`
   add(day(1), 'income', 'Wages', 'Paycheck', 'Paycheck', 2600)
   add(day(15), 'income', 'Wages', 'Paycheck', 'Paycheck', 2600)
   if (m % 4 === 0) add(day(20), 'income', 'Other', 'Refunds', 'Store refund', between(20, 90))
@@ -75,7 +76,7 @@ for (let m = 1; m <= 10; m++) {
   if (m % 3 === 0) add(day(25), 'savings', 'Savings', 'HYSA', '', 500)
 }
 
-const accounts = [
+const accounts: Account[] = [
   { id: 'checking', name: 'Checking', group: 'Cash' },
   { id: 'savings', name: 'Savings', group: 'Cash' },
   { id: 'hysa', name: 'HYSA', group: 'Cash' },
@@ -84,8 +85,8 @@ const accounts = [
   { id: '401k', name: '401k', group: 'Investments' },
   { id: 'hsa', name: 'HSA', group: 'Investments' }
 ]
-const snapshots = []
-const start = { checking: 2500, savings: 4000, hysa: 8000, brokerage: 20000, 'roth-ira': 25000, '401k': 18000, hsa: 3000 }
+const snapshots: Snapshot[] = []
+const start: Record<string, number> = { checking: 2500, savings: 4000, hysa: 8000, brokerage: 20000, 'roth-ira': 25000, '401k': 18000, hsa: 3000 }
 for (let i = 0; i < 24; i++) {
   const y = 2024 + Math.floor((9 + i) / 12)
   const mo = ((9 + i) % 12) + 1
@@ -97,7 +98,7 @@ for (let i = 0; i < 24; i++) {
   snapshots.push({ date: `${y}-${pad(mo)}-${pad(last)}`, values })
 }
 
-const subscriptions = [
+const subscriptions: Subscription[] = [
   { service: 'Music streaming', price: 11, category: 'Discretionary', frequency: 'Monthly', when: '27th', from: 'Credit Card' },
   { service: 'Gym', price: 25, category: 'Discretionary', frequency: 'Monthly', when: '18th', from: 'Credit Card' },
   { service: 'TV streaming', price: 18, category: 'Discretionary', frequency: 'Monthly', when: '28th', from: 'Credit Card' },
@@ -106,6 +107,6 @@ const subscriptions = [
 
 writeFileSync(
   new URL('../src/data/seed.sample.json', import.meta.url),
-  JSON.stringify({ version: 1, sample: true, categories, entries, netWorth: { accounts, snapshots }, subscriptions })
+  JSON.stringify({ version: 1, sample: true, categories, entries, netWorth: { accounts, snapshots }, subscriptions } satisfies FinanceData)
 )
 console.log(`sample seed: ${entries.length} entries, ${snapshots.length} snapshots`)

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
@@ -11,29 +11,41 @@ import { useToast } from 'primevue/usetoast'
 import { ui, selectedYm } from '../store/ui'
 import { categoriesOf, findCategory, saveEntry, deleteEntry, addSubcategory, addCategory } from '../store/finance'
 import { money2 } from '../lib/format'
+import type { EntryType } from '../types'
 
 const toast = useToast()
-const TYPES = [
+const TYPES: { label: string; value: EntryType }[] = [
   { label: 'Expense', value: 'expense' },
   { label: 'Income', value: 'income' },
   { label: 'Savings', value: 'savings' }
 ]
 
-const form = reactive({ id: null, type: 'expense', date: null, category: null, subcategory: null, description: '', amount: null })
-const errors = reactive({})
-const adding = ref(null) // 'category' | 'subcategory' | null
+interface EntryForm {
+  id: string | null
+  type: EntryType
+  date: Date | null
+  category: string | null
+  subcategory: string | null
+  description: string
+  amount: number | null
+}
+type Field = 'date' | 'category' | 'subcategory' | 'amount'
+
+const form = reactive<EntryForm>({ id: null, type: 'expense', date: null, category: null, subcategory: null, description: '', amount: null })
+const errors = reactive<Partial<Record<Field, string>>>({})
+const adding = ref<'category' | 'subcategory' | null>(null)
 const newName = ref('')
 
 const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 
-function toDate(iso) {
+function toDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
-function toIso(d) {
+function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-function defaultDate() {
+function defaultDate(): Date {
   const today = new Date()
   const ym = selectedYm.value
   if (toIso(today).startsWith(ym)) return today
@@ -45,7 +57,7 @@ watch(
   (open) => {
     if (!open) return
     const e = ui.entryDialog.entry
-    Object.keys(errors).forEach((k) => delete errors[k])
+    clearErrors()
     adding.value = null
     if (e) Object.assign(form, { ...e, date: toDate(e.date) })
     else Object.assign(form, { id: null, type: form.type || 'expense', date: defaultDate(), category: null, subcategory: null, description: '', amount: null })
@@ -58,17 +70,17 @@ const subOptions = computed(() => findCategory(form.type, form.category)?.subcat
 watch(
   () => form.type,
   () => {
-    if (!categoryOptions.value.includes(form.category)) form.category = null
+    if (form.category && !categoryOptions.value.includes(form.category)) form.category = null
   }
 )
 watch(
   () => form.category,
   () => {
-    if (!subOptions.value.includes(form.subcategory)) form.subcategory = subOptions.value.length === 1 ? subOptions.value[0] : null
+    if (!form.subcategory || !subOptions.value.includes(form.subcategory)) form.subcategory = subOptions.value.length === 1 ? subOptions.value[0] : null
   }
 )
 
-function startAdd(kind) {
+function startAdd(kind: 'category' | 'subcategory'): void {
   adding.value = kind
   newName.value = ''
 }
@@ -88,8 +100,12 @@ function confirmAdd() {
   adding.value = null
 }
 
-function validate() {
-  Object.keys(errors).forEach((k) => delete errors[k])
+function clearErrors(): void {
+  for (const k of Object.keys(errors) as Field[]) delete errors[k]
+}
+
+function validate(): boolean {
+  clearErrors()
   if (!form.date) errors.date = 'Pick a date'
   if (!form.category) errors.category = 'Pick a category'
   if (!form.subcategory) errors.subcategory = 'Pick a subcategory'
@@ -97,9 +113,17 @@ function validate() {
   return !Object.keys(errors).length
 }
 
-function save(another = false) {
-  if (!validate()) return
-  const saved = saveEntry({ ...form, date: toIso(form.date), description: form.description.trim() })
+function save(another = false): void {
+  if (!validate() || !form.date || !form.category || !form.subcategory || form.amount === null) return
+  const saved = saveEntry({
+    id: form.id,
+    type: form.type,
+    date: toIso(form.date),
+    category: form.category,
+    subcategory: form.subcategory,
+    description: form.description.trim(),
+    amount: form.amount
+  })
   toast.add({ severity: 'success', summary: form.id ? 'Entry updated' : 'Entry added', detail: `${saved.subcategory} · ${money2(saved.amount)}`, life: 2200 })
   // jump the month strip to where the entry landed
   ui.year = +saved.date.slice(0, 4)
@@ -110,8 +134,8 @@ function save(another = false) {
 
 const confirmingDelete = ref(false)
 watch(() => ui.entryDialog.open, () => (confirmingDelete.value = false))
-function remove() {
-  deleteEntry(form.id)
+function remove(): void {
+  if (form.id) deleteEntry(form.id)
   toast.add({ severity: 'info', summary: 'Entry deleted', life: 2000 })
   ui.entryDialog.open = false
 }

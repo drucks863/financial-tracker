@@ -6,11 +6,11 @@ const DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', 
 export const OTHER_LIGHT = '#a3a29c'
 export const OTHER_DARK = '#6b6a65'
 
-export const series = (i, dark) => (dark ? DARK : LIGHT)[i % 8]
-export const otherColor = (dark) => (dark ? OTHER_DARK : OTHER_LIGHT)
+export const series = (i: number, dark: boolean): string => (dark ? DARK : LIGHT)[i % 8]
+export const otherColor = (dark: boolean): string => (dark ? OTHER_DARK : OTHER_LIGHT)
 
 // Fixed roles used across the app.
-export const ROLE = {
+export const ROLE: Record<'income' | 'expense' | 'cash' | 'investments' | 'other' | 'debt', number> = {
   income: 0, // blue
   expense: 1, // orange
   cash: 2, // aqua
@@ -19,15 +19,16 @@ export const ROLE = {
   debt: 7 // red
 }
 
-// Top N categories by total keep their own slot; everything else folds into "Other".
-export function foldCategories(totals, n = 7) {
-  const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1])
-  const top = sorted.slice(0, n)
-  const rest = sorted.slice(n)
-  return { top: top.map(([k]) => k), restNames: rest.map(([k]) => k) }
+export interface ChartChrome {
+  ink: string
+  ink2: string
+  muted: string
+  grid: string
+  axis: string
+  surface: string
 }
 
-export function chrome(dark) {
+export function chrome(dark: boolean): ChartChrome {
   return dark
     ? { ink: '#f0efec', ink2: '#c3c2b7', muted: '#9a998f', grid: '#2c2c2a', axis: '#383835', surface: '#0f172a' }
     : { ink: '#0b0b0b', ink2: '#52514e', muted: '#7a7973', grid: '#e9e8e3', axis: '#c3c2b7', surface: '#ffffff' }

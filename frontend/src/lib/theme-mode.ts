@@ -5,7 +5,7 @@ export const isDark = ref(false)
 
 // Dark when <html data-theme="dark">, light when data-theme="light",
 // otherwise follow the OS. PrimeVue reads the `.app-dark` class.
-export function syncDarkMode() {
+export function syncDarkMode(): void {
   const root = document.documentElement
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
   const apply = () => {

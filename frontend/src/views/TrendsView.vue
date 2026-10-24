@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
@@ -8,6 +8,8 @@ import { monthTotals, avgNonZero, yearGrid, yearsAvailable, categoriesOf } from 
 import { money, signedMoney, pct, MONTHS } from '../lib/format'
 import { series, otherColor, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
+import type { ChartBuilder } from '../lib/chart-types'
+import type { EntryType } from '../types'
 
 const years = computed(() => yearsAvailable().map((y) => ({ label: String(y), value: y })))
 const rows = computed(() => monthTotals(ui.year))
@@ -31,7 +33,7 @@ const stats = computed(() => {
 })
 
 /* ---- stacked spending by category ---- */
-const stacked = computed(() => {
+const stacked = computed<ChartBuilder>(() => {
   const grid = yearGrid('expense', ui.year)
   const top = categoryRank.value.slice(0, 7)
   const rest = Object.keys(grid).filter((n) => !top.includes(n))
@@ -46,7 +48,7 @@ const stacked = computed(() => {
           backgroundColor: series(i, dark),
           borderColor: dark ? '#0f172a' : '#ffffff',
           borderWidth: { top: 2 },
-          borderSkipped: 'start'
+          borderSkipped: 'start' as const
         })),
         {
           label: 'Other',
@@ -55,7 +57,7 @@ const stacked = computed(() => {
           borderColor: dark ? '#0f172a' : '#ffffff',
           borderWidth: { top: 2 },
           borderRadius: { topLeft: 4, topRight: 4 },
-          borderSkipped: 'start'
+          borderSkipped: 'start' as const
         }
       ]
     },
@@ -70,10 +72,10 @@ const stackedLegend = computed(() => [...categoryRank.value.slice(0, 7).map((n, 
 const otherNames = computed(() => categoryRank.value.slice(7).join(', '))
 
 /* ---- one category over time ---- */
-const trendType = ref('expense')
-const trendCat = ref(null)
+const trendType = ref<EntryType>('expense')
+const trendCat = ref<string | null>(null)
 const trendOptions = computed(() => categoriesOf(trendType.value).map((c) => c.name))
-const trendName = computed(() => (trendOptions.value.includes(trendCat.value) ? trendCat.value : trendOptions.value[0]))
+const trendName = computed<string>(() => (trendCat.value && trendOptions.value.includes(trendCat.value) ? trendCat.value : (trendOptions.value[0] ?? '')))
 const trend = computed(() => {
   const grid = yearGrid(trendType.value, ui.year)
   const name = trendName.value
@@ -83,7 +85,7 @@ const trend = computed(() => {
   return {
     average,
     total: data.reduce((a, b) => a + b, 0),
-    build: (dark, c) => ({
+    build: ((dark, c) => ({
       type: 'bar',
       data: {
         labels: MONTHS,
@@ -110,18 +112,18 @@ const trend = computed(() => {
           }
         ]
       }
-    })
+    })) satisfies ChartBuilder
   }
 })
 
 /* ---- sheet-style year grid ---- */
-const gridType = ref('expense')
-const expanded = reactive({})
+const gridType = ref<EntryType>('expense')
+const expanded = reactive<Record<string, boolean>>({})
 const grid = computed(() => {
   const g = yearGrid(gridType.value, ui.year)
   const order = categoriesOf(gridType.value).map((c) => c.name)
   const names = Object.keys(g).sort((a, b) => order.indexOf(a) - order.indexOf(b))
-  const row = (label, months) => ({ label, months, total: months.reduce((a, b) => a + b, 0), avg: avgNonZero(months) })
+  const row = (label: string, months: number[]) => ({ label, months, total: months.reduce((a, b) => a + b, 0), avg: avgNonZero(months) })
   const cats = names.map((n) => ({
     ...row(n, g[n].months),
     subs: Object.entries(g[n].subs).map(([s, months]) => row(s, months))
@@ -129,7 +131,7 @@ const grid = computed(() => {
   const totalMonths = MONTHS.map((_, m) => cats.reduce((a, c) => a + c.months[m], 0))
   return { cats, total: row('Monthly totals', totalMonths) }
 })
-const cell = (v) => (Math.abs(v) < 0.005 ? '' : money(v))
+const cell = (v: number): string => (Math.abs(v) < 0.005 ? '' : money(v))
 const allExpanded = computed(() => grid.value.cats.every((c) => expanded[c.label]))
 function toggleAll() {
   const to = !allExpanded.value
@@ -145,7 +147,7 @@ const yoy = computed(() => {
   })
   return {
     count: ys.length,
-    build: (dark) => ({
+    build: ((dark) => ({
       type: 'bar',
       data: {
         labels: data.map((d) => String(d.y)),
@@ -154,7 +156,7 @@ const yoy = computed(() => {
           { label: 'Avg monthly expenses', data: data.map((d) => d.expense), backgroundColor: series(ROLE.expense, dark), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 48 }
         ]
       }
-    })
+    })) satisfies ChartBuilder
   }
 })
 </script>

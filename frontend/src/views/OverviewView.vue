@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import Button from 'primevue/button'
 import MonthStrip from '../components/MonthStrip.vue'
@@ -8,8 +8,10 @@ import { state, monthTotals, avgNonZero, categoryTotals, netWorthSeries, categor
 import { money, signedMoney, pct, MONTHS, monthLabel, shortDate } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
+import type { ChartBuilder } from '../lib/chart-types'
+import type { Entry } from '../types'
 
-const emit = defineEmits(['navigate'])
+const emit = defineEmits<{ navigate: [view: string] }>()
 
 const year = computed(() => monthTotals(ui.year))
 const m = computed(() => year.value[ui.month])
@@ -26,16 +28,20 @@ const spend = computed(() => {
     .map(([name, v]) => ({ name, total: v.total }))
     .filter((c) => c.total > 0)
     .sort((a, b) => b.total - a.total)
+    .map((c) => {
+      const avg = catAvg.value[c.name] || 0
+      return { ...c, avg, delta: avg ? c.total - avg : null }
+    })
 })
 
 const catAvg = computed(() => {
-  const out = {}
+  const out: Record<string, number> = {}
   const yr = String(ui.year)
-  const totals = {}
+  const totals: Record<string, number[]> = {}
   for (const e of state.entries) {
     if (e.type !== 'expense' || !e.date.startsWith(yr)) continue
     const k = e.category
-    ;(totals[k] ||= Array(12).fill(0))[+e.date.slice(5, 7) - 1] += e.amount
+    ;(totals[k] ??= Array<number>(12).fill(0))[+e.date.slice(5, 7) - 1] += e.amount
   }
   for (const [k, arr] of Object.entries(totals)) out[k] = avgNonZero(arr)
   return out
@@ -46,7 +52,7 @@ const saved = computed(() => {
   const yr = String(ui.year)
   return categoriesOf('savings').flatMap((cat) =>
     cat.subcategories.map((sub) => {
-      const match = (e) => e.type === 'savings' && e.category === cat.name && e.subcategory === sub
+      const match = (e: Entry) => e.type === 'savings' && e.category === cat.name && e.subcategory === sub
       return {
         name: sub,
         group: cat.name,
@@ -62,7 +68,7 @@ const nw = computed(() => netWorthSeries())
 const nwLast = computed(() => nw.value.at(-1))
 const nwPrev = computed(() => nw.value.at(-2))
 
-const flowChart = computed(() => {
+const flowChart = computed<ChartBuilder>(() => {
   const rows = year.value
   return (dark, c) => ({
     type: 'bar',
@@ -111,9 +117,9 @@ const flowChart = computed(() => {
   })
 })
 
-const donut = computed(() => {
+const donut = computed<ChartBuilder>(() => {
   const items = spend.value
-  const rank = categoryRank.value
+  void categoryRank.value // recolor when the ranking changes
   return (dark, c) => ({
     type: 'doughnut',
     data: {
@@ -132,15 +138,14 @@ const donut = computed(() => {
     options: {
       cutout: '68%',
       interaction: { mode: 'nearest', intersect: true },
-      plugins: { tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${money(ctx.parsed)}` } } }
-    },
-    _rank: rank
+      plugins: { tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${money(Number(ctx.parsed))}` } } }
+    }
   })
 })
 
-const nwSpark = computed(() => {
+const nwSpark = computed<ChartBuilder>(() => {
   const s = nw.value
-  return (dark, c) => ({
+  return (dark) => ({
     type: 'line',
     data: {
       labels: s.map((p) => shortDate(p.date)),
@@ -164,11 +169,6 @@ const nwSpark = computed(() => {
     }
   })
 })
-
-function deltaVsAvg(value, average) {
-  if (!average) return null
-  return value - average
-}
 </script>
 
 <template>
@@ -252,10 +252,10 @@ function deltaVsAvg(value, average) {
               <span class="swatch" :style="{ background: categoryColor(c.name, isDark) }" :data-cat="c.name"></span>
               <span class="cat-name">{{ c.name }}</span>
               <span class="num amt">{{ money(c.total) }}</span>
-              <span v-if="deltaVsAvg(c.total, catAvg[c.name]) !== null" class="delta num" :title="`Monthly average ${money(catAvg[c.name])}`">
-                <i class="pi" :class="c.total >= catAvg[c.name] ? 'pi-arrow-up' : 'pi-arrow-down'" aria-hidden="true"></i>
-                {{ money(Math.abs(deltaVsAvg(c.total, catAvg[c.name]))) }}
-                <span class="sr-only">{{ c.total >= catAvg[c.name] ? 'above' : 'below' }} average</span>
+              <span v-if="c.delta !== null" class="delta num" :title="`Monthly average ${money(c.avg)}`">
+                <i class="pi" :class="c.delta >= 0 ? 'pi-arrow-up' : 'pi-arrow-down'" aria-hidden="true"></i>
+                {{ money(Math.abs(c.delta)) }}
+                <span class="sr-only">{{ c.delta >= 0 ? 'above' : 'below' }} average</span>
               </span>
             </li>
           </ul>

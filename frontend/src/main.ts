@@ -1,8 +1,6 @@
 import { createApp } from 'vue'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
-import ConfirmationService from 'primevue/confirmationservice'
-import Tooltip from 'primevue/tooltip'
 import 'primeicons/primeicons.css'
 import './style.css'
 import App from './App.vue'
@@ -14,6 +12,4 @@ syncDarkMode()
 createApp(App)
   .use(PrimeVue, { theme: { preset: FinancePreset, options: { darkModeSelector: '.app-dark', cssLayer: false } } })
   .use(ToastService)
-  .use(ConfirmationService)
-  .directive('tooltip', Tooltip)
   .mount('#app')

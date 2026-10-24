@@ -4,7 +4,7 @@ import Aura from '@primeuix/themes/aura'
 // Aura with a spruce (blue-green) primary and slate surfaces.
 // Dark mode is driven by the `.app-dark` class on <html>, which main.js keeps in
 // sync with the OS setting and any explicit data-theme attribute.
-const ramp = (name) =>
+const ramp = (name: string): Record<number, string> =>
   Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((s) => [s, `{${name}.${s}}`]))
 
 export const FinancePreset = definePreset(Aura, {
