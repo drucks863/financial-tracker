@@ -26,6 +26,10 @@ monthly and yearly averages, and net worth.
 - **Monorepo.** The Vue UI gets bundled into the Spring Boot jar for deployment, but must
   also run on its own locally (`npm run dev` in `frontend/`, proxying `/api` to `localhost:8080`).
 
+## Git
+
+- Branch names are short and descriptive (e.g. `initial-backend`), with no `claude/` prefix (Devin, 2026-10-24).
+
 ## Repo layout
 
 ```
