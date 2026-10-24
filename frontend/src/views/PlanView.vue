@@ -91,6 +91,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 <template>
   <div class="stack">
     <header class="page-head">
+      <h1 class="sr-only">Financial profile</h1>
       <div class="who">
         <span class="avatar-lg" aria-hidden="true">
           <template v-if="initials">{{ initials }}</template>
@@ -101,7 +102,6 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
           <small class="muted">Your Google name and photo will show here once sign-in is added.</small>
         </div>
       </div>
-      <h1>Financial profile</h1>
     </header>
 
     <div ref="tabsEl" class="tabs-wrap">
@@ -338,17 +338,24 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 </template>
 
 <style scoped>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .tabs-wrap {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  margin-top: -6px;
+  gap: 12px;
 }
 .tabs-wrap :deep(.p-tablist-tab-list) {
   background: transparent;
 }
 .tabs-wrap :deep(.p-tab) {
-  padding: 10px 14px;
+  padding: 14px 16px;
   font-size: 0.9rem;
   white-space: nowrap;
 }
@@ -366,9 +373,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
   align-items: center;
   gap: 14px;
   width: 100%;
-  padding-bottom: 20px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
 }
 .who-text {
   display: grid;
