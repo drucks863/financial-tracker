@@ -1,20 +1,25 @@
 package app.financetracker.web
 
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
-import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ApiTest(@Autowired val mvc: MockMvc) {
+    // Each test starts from the seed; resetting is much cheaper than a fresh Spring context per test.
+    @BeforeEach
+    fun reset() {
+        mvc.post("/api/data/reset").andExpect { status { isOk() } }
+    }
 
     @Test
     fun `serves the sample data in the frontend's shape`() {
@@ -47,6 +52,16 @@ class ApiTest(@Autowired val mvc: MockMvc) {
         val body = """{"id":"","date":"March 4","type":"expense","category":"Food","subcategory":"Groceries","description":"","amount":1}"""
         mvc.put("/api/entries/x") { contentType = MediaType.APPLICATION_JSON; content = body }.andExpect { status { isBadRequest() } }
         mvc.get("/api/entries?month=3").andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `renames a subcategory whose name has a slash`() {
+        val body = """{"name":"Hobbies/Toys"}"""
+        mvc.put("/api/categories/exp-entertainment/subcategories?name={n}", "Hobby/Toys") { contentType = MediaType.APPLICATION_JSON; content = body }
+            .andExpect { status { isOk() } }
+        mvc.put("/api/categories/exp-entertainment/subcategories?name={n}", "Hobbies/Toys") { contentType = MediaType.APPLICATION_JSON; content = """{"name":"Spare/Unused"}""" }
+            .andExpect { status { isOk() } }
+        mvc.get("/api/categories").andExpect { jsonPath("$[?(@.id == 'exp-entertainment')].subcategories[*]") { value(org.hamcrest.Matchers.hasItem("Spare/Unused")) } }
     }
 
     @Test

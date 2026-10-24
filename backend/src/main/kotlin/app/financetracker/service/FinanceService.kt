@@ -17,6 +17,7 @@ import app.financetracker.repo.normalize
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.LocalDate
 import java.util.UUID
 
 fun newId(prefix: String) = prefix + UUID.randomUUID().toString().replace("-", "").take(12)
@@ -26,6 +27,9 @@ private fun notFound(msg: String): Nothing = throw ResponseStatusException(HttpS
 private fun bad(msg: String): Nothing = throw ResponseStatusException(HttpStatus.BAD_REQUEST, msg)
 
 private val DATE = Regex("""^\d{4}-\d{2}-\d{2}$""")
+
+/** YYYY-MM-DD and a real calendar date (no month 13 or February 30). */
+private fun isDate(s: String) = DATE.matches(s) && runCatching { LocalDate.parse(s) }.isSuccess
 
 /** Partial update of a category; null fields are left as they are. */
 data class CategoryPatch(val name: String? = null, val essential: Boolean? = null)
@@ -74,6 +78,7 @@ class FinanceService(private val repo: FinanceRepository, private val seed: Seed
     fun saveCategory(u: String, c: Category): Category {
         val name = c.name.trim().ifEmpty { bad("Category needs a name") }
         val existing = repo.categories(u).find { it.id == c.id }
+        if (existing != null && existing.type != c.type) bad("A category's type can't change")
         if (existing != null && existing.name != name) bad("Rename ${existing.name} with PATCH so entries follow")
         if (existing == null && findCategory(u, c.type, name) != null) conflict("$name already exists")
         existing?.subcategories?.filter { it !in c.subcategories }?.forEach { requireUnused(u, existing, it) }
@@ -158,7 +163,7 @@ class FinanceService(private val repo: FinanceRepository, private val seed: Seed
     }
 
     private fun validate(e: Entry) {
-        if (!DATE.matches(e.date)) bad("Date must be YYYY-MM-DD, got ${e.date}")
+        if (!isDate(e.date)) bad("Date must be YYYY-MM-DD, got ${e.date}")
         if (!e.amount.isFinite()) bad("Amount must be a number")
         if (e.category.isBlank()) bad("Entry needs a category")
     }
@@ -180,7 +185,7 @@ class FinanceService(private val repo: FinanceRepository, private val seed: Seed
             val months = imp.entries.map { it.month }.toSet()
             repo.deleteEntries(u, repo.entries(u).filter { it.month in months }.map { it.id })
         }
-        val entries = imp.entries.map { it.copy(id = newId("e")) }
+        val entries = imp.entries.map { it.copy(id = newId("e"), category = it.category.trim(), subcategory = it.subcategory.trim(), description = it.description.trim()) }
         entries.forEach { ensureCategory(u, it.type, it.category, it.subcategory) }
         repo.saveEntries(u, entries)
         return entries.size
@@ -203,7 +208,7 @@ class FinanceService(private val repo: FinanceRepository, private val seed: Seed
     }
 
     fun saveSnapshot(u: String, s: Snapshot): Snapshot {
-        if (!DATE.matches(s.date)) bad("Date must be YYYY-MM-DD, got ${s.date}")
+        if (!isDate(s.date)) bad("Date must be YYYY-MM-DD, got ${s.date}")
         val known = repo.accounts(u).map { it.id }.toSet()
         val unknown = s.values.keys - known
         if (unknown.isNotEmpty()) bad("Unknown accounts: ${unknown.joinToString()}")
@@ -215,10 +220,13 @@ class FinanceService(private val repo: FinanceRepository, private val seed: Seed
 
     /** Accounts matched by name (case-insensitive), created when new, and their month-end balances merged in. */
     fun importNetWorth(u: String, accounts: List<AccountImport>): NetWorth {
-        val existing = repo.accounts(u)
+        // check every date first so a bad one doesn't leave half-created accounts behind
+        accounts.flatMap { it.values.keys }.find { !isDate(it) }?.let { bad("Date must be YYYY-MM-DD, got $it") }
+        val existing = repo.accounts(u).toMutableList()
         val snapshots = repo.snapshots(u).associateBy { it.date }.toMutableMap()
         for (a in accounts) {
-            val acct = existing.find { it.name.equals(a.name, ignoreCase = true) } ?: saveAccount(u, Account("", a.name, a.group))
+            val acct = existing.find { it.name.equals(a.name.trim(), ignoreCase = true) }
+                ?: saveAccount(u, Account("", a.name, a.group)).also { existing += it }
             for ((date, v) in a.values) {
                 val s = snapshots[date] ?: Snapshot(date, emptyMap())
                 snapshots[date] = s.copy(values = s.values + (acct.id to v))

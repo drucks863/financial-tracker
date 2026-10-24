@@ -59,11 +59,13 @@ class CategoryController(private val svc: FinanceService, private val user: Curr
     @PostMapping("/{id}/subcategories")
     fun addSub(@PathVariable id: String, @RequestBody b: NameBody) = svc.addSubcategory(user.id(), id, b.name)
 
-    @PutMapping("/{id}/subcategories/{sub}")
-    fun renameSub(@PathVariable id: String, @PathVariable sub: String, @RequestBody b: NameBody) = svc.renameSubcategory(user.id(), id, sub, b.name)
+    // The subcategory goes in `?name=` rather than the path: names like "Hobby/Toys" would need an
+    // encoded slash (%2F), which Tomcat rejects.
+    @PutMapping("/{id}/subcategories")
+    fun renameSub(@PathVariable id: String, @RequestParam name: String, @RequestBody b: NameBody) = svc.renameSubcategory(user.id(), id, name, b.name)
 
-    @DeleteMapping("/{id}/subcategories/{sub}")
-    fun removeSub(@PathVariable id: String, @PathVariable sub: String) = svc.removeSubcategory(user.id(), id, sub)
+    @DeleteMapping("/{id}/subcategories")
+    fun removeSub(@PathVariable id: String, @RequestParam name: String) = svc.removeSubcategory(user.id(), id, name)
 }
 
 data class ImportResult(val imported: Int)

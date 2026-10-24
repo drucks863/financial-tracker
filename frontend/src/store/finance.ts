@@ -29,8 +29,15 @@ const validPlan = (p: unknown): p is Plan => {
 }
 const withPlan = (d: FinanceData): FinanceData => {
   const plan = validPlan(d.plan) ? d.plan : validPlan(seed.plan) ? clone(seed.plan) : emptyPlan()
-  // subscriptions from older data have no ids
-  const subscriptions = d.subscriptions.map((s, i) => (s.id ? s : { ...s, id: `s${i + 1}` }))
+  // subscriptions from older data have no ids; skip ids already taken
+  const taken = new Set(d.subscriptions.map((s) => s.id).filter(Boolean))
+  let next = 1
+  const freeId = () => {
+    while (taken.has(`s${next}`)) next++
+    taken.add(`s${next}`)
+    return `s${next}`
+  }
+  const subscriptions = d.subscriptions.map((s) => (s.id ? s : { ...s, id: freeId() }))
   return { ...d, subscriptions, plan: { ...plan, loans: plan.loans ?? [] } }
 }
 
@@ -62,6 +69,27 @@ watch(
   { deep: true }
 )
 
+// A cleared number field (PrimeVue InputNumber) leaves null in the plan; the API's numbers aren't
+// nullable (only takeHome is), so send those as 0 instead of failing every save.
+const n0 = (v: number | null | undefined): number => v ?? 0
+export const planForApi = (p: Plan): Plan => ({
+  ...p,
+  salary: n0(p.salary),
+  taxRate: n0(p.taxRate),
+  k401: n0(p.k401),
+  match: n0(p.match),
+  deductions: p.deductions.map((d) => ({ ...d, perPaycheck: n0(d.perPaycheck) })),
+  housing: p.housing.map((h) => ({ ...h, monthly: n0(h.monthly), share: n0(h.share) })),
+  loans: (p.loans ?? []).map((l) => ({
+    ...l,
+    amount: n0(l.amount),
+    rate: n0(l.rate),
+    termYears: n0(l.termYears),
+    extraMonthly: n0(l.extraMonthly),
+    property: l.property ? { ...l.property, value: n0(l.property.value), yearlyChange: n0(l.property.yearlyChange) } : null
+  }))
+})
+
 /**
  * Load from the API when it's there. Called once before the app mounts; afterwards every change
  * is sent to the server, and the budget setup (edited in place by its form) is saved shortly
@@ -77,7 +105,7 @@ export async function initStore(): Promise<void> {
     () => state.plan,
     () => {
       clearTimeout(timer)
-      timer = setTimeout(() => send('PUT', '/plan', state.plan), 600)
+      timer = setTimeout(() => send('PUT', '/plan', planForApi(state.plan!)), 600)
     },
     { deep: true }
   )
@@ -97,7 +125,7 @@ export function bulkChange(fn: () => void): void {
   } finally {
     quiet = false
   }
-  void send('PUT', '/data', state)
+  void send('PUT', '/data', { ...state, plan: state.plan && planForApi(state.plan) })
 }
 
 export function resetToSheetData(): void {
@@ -166,7 +194,7 @@ export function renameSubcategory(cat: Category, oldName: string, newName: strin
   state.entries.forEach((e) => {
     if (e.type === cat.type && e.category === cat.name && e.subcategory === oldName) e.subcategory = newName
   })
-  push('PUT', `/categories/${enc(cat.id)}/subcategories/${enc(oldName)}`, { name: newName })
+  push('PUT', `/categories/${enc(cat.id)}/subcategories?name=${enc(oldName)}`, { name: newName })
   return true
 }
 
@@ -176,7 +204,7 @@ export const entriesUsing = (cat: Category, sub?: string): number =>
 export function removeSubcategory(cat: Category, sub: string): boolean {
   if (entriesUsing(cat, sub)) return false
   cat.subcategories = cat.subcategories.filter((s) => s !== sub)
-  push('DELETE', `/categories/${enc(cat.id)}/subcategories/${enc(sub)}`)
+  push('DELETE', `/categories/${enc(cat.id)}/subcategories?name=${enc(sub)}`)
   return true
 }
 

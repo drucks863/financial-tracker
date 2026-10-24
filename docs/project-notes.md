@@ -64,7 +64,7 @@ docs/       these notes, the todo list, architecture
 | | |
 |---|---|
 | `GET /data`, `PUT /data`, `POST /data/reset` | whole document (startup load, bulk import, reset to seed) |
-| `/categories` | `GET`, `POST`, `PUT /{id}`, `PATCH /{id}` (name, essential; rename cascades), `DELETE /{id}` (409 in use), `POST /{id}/subcategories`, `PUT`/`DELETE /{id}/subcategories/{name}` |
+| `/categories` | `GET`, `POST`, `PUT /{id}`, `PATCH /{id}` (name, essential; rename cascades), `DELETE /{id}` (409 in use), `POST /{id}/subcategories`, `PUT`/`DELETE /{id}/subcategories?name=` |
 | `/entries` | `GET ?year=&month=`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /import` (`replaceMonths`) |
 | `/net-worth` | `GET`, `GET /series`, `PUT`/`DELETE /accounts/{id}`, `PUT`/`DELETE /snapshots/{date}`, `POST /import` |
 | `/subscriptions` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |

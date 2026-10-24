@@ -107,6 +107,18 @@ class FinanceServiceTest {
     }
 
     @Test
+    fun `impossible dates are rejected`() {
+        assertThrows<ResponseStatusException> { svc.saveEntry(u, Entry("", "2026-13-01", EntryType.EXPENSE, "Food", "Groceries", "x", 1.0)) }
+        assertThrows<ResponseStatusException> { svc.saveEntry(u, Entry("", "2026-02-30", EntryType.EXPENSE, "Food", "Groceries", "x", 1.0)) }
+    }
+
+    @Test
+    fun `net worth import with a bad date creates nothing`() {
+        assertThrows<ResponseStatusException> { svc.importNetWorth(u, listOf(AccountImport("Brokerage", AccountGroup.INVESTMENTS, mapOf("2026-02-31" to 1.0)))) }
+        assertEquals(1, svc.netWorth(u).accounts.size)
+    }
+
+    @Test
     fun `reset goes back to the seed`() {
         svc.deleteEntry(u, "e1")
         svc.reset(u)

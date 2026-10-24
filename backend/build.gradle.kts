@@ -53,7 +53,7 @@ val npmBuild by tasks.registering(Exec::class) {
     // `build:server` always bundles the sample seed, never seed.local.json
     commandLine("npm", "run", "build:server")
     inputs.dir(frontendDir.dir("src"))
-    inputs.files(frontendDir.files("index.html", "vite.config.ts", "package.json"))
+    inputs.files(frontendDir.files("index.html", "vite.config.ts", "package.json", "tsconfig.json", "tsconfig.app.json", "tsconfig.node.json"))
     outputs.dir(frontendDir.dir("dist"))
 }
 

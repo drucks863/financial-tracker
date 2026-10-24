@@ -28,8 +28,16 @@ class RepositoryConfig {
 
 class SeedData(val data: FinanceData)
 
-/** Older data has subscriptions without ids; give them stable ones. */
-fun normalize(data: FinanceData): FinanceData = data.copy(
-    version = FinanceData.VERSION,
-    subscriptions = data.subscriptions.mapIndexed { i, s -> if (s.id.isBlank()) s.copy(id = "s${i + 1}") else s },
-)
+/** Older data has subscriptions without ids; give them stable ones that don't clash with ids already there. */
+fun normalize(data: FinanceData): FinanceData {
+    val taken = data.subscriptions.map { it.id }.filter { it.isNotBlank() }.toMutableSet()
+    var next = 1
+    fun freeId(): String {
+        while ("s$next" in taken) next++
+        return "s$next".also { taken += it }
+    }
+    return data.copy(
+        version = FinanceData.VERSION,
+        subscriptions = data.subscriptions.map { s -> if (s.id.isBlank()) s.copy(id = freeId()) else s },
+    )
+}
