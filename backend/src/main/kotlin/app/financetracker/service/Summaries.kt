@@ -1,42 +1,17 @@
 package app.financetracker.service
 
-import app.financetracker.domain.Account
-import app.financetracker.domain.AccountGroup
-import app.financetracker.domain.Category
-import app.financetracker.domain.Entry
-import app.financetracker.domain.EntryType
-import app.financetracker.domain.Loan
-import app.financetracker.domain.Snapshot
+import app.financetracker.model.Account
+import app.financetracker.model.AccountGroup
+import app.financetracker.model.Category
+import app.financetracker.model.Entry
+import app.financetracker.model.EntryType
+import app.financetracker.model.Loan
+import app.financetracker.model.MonthTotals
+import app.financetracker.model.NetWorthPoint
+import app.financetracker.model.Snapshot
 import kotlin.math.abs
 
 // Aggregates the screens show. Ports of monthTotals / netWorthSeries in frontend/src/store/finance.ts.
-
-data class MonthTotals(
-    /** 0-based, like the frontend */
-    val month: Int,
-    val ym: String,
-    val income: Double,
-    val expense: Double,
-    val essential: Double,
-    val discretionary: Double,
-    val count: Int,
-    val net: Double,
-    val savingsRate: Double?,
-)
-
-data class NetWorthPoint(
-    val date: String,
-    /** per group; Debt is the amount owed, as a positive number */
-    val byGroup: Map<AccountGroup, Double>,
-    val assets: Double,
-    val debt: Double,
-    /** loan balances that month, by loan id */
-    val loans: Map<String, Double>,
-    /** values of the properties behind loans that month, by loan id */
-    val properties: Map<String, Double>,
-    val total: Double,
-    val values: Map<String, Double>,
-)
 
 object Summaries {
     /** Per-month totals for one year, like the sheet's Summary tab: net = income - expenses. */

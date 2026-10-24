@@ -1,4 +1,4 @@
-package app.financetracker.user
+package app.financetracker.service
 
 import org.springframework.stereotype.Component
 

@@ -1,9 +1,9 @@
 package app.financetracker.service
 
-import app.financetracker.domain.PayDeduction
-import app.financetracker.domain.PayFrequency
-import app.financetracker.domain.Plan
-import app.financetracker.domain.SharedCost
+import app.financetracker.model.PayDeduction
+import app.financetracker.model.PayFrequency
+import app.financetracker.model.Plan
+import app.financetracker.model.SharedCost
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 

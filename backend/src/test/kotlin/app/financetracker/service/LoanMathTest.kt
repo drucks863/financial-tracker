@@ -1,7 +1,7 @@
 package app.financetracker.service
 
-import app.financetracker.domain.Loan
-import app.financetracker.domain.LoanProperty
+import app.financetracker.model.Loan
+import app.financetracker.model.LoanProperty
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

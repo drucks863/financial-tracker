@@ -1,6 +1,8 @@
 package app.financetracker.service
 
-import app.financetracker.domain.Loan
+import app.financetracker.model.Loan
+import app.financetracker.model.LoanRow
+import app.financetracker.model.LoanSummary
 import java.time.YearMonth
 import kotlin.math.abs
 import kotlin.math.max
@@ -9,29 +11,6 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 // Standard amortization, month by month. A port of frontend/src/lib/loan.ts; keep the two in step.
-
-data class LoanRow(
-    /** YYYY-MM */
-    val ym: String,
-    val payment: Double,
-    val interest: Double,
-    val principal: Double,
-    /** balance after this payment */
-    val balance: Double,
-)
-
-data class LoanSummary(
-    val payment: Double,
-    val balance: Double,
-    val value: Double,
-    /** what you own of the property: its value minus what's still owed */
-    val equity: Double?,
-    val payoff: String?,
-    val interestPaid: Double,
-    val principalPaid: Double,
-    val interestTotal: Double,
-    val rows: List<LoanRow>,
-)
 
 object LoanMath {
     private val YM = Regex("""^\d{4}-\d{2}$""")

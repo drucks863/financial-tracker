@@ -42,15 +42,20 @@ docs/       these notes, the todo list, architecture
 
 - Spring Boot 4.1, Kotlin 2.3, Java 21, Jackson 3, JUnit 5. Gradle wrapper at the repo root,
   backend is the `:backend` module. Package `app.financetracker`.
-- Layers: `domain/Models.kt` (data classes that mirror `frontend/src/types.ts` field for field, so the
-  JSON is what the store already uses), `repo/FinanceRepository` (plain per-user storage),
-  `service/FinanceService` (the rules: category renames cascade to entries, categories and
-  subcategories in use can't be removed, saving an entry creates its category), `web/Controllers.kt`.
+- Packages follow **model / controller / service / repository** (Devin, 2026-10-24):
+  - `model/`: data classes grouped by topic, one file each (`Category`, `Entry`, `NetWorth`, `Plan`,
+    `Loan`, `Subscription`, `FinanceData`). They mirror `frontend/src/types.ts` field for field, so the
+    JSON is what the store already uses. Request bodies and computed results for a topic live in its file.
+  - `controller/`: one REST controller per file, thin, all under `/api`.
+  - `service/`: `FinanceService` (the rules: category renames cascade to entries, categories and
+    subcategories in use can't be removed, saving an entry creates its category), the math
+    (`LoanMath`, `PlanCalculator`, `Summaries`) and `CurrentUser`.
+  - `repository/`: `FinanceRepository` (plain per-user storage), the in-memory implementation, and its config.
 - **Storage is mocked**: `InMemoryFinanceRepository`, seeded per user from `finance.seed`
   (default: the frontend's `seed.sample.json`, copied into the jar at build time). `bootRun` uses
   `seed.local.json` when it exists. Data is lost on restart. DynamoDB replaces the repository bean in
   `RepositoryConfig`; the interface is shaped for one table (PK user, SK kind#id).
-- **Auth seam**: `user/CurrentUser`. Every call is keyed by its id; `LocalUser` returns `"local"`.
+- **Auth seam**: `service/CurrentUser`. Every call is keyed by its id; `LocalUser` returns `"local"`.
   Google SSO replaces that one bean (use the OIDC `sub`).
 - Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),
   `PlanCalculator` (budget setup figures), `Summaries` (month totals, net worth series). The frontend

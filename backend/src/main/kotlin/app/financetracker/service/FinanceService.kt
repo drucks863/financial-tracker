@@ -1,24 +1,26 @@
 package app.financetracker.service
 
-import app.financetracker.domain.Account
-import app.financetracker.domain.AccountGroup
-import app.financetracker.domain.Category
-import app.financetracker.domain.Entry
-import app.financetracker.domain.EntryType
-import app.financetracker.domain.FinanceData
-import app.financetracker.domain.NetWorth
-import app.financetracker.domain.Plan
-import app.financetracker.domain.Snapshot
-import app.financetracker.domain.Subscription
-import app.financetracker.domain.month
-import app.financetracker.repo.FinanceRepository
-import app.financetracker.repo.SeedData
-import app.financetracker.repo.normalize
+import app.financetracker.model.Account
+import app.financetracker.model.AccountImport
+import app.financetracker.model.Category
+import app.financetracker.model.CategoryPatch
+import app.financetracker.model.Entry
+import app.financetracker.model.EntryImport
+import app.financetracker.model.EntryType
+import app.financetracker.model.FinanceData
+import app.financetracker.model.NetWorth
+import app.financetracker.model.Plan
+import app.financetracker.model.Snapshot
+import app.financetracker.model.Subscription
+import app.financetracker.model.month
+import app.financetracker.repository.FinanceRepository
+import app.financetracker.repository.SeedData
+import app.financetracker.repository.normalize
+import java.time.LocalDate
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.LocalDate
-import java.util.UUID
 
 fun newId(prefix: String) = prefix + UUID.randomUUID().toString().replace("-", "").take(12)
 
@@ -30,12 +32,6 @@ private val DATE = Regex("""^\d{4}-\d{2}-\d{2}$""")
 
 /** YYYY-MM-DD and a real calendar date (no month 13 or February 30). */
 private fun isDate(s: String) = DATE.matches(s) && runCatching { LocalDate.parse(s) }.isSuccess
-
-/** Partial update of a category; null fields are left as they are. */
-data class CategoryPatch(val name: String? = null, val essential: Boolean? = null)
-
-/** Entries from a file import. With [replaceMonths], entries already in those months are removed first. */
-data class EntryImport(val entries: List<Entry>, val replaceMonths: Boolean = false)
 
 /**
  * The rules the frontend store applies (cascading renames, no deleting categories in use,
@@ -266,5 +262,3 @@ class FinanceService(private val repo: FinanceRepository, private val seed: Seed
 
     fun planSummary(u: String) = PlanCalculator.summarize(plan(u))
 }
-
-data class AccountImport(val name: String, val group: AccountGroup, val values: Map<String, Double>)

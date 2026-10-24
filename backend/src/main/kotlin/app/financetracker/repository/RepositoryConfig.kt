@@ -1,6 +1,6 @@
-package app.financetracker.repo
+package app.financetracker.repository
 
-import app.financetracker.domain.FinanceData
+import app.financetracker.model.FinanceData
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

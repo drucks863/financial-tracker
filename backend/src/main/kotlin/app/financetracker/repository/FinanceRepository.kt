@@ -1,12 +1,12 @@
-package app.financetracker.repo
+package app.financetracker.repository
 
-import app.financetracker.domain.Account
-import app.financetracker.domain.Category
-import app.financetracker.domain.Entry
-import app.financetracker.domain.FinanceData
-import app.financetracker.domain.Plan
-import app.financetracker.domain.Snapshot
-import app.financetracker.domain.Subscription
+import app.financetracker.model.Account
+import app.financetracker.model.Category
+import app.financetracker.model.Entry
+import app.financetracker.model.FinanceData
+import app.financetracker.model.Plan
+import app.financetracker.model.Snapshot
+import app.financetracker.model.Subscription
 
 /**
  * Storage for one person's data, keyed by user id. Plain reads and writes only: rules such as

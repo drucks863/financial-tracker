@@ -1,51 +1,15 @@
 package app.financetracker.service
 
-import app.financetracker.domain.Loan
-import app.financetracker.domain.Plan
-import app.financetracker.domain.SharedCost
+import app.financetracker.model.HousingLine
+import app.financetracker.model.LoanLine
+import app.financetracker.model.Monthly
+import app.financetracker.model.Paycheck
+import app.financetracker.model.Plan
+import app.financetracker.model.PlanSummary
 import java.time.YearMonth
 import kotlin.math.max
 
 // The budget setup's derived figures. A port of `planned` in frontend/src/store/plan.ts.
-
-data class Paycheck(
-    val gross: Double,
-    val k401: Double,
-    val match: Double,
-    val deductions: Double,
-    val taxes: Double,
-    val estTakeHome: Double,
-    val takeHome: Double,
-)
-
-data class Monthly(
-    val gross: Double,
-    val k401: Double,
-    val match: Double,
-    val deductions: Double,
-    val taxes: Double,
-    val takeHome: Double,
-    val housingTotal: Double,
-    val housingMine: Double,
-    val loanPayments: Double,
-    /** take-home after my share of rent and bills, and loan payments */
-    val afterHousing: Double,
-    val saved: Double,
-)
-
-data class HousingLine(val item: SharedCost, val mine: Double)
-data class LoanLine(val loan: Loan, val summary: LoanSummary)
-
-data class PlanSummary(
-    val perYear: Int,
-    val paycheck: Paycheck,
-    val monthly: Monthly,
-    val housing: List<HousingLine>,
-    val loans: List<LoanLine>,
-    val savedYearly: Double,
-    /** share of gross pay going to 401k (yours + company) and other deductions */
-    val savedRate: Double?,
-)
 
 object PlanCalculator {
     fun summarize(p: Plan, ym: String = YearMonth.now().toString()): PlanSummary {
