@@ -182,8 +182,28 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
   font-size: 0.8125rem;
   border-bottom: 1px solid var(--line);
 }
-.cat + .cat {
-  border-top: 1px solid var(--line);
+/* Each category is its own bordered card, so categories read as the top level and
+   subcategories as labels inside them. */
+.list-panel {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.list-head {
+  padding: 0 4px;
+  border-bottom: 0;
+}
+.cat {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.cat-row[aria-expanded='true'] {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
 }
 .cat-row {
   width: 100%;
@@ -193,7 +213,7 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
   gap: 10px;
   padding: 14px 16px;
   border: 0;
-  background: none;
+  background: var(--panel-2);
   font: inherit;
   color: var(--ink);
   cursor: pointer;
@@ -203,7 +223,8 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
   background: var(--accent-soft);
 }
 .cat-name {
-  font-weight: 600;
+  font-size: 1.0625rem;
+  font-weight: 650;
 }
 .tag {
   margin-left: 6px;
@@ -215,7 +236,8 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
   padding: 0 6px;
 }
 .cat-total {
-  font-weight: 600;
+  font-size: 1.0625rem;
+  font-weight: 650;
 }
 .cat-row .pi {
   font-size: 0.75rem;
