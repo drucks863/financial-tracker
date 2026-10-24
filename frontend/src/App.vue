@@ -6,9 +6,9 @@ import OverviewView from './views/OverviewView.vue'
 import CashFlowView from './views/CashFlowView.vue'
 import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
-import SettingsView from './views/SettingsView.vue'
 import PlanView from './views/PlanView.vue'
 import { isSampleData, state } from './store/finance'
+import { ui, isProfileTab } from './store/ui'
 
 const VIEWS = [
   { id: 'overview', label: 'Overview', icon: 'pi pi-home', component: OverviewView },
@@ -16,8 +16,7 @@ const VIEWS = [
   { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView },
   { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
   // opened from the avatar, not listed in the nav
-  { id: 'plan', label: 'Financial profile', icon: 'pi pi-calculator', component: PlanView, hidden: true },
-  { id: 'data', label: 'Data', icon: 'pi pi-sliders-h', component: SettingsView }
+  { id: 'plan', label: 'Financial profile', icon: 'pi pi-calculator', component: PlanView, hidden: true }
 ]
 
 const NAV = VIEWS.filter((v) => !('hidden' in v))
@@ -35,10 +34,22 @@ const me = computed(() => {
 const current = ref('overview')
 const view = computed(() => VIEWS.find((v) => v.id === current.value) || VIEWS[0])
 
-function go(id: string): void {
+// Routes are view ids; the profile also takes a tab ("plan/categories").
+// "#data" is the old Data page, now the profile's Import & export tab.
+function route(h: string): boolean {
+  if (h === 'data') h = 'plan/files'
+  const [id, tab] = h.split('/')
+  if (!VIEWS.some((v) => v.id === id)) return false
   current.value = id
+  if (id === 'plan') ui.profileTab = tab && isProfileTab(tab) ? tab : 'plan'
+  return true
+}
+
+function go(h: string): void {
+  if (!route(h)) return
+  const hash = current.value === 'plan' && ui.profileTab !== 'plan' ? `plan/${ui.profileTab}` : current.value
   try {
-    history.replaceState(null, '', `#${id}`)
+    history.replaceState(null, '', `#${hash}`)
   } catch {
     /* sandboxed */
   }
@@ -46,8 +57,7 @@ function go(id: string): void {
 }
 
 function fromHash() {
-  const h = location.hash.slice(1)
-  if (VIEWS.some((v) => v.id === h)) current.value = h
+  route(location.hash.slice(1))
 }
 onMounted(() => {
   fromHash()
@@ -67,7 +77,6 @@ onMounted(() => {
         :key="v.id"
         type="button"
         class="nav-item"
-        :class="{ end: v.id === 'data' }"
         :aria-label="v.label"
         :aria-current="current === v.id ? 'page' : undefined"
         @click="go(v.id)"
@@ -88,7 +97,7 @@ onMounted(() => {
     </nav>
 
     <main class="main">
-      <p v-if="isSampleData" class="sample-note">Showing made-up sample data. Import your sheets from the Data tab, or add <code>src/data/seed.local.json</code>.</p>
+      <p v-if="isSampleData" class="sample-note">Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export), or add <code>src/data/seed.local.json</code>.</p>
       <component :is="view.component" @navigate="go" />
     </main>
 
@@ -272,9 +281,6 @@ onMounted(() => {
   .nav-item[aria-current='page'] .pi {
     color: var(--accent);
   }
-  .nav-item.end {
-    margin-top: auto;
-  }
   .me {
     flex: none;
     display: flex;
@@ -282,7 +288,7 @@ onMounted(() => {
     justify-items: start;
     gap: 10px;
     height: auto;
-    margin-top: 10px;
+    margin-top: auto;
     padding: 14px 8px 10px;
     border-top: 1px solid var(--line);
     border-radius: 0;

@@ -305,7 +305,7 @@ const yoy = computed(() => {
           <span><i class="swatch" style="background: var(--series-income)"></i>Avg monthly income</span>
           <span><i class="swatch" style="background: var(--series-expense)"></i>Avg monthly expenses</span>
         </div>
-        <p v-if="yoy.count < 2" class="hint muted">Only {{ ui.year }} is loaded. Import your Cash Flow ’22 to ’25 workbooks from the Data tab to compare years.</p>
+        <p v-if="yoy.count < 2" class="hint muted">Only {{ ui.year }} is loaded. Import your Cash Flow ’22 to ’25 workbooks from your profile’s Import &amp; export tab to compare years.</p>
       </section>
 
       <section class="panel span-2">

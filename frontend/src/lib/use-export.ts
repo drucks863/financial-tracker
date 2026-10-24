@@ -5,7 +5,7 @@ import type { SaveError } from './io'
 
 export type ExportKind = 'csv' | 'xlsx' | 'nw'
 
-/** Export actions shared by the Overview download menu and the Data screen. */
+/** Export actions shared by the Overview download menu and the profile's Import & export tab. */
 export function useExport() {
   const toast = useToast()
   const exporting = ref<ExportKind | null>(null)

@@ -32,6 +32,9 @@ import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
 import { useExport } from '../lib/use-export'
 import type { Category, EntryType, Subscription } from '../types'
 
+// The non-plan tabs of the financial profile: one group of panels per tab.
+defineProps<{ section: 'categories' | 'subscriptions' | 'files' }>()
+
 const toast = useToast()
 
 /* ---------- export ---------- */
@@ -232,265 +235,258 @@ function reset() {
 </script>
 
 <template>
-  <div class="stack">
-    <header>
-      <h1>Data</h1>
-      <p class="muted">Import past years, export everything, and manage your categories</p>
-    </header>
-
-    <div class="grid-2">
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Export</h2>
-            <p class="muted">{{ state.entries.length }} entries · {{ state.netWorth.snapshots.length }} net worth snapshots</p>
-          </div>
+  <div class="grid-2">
+    <section v-if="section === 'files'" class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Export</h2>
+          <p class="muted">{{ state.entries.length }} entries · {{ state.netWorth.snapshots.length }} net worth snapshots</p>
         </div>
-        <div class="export-list">
-          <button type="button" class="export" :disabled="!!exporting" @click="doExport('xlsx')">
-            <i class="pi pi-file-excel" aria-hidden="true"></i>
-            <span>
-              <strong>Everything as Excel</strong>
-              <small class="muted">Entries, monthly summary, Expenses and Income grids per year, net worth, categories</small>
-            </span>
-            <i class="pi" :class="exporting === 'xlsx' ? 'pi-spin pi-spinner' : 'pi-download'" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="export" :disabled="!!exporting" @click="doExport('csv')">
-            <i class="pi pi-file" aria-hidden="true"></i>
-            <span>
-              <strong>Entries as CSV</strong>
-              <small class="muted">One row per entry. Re-imports cleanly.</small>
-            </span>
-            <i class="pi" :class="exporting === 'csv' ? 'pi-spin pi-spinner' : 'pi-download'" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="export" :disabled="!!exporting" @click="doExport('nw')">
-            <i class="pi pi-chart-line" aria-hidden="true"></i>
-            <span>
-              <strong>Net worth as CSV</strong>
-              <small class="muted">Accounts by month-end date</small>
-            </span>
-            <i class="pi" :class="exporting === 'nw' ? 'pi-spin pi-spinner' : 'pi-download'" aria-hidden="true"></i>
-          </button>
+      </div>
+      <div class="export-list">
+        <button type="button" class="export" :disabled="!!exporting" @click="doExport('xlsx')">
+          <i class="pi pi-file-excel" aria-hidden="true"></i>
+          <span>
+            <strong>Everything as Excel</strong>
+            <small class="muted">Entries, monthly summary, Expenses and Income grids per year, net worth, categories</small>
+          </span>
+          <i class="pi" :class="exporting === 'xlsx' ? 'pi-spin pi-spinner' : 'pi-download'" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="export" :disabled="!!exporting" @click="doExport('csv')">
+          <i class="pi pi-file" aria-hidden="true"></i>
+          <span>
+            <strong>Entries as CSV</strong>
+            <small class="muted">One row per entry. Re-imports cleanly.</small>
+          </span>
+          <i class="pi" :class="exporting === 'csv' ? 'pi-spin pi-spinner' : 'pi-download'" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="export" :disabled="!!exporting" @click="doExport('nw')">
+          <i class="pi pi-chart-line" aria-hidden="true"></i>
+          <span>
+            <strong>Net worth as CSV</strong>
+            <small class="muted">Accounts by month-end date</small>
+          </span>
+          <i class="pi" :class="exporting === 'nw' ? 'pi-spin pi-spinner' : 'pi-download'" aria-hidden="true"></i>
+        </button>
+      </div>
+    </section>
+
+    <section v-if="section === 'files'" class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Import</h2>
+          <p class="muted">CSV or Excel. Download a Google Sheet with File › Download › Microsoft Excel.</p>
         </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Import</h2>
-            <p class="muted">CSV or Excel. Download a Google Sheet with File › Download › Microsoft Excel.</p>
-          </div>
+      </div>
+      <div class="imp">
+        <SelectButton v-model="imp.kind" :options="KINDS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Import type" @change="parse" />
+        <p class="ink2 small" v-if="imp.kind === 'entries'">
+          Columns: <strong>Date, Type, Category, Subcategory, Description, Amount</strong>. Type is Income or Expense. New categories are created for you.
+        </p>
+        <div v-else-if="imp.kind === 'cashflow'" class="cf-year">
+          <p class="ink2 small">Reads a Cash Flow workbook laid out like your ’26 sheet: the Expenses and Income tabs plus each month tab’s itemized lines.</p>
+          <label class="year-field">
+            <span class="small ink2">Year this workbook covers</span>
+            <InputNumber v-model="imp.year" input-id="import-year" :use-grouping="false" :min="2000" :max="2100" show-buttons size="small" @update:model-value="parse" />
+          </label>
         </div>
-        <div class="imp">
-          <SelectButton v-model="imp.kind" :options="KINDS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Import type" @change="parse" />
-          <p class="ink2 small" v-if="imp.kind === 'entries'">
-            Columns: <strong>Date, Type, Category, Subcategory, Description, Amount</strong>. Type is Income or Expense. New categories are created for you.
-          </p>
-          <div v-else-if="imp.kind === 'cashflow'" class="cf-year">
-            <p class="ink2 small">Reads a Cash Flow workbook laid out like your ’26 sheet: the Expenses and Income tabs plus each month tab’s itemized lines.</p>
-            <label class="year-field">
-              <span class="small ink2">Year this workbook covers</span>
-              <InputNumber v-model="imp.year" input-id="import-year" :use-grouping="false" :min="2000" :max="2100" show-buttons size="small" @update:model-value="parse" />
-            </label>
-          </div>
-          <p class="ink2 small" v-else>Reads the “Net Worth Tracker” tab: month-end dates across the top, accounts under Cash, Investment Accounts, Other Assets and Debt.</p>
+        <p class="ink2 small" v-else>Reads the “Net Worth Tracker” tab: month-end dates across the top, accounts under Cash, Investment Accounts, Other Assets and Debt.</p>
 
-          <input ref="fileInput" type="file" accept=".csv,.xlsx,.xls,text/csv" class="hidden-input" @change="onFile" />
-          <Button :label="imp.file ? `Choose a different file` : 'Choose file'" icon="pi pi-upload" outlined :loading="imp.busy" @click="pick" />
-          <p v-if="imp.file" class="small muted">{{ imp.file.name }}</p>
+        <input ref="fileInput" type="file" accept=".csv,.xlsx,.xls,text/csv" class="hidden-input" @change="onFile" />
+        <Button :label="imp.file ? `Choose a different file` : 'Choose file'" icon="pi pi-upload" outlined :loading="imp.busy" @click="pick" />
+        <p v-if="imp.file" class="small muted">{{ imp.file.name }}</p>
 
-          <Message v-if="imp.error" severity="error" size="small">{{ imp.error }}</Message>
+        <Message v-if="imp.error" severity="error" size="small">{{ imp.error }}</Message>
 
-          <div v-if="preview" class="preview">
-            <template v-if="preview.networth">
-              <p>
-                <strong>{{ preview.accounts.length }} accounts</strong> across <strong>{{ preview.dates.length }} months</strong>
-                <span v-if="preview.dates.length" class="muted"> ({{ shortDate(preview.dates[0]) }} to {{ shortDate(preview.dates[preview.dates.length - 1]) }})</span>
-              </p>
-              <ul class="small ink2 plain">
-                <li v-for="a in preview.accounts" :key="a.name">{{ a.name }} <span class="muted">· {{ a.group }}</span></li>
-              </ul>
-              <p class="small muted">Matching months are updated; other months are kept.</p>
-            </template>
-            <template v-else>
-              <p>
-                <strong>{{ preview.count }} entries</strong> across <strong>{{ preview.months.length }} months</strong>:
-                <span class="num">{{ money(preview.income) }}</span> income, <span class="num">{{ money(preview.expense) }}</span> expenses
-              </p>
-              <p v-if="preview.newCats.length" class="small ink2">Adds {{ preview.newCats.length }} new: {{ preview.newCats.slice(0, 6).join(', ') }}{{ preview.newCats.length > 6 ? '…' : '' }}</p>
-              <div class="table-scroll">
-                <table class="sample">
-                  <tbody>
-                    <tr v-for="(e, i) in preview.sample" :key="i">
-                      <td>{{ e.date }}</td>
-                      <td>{{ e.category }} › {{ e.subcategory }}</td>
-                      <td>{{ e.description }}</td>
-                      <td class="num r">{{ money2(e.amount) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <label v-if="preview.existing" class="replace">
-                <Checkbox v-model="imp.replace" binary input-id="import-replace" />
-                <span class="small">Replace the {{ preview.existing }} entries already in those months</span>
-              </label>
-            </template>
-            <ul v-if="preview.problems?.length" class="small muted plain">
-              <li v-for="p in preview.problems.slice(0, 5)" :key="p">{{ p }}</li>
+        <div v-if="preview" class="preview">
+          <template v-if="preview.networth">
+            <p>
+              <strong>{{ preview.accounts.length }} accounts</strong> across <strong>{{ preview.dates.length }} months</strong>
+              <span v-if="preview.dates.length" class="muted"> ({{ shortDate(preview.dates[0]) }} to {{ shortDate(preview.dates[preview.dates.length - 1]) }})</span>
+            </p>
+            <ul class="small ink2 plain">
+              <li v-for="a in preview.accounts" :key="a.name">{{ a.name }} <span class="muted">· {{ a.group }}</span></li>
             </ul>
-            <div class="row-actions">
-              <Button label="Cancel" text severity="secondary" @click="(imp.result = null), (imp.file = null)" />
-              <Button :label="preview.networth ? 'Import net worth' : `Import ${preview.count} entries`" :disabled="preview.networth ? !preview.accounts.length : !preview.count" @click="commitImport" />
+            <p class="small muted">Matching months are updated; other months are kept.</p>
+          </template>
+          <template v-else>
+            <p>
+              <strong>{{ preview.count }} entries</strong> across <strong>{{ preview.months.length }} months</strong>:
+              <span class="num">{{ money(preview.income) }}</span> income, <span class="num">{{ money(preview.expense) }}</span> expenses
+            </p>
+            <p v-if="preview.newCats.length" class="small ink2">Adds {{ preview.newCats.length }} new: {{ preview.newCats.slice(0, 6).join(', ') }}{{ preview.newCats.length > 6 ? '…' : '' }}</p>
+            <div class="table-scroll">
+              <table class="sample">
+                <tbody>
+                  <tr v-for="(e, i) in preview.sample" :key="i">
+                    <td>{{ e.date }}</td>
+                    <td>{{ e.category }} › {{ e.subcategory }}</td>
+                    <td>{{ e.description }}</td>
+                    <td class="num r">{{ money2(e.amount) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <label v-if="preview.existing" class="replace">
+              <Checkbox v-model="imp.replace" binary input-id="import-replace" />
+              <span class="small">Replace the {{ preview.existing }} entries already in those months</span>
+            </label>
+          </template>
+          <ul v-if="preview.problems?.length" class="small muted plain">
+            <li v-for="p in preview.problems.slice(0, 5)" :key="p">{{ p }}</li>
+          </ul>
+          <div class="row-actions">
+            <Button label="Cancel" text severity="secondary" @click="(imp.result = null), (imp.file = null)" />
+            <Button :label="preview.networth ? 'Import net worth' : `Import ${preview.count} entries`" :disabled="preview.networth ? !preview.accounts.length : !preview.count" @click="commitImport" />
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="panel span-2">
-        <div class="panel-head">
-          <div>
-            <h2>Categories</h2>
-            <p class="muted">Start from your sheet’s categories. Add, rename, or remove; renames carry over to existing entries.</p>
-          </div>
-          <SelectButton v-model="catType" :options="CAT_TYPES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Category type" />
+    <section v-if="section === 'categories'" class="panel span-2">
+      <div class="panel-head">
+        <div>
+          <h2>Categories</h2>
+          <p class="muted">Start from your sheet’s categories. Add, rename, or remove; renames carry over to existing entries.</p>
         </div>
+        <SelectButton v-model="catType" :options="CAT_TYPES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Category type" />
+      </div>
 
-        <form class="add-row" @submit.prevent="createCategory">
-          <InputText id="new-category" v-model="newCat" :placeholder="`New ${catType} category`" fluid />
-          <Button type="submit" label="Add category" icon="pi pi-plus" outlined />
-        </form>
+      <form class="add-row" @submit.prevent="createCategory">
+        <InputText id="new-category" v-model="newCat" :placeholder="`New ${catType} category`" fluid />
+        <Button type="submit" label="Add category" icon="pi pi-plus" outlined />
+      </form>
 
-        <ul class="cats">
-          <li v-for="cat in cats" :key="cat.id" class="cat">
-            <div class="cat-line">
-              <button type="button" class="chev" :aria-expanded="!!openCats[cat.id]" :aria-label="`Show subcategories of ${cat.name}`" @click="openCats[cat.id] = !openCats[cat.id]">
-                <i class="pi" :class="openCats[cat.id] ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true"></i>
-              </button>
+      <ul class="cats">
+        <li v-for="cat in cats" :key="cat.id" class="cat">
+          <div class="cat-line">
+            <button type="button" class="chev" :aria-expanded="!!openCats[cat.id]" :aria-label="`Show subcategories of ${cat.name}`" @click="openCats[cat.id] = !openCats[cat.id]">
+              <i class="pi" :class="openCats[cat.id] ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true"></i>
+            </button>
+            <InputText
+              v-if="editing.key === cat.id"
+              :id="`rename-${cat.id}`"
+              v-model="editing.value"
+              size="small"
+              autofocus
+              @keydown.enter.prevent="commitEdit(cat)"
+              @keydown.esc="editing.key = null"
+              @blur="commitEdit(cat)"
+            />
+            <button v-else type="button" class="name" @click="openCats[cat.id] = !openCats[cat.id]">
+              {{ cat.name }} <small class="muted">{{ cat.subcategories.length }} sub · {{ entriesUsing(cat) }} entries</small>
+            </button>
+            <label v-if="cat.type === 'expense'" class="flag">
+              <ToggleSwitch v-model="cat.essential" :input-id="`ess-${cat.id}`" />
+              <span class="small ink2">Essential</span>
+            </label>
+            <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" :aria-label="`Rename ${cat.name}`" @click="startEdit(cat.id, cat.name)" />
+            <Button icon="pi pi-trash" text rounded size="small" severity="secondary" :aria-label="`Remove ${cat.name}`" @click="tryRemoveCat(cat)" />
+          </div>
+          <div v-if="openCats[cat.id]" class="subs">
+            <div v-for="sub in cat.subcategories" :key="sub" class="sub-line">
               <InputText
-                v-if="editing.key === cat.id"
-                :id="`rename-${cat.id}`"
+                v-if="editing.key === cat.id + '/' + sub"
+                :id="`rename-${cat.id}-${sub}`"
                 v-model="editing.value"
                 size="small"
                 autofocus
-                @keydown.enter.prevent="commitEdit(cat)"
+                @keydown.enter.prevent="commitEdit(cat, sub)"
                 @keydown.esc="editing.key = null"
-                @blur="commitEdit(cat)"
+                @blur="commitEdit(cat, sub)"
               />
-              <button v-else type="button" class="name" @click="openCats[cat.id] = !openCats[cat.id]">
-                {{ cat.name }} <small class="muted">{{ cat.subcategories.length }} sub · {{ entriesUsing(cat) }} entries</small>
-              </button>
-              <label v-if="cat.type === 'expense'" class="flag">
-                <ToggleSwitch v-model="cat.essential" :input-id="`ess-${cat.id}`" />
-                <span class="small ink2">Essential</span>
-              </label>
-              <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" :aria-label="`Rename ${cat.name}`" @click="startEdit(cat.id, cat.name)" />
-              <Button icon="pi pi-trash" text rounded size="small" severity="secondary" :aria-label="`Remove ${cat.name}`" @click="tryRemoveCat(cat)" />
+              <span v-else class="sub-name">{{ sub }} <small class="muted">{{ entriesUsing(cat, sub) }}</small></span>
+              <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" :aria-label="`Rename ${sub}`" @click="startEdit(cat.id + '/' + sub, sub)" />
+              <Button icon="pi pi-times" text rounded size="small" severity="secondary" :aria-label="`Remove ${sub}`" @click="tryRemoveSub(cat, sub)" />
             </div>
-            <div v-if="openCats[cat.id]" class="subs">
-              <div v-for="sub in cat.subcategories" :key="sub" class="sub-line">
-                <InputText
-                  v-if="editing.key === cat.id + '/' + sub"
-                  :id="`rename-${cat.id}-${sub}`"
-                  v-model="editing.value"
-                  size="small"
-                  autofocus
-                  @keydown.enter.prevent="commitEdit(cat, sub)"
-                  @keydown.esc="editing.key = null"
-                  @blur="commitEdit(cat, sub)"
-                />
-                <span v-else class="sub-name">{{ sub }} <small class="muted">{{ entriesUsing(cat, sub) }}</small></span>
-                <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" :aria-label="`Rename ${sub}`" @click="startEdit(cat.id + '/' + sub, sub)" />
-                <Button icon="pi pi-times" text rounded size="small" severity="secondary" :aria-label="`Remove ${sub}`" @click="tryRemoveSub(cat, sub)" />
-              </div>
-              <form class="add-row small-row" @submit.prevent="createSub(cat)">
-                <InputText :id="`new-sub-${cat.id}`" v-model="newSub[cat.id]" placeholder="New subcategory" size="small" fluid />
-                <Button type="submit" label="Add" size="small" outlined />
-              </form>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Subscriptions</h2>
-            <p class="muted num">About {{ money(subsMonthly) }} a month. Tap one to edit it.</p>
+            <form class="add-row small-row" @submit.prevent="createSub(cat)">
+              <InputText :id="`new-sub-${cat.id}`" v-model="newSub[cat.id]" placeholder="New subcategory" size="small" fluid />
+              <Button type="submit" label="Add" size="small" outlined />
+            </form>
           </div>
-          <Button label="Add" icon="pi pi-plus" text size="small" @click="openSub(null)" />
-        </div>
-        <table class="subs-t">
-          <tbody>
-            <tr v-for="(s, i) in state.subscriptions" :key="`${i}-${s.service}`" class="sub-tr" tabindex="0" @click="openSub(i)" @keydown.enter="openSub(i)">
-              <td>
-                {{ s.service }}
-                <small class="muted">{{ s.frequency }} · {{ s.when }} · {{ s.from }}</small>
-              </td>
-              <td><span class="tag">{{ s.category }}</span></td>
-              <td class="num r">{{ typeof s.price === 'number' ? money2(s.price) : '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-if="!state.subscriptions.length" class="empty">No subscriptions yet.</p>
-      </section>
+        </li>
+      </ul>
+    </section>
 
-      <Dialog v-model:visible="subEdit.open" modal :header="subEdit.index === null ? 'Add subscription' : 'Edit subscription'" :style="{ width: 'min(440px, calc(100vw - 32px))' }">
-        <form class="sub-form" @submit.prevent="saveSub">
+    <section v-if="section === 'subscriptions'" class="panel span-2">
+      <div class="panel-head">
+        <div>
+          <h2>Subscriptions</h2>
+          <p class="muted num">About {{ money(subsMonthly) }} a month. Tap one to edit it.</p>
+        </div>
+        <Button label="Add" icon="pi pi-plus" text size="small" @click="openSub(null)" />
+      </div>
+      <table class="subs-t">
+        <tbody>
+          <tr v-for="(s, i) in state.subscriptions" :key="`${i}-${s.service}`" class="sub-tr" tabindex="0" @click="openSub(i)" @keydown.enter="openSub(i)">
+            <td>
+              {{ s.service }}
+              <small class="muted">{{ s.frequency }} · {{ s.when }} · {{ s.from }}</small>
+            </td>
+            <td><span class="tag">{{ s.category }}</span></td>
+            <td class="num r">{{ typeof s.price === 'number' ? money2(s.price) : '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-if="!state.subscriptions.length" class="empty">No subscriptions yet.</p>
+    </section>
+
+    <Dialog v-model:visible="subEdit.open" modal :header="subEdit.index === null ? 'Add subscription' : 'Edit subscription'" :style="{ width: 'min(440px, calc(100vw - 32px))' }">
+      <form class="sub-form" @submit.prevent="saveSub">
+        <label class="sub-field">
+          <span>Service</span>
+          <InputText v-model="subEdit.form.service" :invalid="!!subEdit.error" autofocus fluid />
+          <small v-if="subEdit.error" class="err">{{ subEdit.error }}</small>
+        </label>
+        <div class="sub-2">
           <label class="sub-field">
-            <span>Service</span>
-            <InputText v-model="subEdit.form.service" :invalid="!!subEdit.error" autofocus fluid />
-            <small v-if="subEdit.error" class="err">{{ subEdit.error }}</small>
+            <span>Price</span>
+            <InputNumber v-model="subEdit.form.price" mode="currency" currency="USD" locale="en-US" fluid />
           </label>
-          <div class="sub-2">
-            <label class="sub-field">
-              <span>Price</span>
-              <InputNumber v-model="subEdit.form.price" mode="currency" currency="USD" locale="en-US" fluid />
-            </label>
-            <label class="sub-field">
-              <span>How often</span>
-              <Select v-model="subEdit.form.frequency" :options="FREQUENCIES" fluid />
-            </label>
-          </div>
-          <div class="sub-2">
-            <label class="sub-field">
-              <span>Type</span>
-              <Select v-model="subEdit.form.category" :options="SUB_KINDS" fluid />
-            </label>
-            <label class="sub-field">
-              <span>When</span>
-              <InputText v-model="subEdit.form.when" placeholder="e.g. 15th, March" fluid />
-            </label>
-          </div>
           <label class="sub-field">
-            <span>Paid from</span>
-            <Select v-model="subEdit.form.from" :options="paidFromOptions" editable placeholder="Card or account" fluid />
+            <span>How often</span>
+            <Select v-model="subEdit.form.frequency" :options="FREQUENCIES" fluid />
           </label>
-          <div class="sub-actions">
-            <Button v-if="subEdit.index !== null" label="Delete" icon="pi pi-trash" text severity="danger" @click="removeSub" />
-            <span class="spacer"></span>
-            <Button label="Cancel" text severity="secondary" @click="subEdit.open = false" />
-            <Button type="submit" label="Save" />
-          </div>
-        </form>
-      </Dialog>
+        </div>
+        <div class="sub-2">
+          <label class="sub-field">
+            <span>Type</span>
+            <Select v-model="subEdit.form.category" :options="SUB_KINDS" fluid />
+          </label>
+          <label class="sub-field">
+            <span>When</span>
+            <InputText v-model="subEdit.form.when" placeholder="e.g. 15th, March" fluid />
+          </label>
+        </div>
+        <label class="sub-field">
+          <span>Paid from</span>
+          <Select v-model="subEdit.form.from" :options="paidFromOptions" editable placeholder="Card or account" fluid />
+        </label>
+        <div class="sub-actions">
+          <Button v-if="subEdit.index !== null" label="Delete" icon="pi pi-trash" text severity="danger" @click="removeSub" />
+          <span class="spacer"></span>
+          <Button label="Cancel" text severity="secondary" @click="subEdit.open = false" />
+          <Button type="submit" label="Save" />
+        </div>
+      </form>
+    </Dialog>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Prototype data</h2>
-            <p class="muted">Changes are saved in this browser only. The real app will save to your account.</p>
-          </div>
+    <section v-if="section === 'files'" class="panel span-2">
+      <div class="panel-head">
+        <div>
+          <h2>Prototype data</h2>
+          <p class="muted">Changes are saved in this browser only. The real app will save to your account.</p>
         </div>
-        <div class="row-actions start">
-          <template v-if="confirmReset">
-            <span class="ink2 small">Replace everything here with your sheet’s values?</span>
-            <Button label="Keep my changes" text severity="secondary" @click="confirmReset = false" />
-            <Button label="Reset" severity="danger" @click="reset" />
-          </template>
-          <Button v-else label="Reset to sheet data" icon="pi pi-refresh" outlined severity="secondary" @click="confirmReset = true" />
-        </div>
-      </section>
-    </div>
+      </div>
+      <div class="row-actions start">
+        <template v-if="confirmReset">
+          <span class="ink2 small">Replace everything here with your sheet’s values?</span>
+          <Button label="Keep my changes" text severity="secondary" @click="confirmReset = false" />
+          <Button label="Reset" severity="danger" @click="reset" />
+        </template>
+        <Button v-else label="Reset to sheet data" icon="pi pi-refresh" outlined severity="secondary" @click="confirmReset = true" />
+      </div>
+    </section>
   </div>
 </template>
 

@@ -15,8 +15,19 @@ export const ui = reactive({
   year: start.year,
   /** 0-based month */
   month: start.month,
-  entryDialog: { open: false, entry: null as Entry | null }
+  entryDialog: { open: false, entry: null as Entry | null },
+  profileTab: 'plan' as ProfileTab
 })
+
+/** Tabs on the financial profile page (opened from the avatar). */
+export const PROFILE_TABS = [
+  { id: 'plan', label: 'Pay & bills', note: 'Your pay, contributions, taxes, bills and loans. The rest of the app plans from these.' },
+  { id: 'categories', label: 'Categories', note: 'The categories and subcategories entries are filed under.' },
+  { id: 'subscriptions', label: 'Subscriptions', note: 'Recurring charges and what they cost each month and year.' },
+  { id: 'files', label: 'Import & export', note: 'Bring in past years from your sheets, or download everything.' }
+] as const
+export type ProfileTab = (typeof PROFILE_TABS)[number]['id']
+export const isProfileTab = (t: string): t is ProfileTab => PROFILE_TABS.some((x) => x.id === t)
 
 export const selectedYm = computed(() => `${ui.year}-${String(ui.month + 1).padStart(2, '0')}`)
 

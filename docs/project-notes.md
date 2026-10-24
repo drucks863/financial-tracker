@@ -64,6 +64,8 @@ docs/       these notes, the todo list, architecture
   account page; it is not in the main nav. Renamed from "My numbers" (Devin, 2026-10-24).
 - Google SSO is planned: the avatar will be the Google photo and the name the Google account
   name. Until then the name is typed at the top of the page and the avatar shows initials.
+- The profile is tabbed: Pay & bills (the plan), Categories, Subscriptions, Import & export
+  (also the prototype reset). There is no separate Data page; `#data` links open Import & export.
 
 - The app does the math. Inputs: yearly salary, pay frequency (weekly, every two weeks, twice
   a month, monthly), effective tax rate, your 401k % and company 401k %, other paycheck

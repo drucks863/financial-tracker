@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type WritableComputedRef } from 'vue'
+import { computed, nextTick, onMounted, ref, watch, type WritableComputedRef } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -8,7 +8,21 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { state } from '../store/finance'
 import { planned, newDeduction, newSharedCost, newLoan, PAY_FREQUENCIES } from '../store/plan'
 import { money, money2, pct } from '../lib/format'
+import Tabs from 'primevue/tabs'
+import TabList from 'primevue/tablist'
+import Tab from 'primevue/tab'
+import SettingsView from './SettingsView.vue'
+import { ui, PROFILE_TABS } from '../store/ui'
 import type { Loan, Plan, SharedCost } from '../types'
+
+const emit = defineEmits<{ navigate: [id: string] }>()
+const tab = computed(() => PROFILE_TABS.find((t) => t.id === ui.profileTab) ?? PROFILE_TABS[0])
+// On phones the tab row scrolls; keep the open tab in view.
+const tabsEl = ref<HTMLElement | null>(null)
+const revealTab = () =>
+  nextTick(() => tabsEl.value?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
+watch(() => ui.profileTab, revealTab)
+onMounted(revealTab)
 
 const p = computed<Plan>(() => state.plan!)
 const n = planned
@@ -87,13 +101,21 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
           <small class="muted">Your Google name and photo will show here once sign-in is added.</small>
         </div>
       </div>
-      <div>
-        <h1>Financial profile</h1>
-        <p class="muted">Your pay, contributions, taxes, bills and loans. The rest of the app plans from these.</p>
-      </div>
+      <h1>Financial profile</h1>
     </header>
 
-    <div class="layout">
+    <div ref="tabsEl" class="tabs-wrap">
+      <Tabs :value="ui.profileTab" scrollable @update:value="(t) => emit('navigate', `plan/${t}`)">
+        <TabList>
+          <Tab v-for="t in PROFILE_TABS" :key="t.id" :value="t.id">{{ t.label }}</Tab>
+        </TabList>
+      </Tabs>
+      <p class="muted tab-note">{{ tab.note }}</p>
+    </div>
+
+    <SettingsView v-if="ui.profileTab !== 'plan'" :section="ui.profileTab" />
+
+    <div v-else class="layout">
       <!-- Summary: first on phones, sticky on the right on desktop -->
       <aside class="panel summary" aria-label="Summary">
         <table class="sum-t">
@@ -316,6 +338,24 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 </template>
 
 <style scoped>
+.tabs-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin-top: -6px;
+}
+.tabs-wrap :deep(.p-tablist-tab-list) {
+  background: transparent;
+}
+.tabs-wrap :deep(.p-tab) {
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.tab-note {
+  margin: 0;
+  font-size: 0.875rem;
+}
 .page-head {
   flex-direction: column;
   align-items: flex-start;

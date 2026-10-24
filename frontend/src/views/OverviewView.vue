@@ -318,7 +318,7 @@ const widget = (id: string) => ({
 })
 const pageMenu = ref<InstanceType<typeof Menu> | null>(null)
 const pageItems = computed(() => [
-  { label: 'Import or manage data', icon: 'pi pi-sliders-h', command: () => emit('navigate', 'data') },
+  { label: 'Import or manage data', icon: 'pi pi-sliders-h', command: () => emit('navigate', 'plan/files') },
   { separator: true },
   { label: 'Reset layout', icon: 'pi pi-undo', disabled: !customOrder.value, command: () => layout.reset() }
 ])
