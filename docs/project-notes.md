@@ -30,11 +30,57 @@ monthly and yearly averages, and net worth.
 
 ```
 frontend/   Vue 3 + PrimeVue app (TypeScript, Vite)
-backend/    Spring Boot + Kotlin (not started)
+backend/    Spring Boot 4 + Kotlin API (Gradle module `:backend`)
 docs/       these notes, the todo list, architecture
 ```
 
-## Data model (prototype, mirrors planned DynamoDB items)
+## Backend (started 2026-10-24)
+
+- Spring Boot 4.1, Kotlin 2.3, Java 21, Jackson 3, JUnit 5. Gradle wrapper at the repo root,
+  backend is the `:backend` module. Package `app.financetracker`.
+- Layers: `domain/Models.kt` (data classes that mirror `frontend/src/types.ts` field for field, so the
+  JSON is what the store already uses), `repo/FinanceRepository` (plain per-user storage),
+  `service/FinanceService` (the rules: category renames cascade to entries, categories and
+  subcategories in use can't be removed, saving an entry creates its category), `web/Controllers.kt`.
+- **Storage is mocked**: `InMemoryFinanceRepository`, seeded per user from `finance.seed`
+  (default: the frontend's `seed.sample.json`, copied into the jar at build time). `bootRun` uses
+  `seed.local.json` when it exists. Data is lost on restart. DynamoDB replaces the repository bean in
+  `RepositoryConfig`; the interface is shaped for one table (PK user, SK kind#id).
+- **Auth seam**: `user/CurrentUser`. Every call is keyed by its id; `LocalUser` returns `"local"`.
+  Google SSO replaces that one bean (use the OIDC `sub`).
+- Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),
+  `PlanCalculator` (budget setup figures), `Summaries` (month totals, net worth series). The frontend
+  still computes its own; keep the two in step until it reads these.
+- Health check for Beanstalk: `/actuator/health`.
+- In this sandbox Maven Central rate-limits Gradle; a user-level init script points it at Google's
+  Maven mirror. That's environment-only, not in the repo.
+
+### API (all under `/api`, JSON)
+
+| | |
+|---|---|
+| `GET /data`, `PUT /data`, `POST /data/reset` | whole document (startup load, bulk import, reset to seed) |
+| `/categories` | `GET`, `POST`, `PUT /{id}`, `PATCH /{id}` (name, essential; rename cascades), `DELETE /{id}` (409 in use), `POST /{id}/subcategories`, `PUT`/`DELETE /{id}/subcategories/{name}` |
+| `/entries` | `GET ?year=&month=`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /import` (`replaceMonths`) |
+| `/net-worth` | `GET`, `GET /series`, `PUT`/`DELETE /accounts/{id}`, `PUT`/`DELETE /snapshots/{date}`, `POST /import` |
+| `/subscriptions` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| `/plan` | `GET`, `PUT`, `GET /summary`, `GET /loans/{id}/schedule` |
+| `/summary/months?year=` | per-month income, expenses, essentials, net |
+
+PUT is an upsert by the client's id, so the UI can save optimistically with ids it generates.
+
+### Frontend ↔ API
+
+- `frontend/src/lib/api.ts`. At startup `initStore()` tries `GET /api/data` (3 s timeout). If it answers,
+  the store loads from it and every store mutation sends its change (queued, in order). If not, the
+  app runs exactly like the prototype from the bundled seed and localStorage (preview, dev without API).
+- The budget setup form edits `state.plan` in place; a debounced watcher PUTs `/plan`.
+- Imports run inside `bulkChange()` and save the whole document with one `PUT /data`.
+- A failed save shows a banner in the app shell.
+- Subscriptions now have ids (older data gets `s1`, `s2`...).
+- The jar's UI build (`npm run build:server`) always bundles the sample seed, never `seed.local.json`.
+
+## Data model (mirrors the DynamoDB items to come)
 
 - **Category**: `type` income | expense, `name`, `subcategories[]`, `essential` (expenses).
 - **Entry**: `date`, `type`, `category`, `subcategory`, `description`, `amount`.

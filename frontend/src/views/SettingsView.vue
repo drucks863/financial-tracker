@@ -24,7 +24,9 @@ import {
   uid,
   resetToSheetData,
   saveSubscription,
-  deleteSubscription
+  deleteSubscription,
+  setEssential,
+  bulkChange
 } from '../store/finance'
 import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook } from '../lib/io'
 import { money, money2, shortDate } from '../lib/format'
@@ -117,34 +119,38 @@ const preview = computed(() => {
 })
 
 function commitImport(): void {
-  if (!imp.result) return
-  if (imp.result.kind === 'networth') {
-    const r = imp.result.data
-    const accts = state.netWorth.accounts
-    for (const a of r.accounts) {
-      let acct = accts.find((x) => x.name.toLowerCase() === a.name.toLowerCase())
-      if (!acct) {
-        acct = { id: uid('a'), name: a.name, group: a.group }
-        accts.push(acct)
+  const res = imp.result
+  if (!res) return
+  // many changes at once: saved to the server as one document at the end
+  bulkChange(() => {
+    if (res.kind === 'networth') {
+      const r = res.data
+      const accts = state.netWorth.accounts
+      for (const a of r.accounts) {
+        let acct = accts.find((x) => x.name.toLowerCase() === a.name.toLowerCase())
+        if (!acct) {
+          acct = { id: uid('a'), name: a.name, group: a.group }
+          accts.push(acct)
+        }
+        for (const [date, v] of Object.entries(a.values)) {
+          let snap = state.netWorth.snapshots.find((s) => s.date === date)
+          if (!snap) state.netWorth.snapshots.push((snap = { date, values: {} }))
+          snap.values[acct.id] = v
+        }
       }
-      for (const [date, v] of Object.entries(a.values)) {
-        let snap = state.netWorth.snapshots.find((s) => s.date === date)
-        if (!snap) state.netWorth.snapshots.push((snap = { date, values: {} }))
-        snap.values[acct.id] = v
+      toast.add({ severity: 'success', summary: 'Net worth imported', detail: `${r.accounts.length} accounts, ${r.dates.length} months`, life: 3000 })
+    } else {
+      const r = res.data
+      if (r.categories) for (const c of r.categories) for (const s of c.subcategories) ensureCategory(c.type, c.name, s)
+      const months = new Set(r.entries.map((e) => e.date.slice(0, 7)))
+      if (imp.replace) state.entries = state.entries.filter((e) => !months.has(e.date.slice(0, 7)))
+      for (const e of r.entries) {
+        ensureCategory(e.type, e.category, e.subcategory)
+        state.entries.push({ ...e, id: uid() })
       }
+      toast.add({ severity: 'success', summary: 'Entries imported', detail: `${r.entries.length} entries across ${months.size} months`, life: 3000 })
     }
-    toast.add({ severity: 'success', summary: 'Net worth imported', detail: `${r.accounts.length} accounts, ${r.dates.length} months`, life: 3000 })
-  } else {
-    const r = imp.result.data
-    if (r.categories) for (const c of r.categories) for (const s of c.subcategories) ensureCategory(c.type, c.name, s)
-    const months = new Set(r.entries.map((e) => e.date.slice(0, 7)))
-    if (imp.replace) state.entries = state.entries.filter((e) => !months.has(e.date.slice(0, 7)))
-    for (const e of r.entries) {
-      ensureCategory(e.type, e.category, e.subcategory)
-      state.entries.push({ ...e, id: uid() })
-    }
-    toast.add({ severity: 'success', summary: 'Entries imported', detail: `${r.entries.length} entries across ${months.size} months`, life: 3000 })
-  }
+  })
   imp.result = null
   imp.file = null
 }
@@ -377,7 +383,7 @@ function reset() {
               {{ cat.name }} <small class="muted">{{ cat.subcategories.length }} sub · {{ entriesUsing(cat) }} entries</small>
             </button>
             <label v-if="cat.type === 'expense'" class="flag">
-              <ToggleSwitch v-model="cat.essential" :input-id="`ess-${cat.id}`" />
+              <ToggleSwitch :model-value="!!cat.essential" :input-id="`ess-${cat.id}`" @update:model-value="setEssential(cat, $event)" />
               <span class="small ink2">Essential</span>
             </label>
             <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" :aria-label="`Rename ${cat.name}`" @click="startEdit(cat.id, cat.name)" />

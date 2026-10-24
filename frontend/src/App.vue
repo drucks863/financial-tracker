@@ -8,6 +8,7 @@ import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
 import PlanView from './views/PlanView.vue'
 import { isSampleData, state } from './store/finance'
+import { sync } from './lib/api'
 import { ui, isProfileTab } from './store/ui'
 
 const VIEWS = [
@@ -97,6 +98,7 @@ onMounted(() => {
     </nav>
 
     <main class="main">
+      <p v-if="sync.error" class="sync-error" role="alert"><i class="pi pi-exclamation-triangle"></i> Couldn't save to the server: {{ sync.error }}. Reload to see what was saved.</p>
       <p v-if="isSampleData" class="sample-note">Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export), or add <code>src/data/seed.local.json</code>.</p>
       <component :is="view.component" @navigate="go" />
     </main>
@@ -118,6 +120,14 @@ onMounted(() => {
   padding-block: 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom, 0px));
 }
 
+.sync-error {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--series-expense);
+  color: var(--ink);
+  font-size: 0.8125rem;
+}
 .sample-note {
   margin: 0 0 16px;
   padding: 10px 14px;

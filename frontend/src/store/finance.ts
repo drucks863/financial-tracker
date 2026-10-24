@@ -1,9 +1,11 @@
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import seed from '@seed'
 import { loanBalanceAt, propertyValueAt } from '../lib/loan'
+import { enc, loadRemote, send, sync } from '../lib/api'
 import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
-// Single in-memory store for the prototype, persisted to localStorage.
+// Single in-memory store. With the API running it loads from and saves to the server (see
+// lib/api.ts); without it, it starts from the bundled seed and persists to localStorage.
 
 const KEY = 'financial-tracker.v1'
 const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o))
@@ -27,7 +29,9 @@ const validPlan = (p: unknown): p is Plan => {
 }
 const withPlan = (d: FinanceData): FinanceData => {
   const plan = validPlan(d.plan) ? d.plan : validPlan(seed.plan) ? clone(seed.plan) : emptyPlan()
-  return { ...d, plan: { ...plan, loans: plan.loans ?? [] } }
+  // subscriptions from older data have no ids
+  const subscriptions = d.subscriptions.map((s, i) => (s.id ? s : { ...s, id: `s${i + 1}` }))
+  return { ...d, subscriptions, plan: { ...plan, loans: plan.loans ?? [] } }
 }
 
 function load(): FinanceData {
@@ -48,6 +52,7 @@ export const state = reactive<FinanceData>(load())
 watch(
   state,
   (s) => {
+    if (sync.remote) return
     try {
       localStorage.setItem(KEY, JSON.stringify(s))
     } catch {
@@ -57,11 +62,53 @@ watch(
   { deep: true }
 )
 
+/**
+ * Load from the API when it's there. Called once before the app mounts; afterwards every change
+ * is sent to the server, and the budget setup (edited in place by its form) is saved shortly
+ * after each edit.
+ */
+export async function initStore(): Promise<void> {
+  const remote = await loadRemote()
+  if (!remote) return
+  Object.assign(state, withPlan(remote))
+  sync.remote = true
+  let timer: ReturnType<typeof setTimeout> | undefined
+  watch(
+    () => state.plan,
+    () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => send('PUT', '/plan', state.plan), 600)
+    },
+    { deep: true }
+  )
+}
+
+let quiet = false
+/** Send a change unless a bulk change (import) is running; that one saves everything at the end. */
+const push = (method: Parameters<typeof send>[0], path: string, body?: unknown) => {
+  if (!quiet) void send(method, path, body)
+}
+
+/** Make many changes locally (an import), then save the whole document in one call. */
+export function bulkChange(fn: () => void): void {
+  quiet = true
+  try {
+    fn()
+  } finally {
+    quiet = false
+  }
+  void send('PUT', '/data', state)
+}
+
 export function resetToSheetData(): void {
+  if (sync.remote) {
+    void send<FinanceData>('POST', '/data/reset').then((d) => d && Object.assign(state, withPlan(d)))
+    return
+  }
   Object.assign(state, withPlan(clone(seed)))
 }
 
-export const isSampleData = !!seed.sample
+export const isSampleData = computed(() => !!state.sample)
 
 export const uid = (p = 'e'): string => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 
@@ -84,6 +131,7 @@ export function addCategory({ type, name, essential = false, subcategories = [] 
   const cat: Category = { id: uid('c'), type, name, subcategories: subcategories.length ? subcategories : ['Other'] }
   if (type === 'expense') cat.essential = essential
   state.categories.push(cat)
+  push('PUT', `/categories/${enc(cat.id)}`, cat)
   return cat
 }
 
@@ -94,13 +142,20 @@ export function renameCategory(cat: Category, newName: string): boolean {
     if (e.type === cat.type && e.category === cat.name) e.category = newName
   })
   cat.name = newName
+  push('PATCH', `/categories/${enc(cat.id)}`, { name: newName })
   return true
+}
+
+export function setEssential(cat: Category, essential: boolean): void {
+  cat.essential = essential
+  push('PATCH', `/categories/${enc(cat.id)}`, { essential })
 }
 
 export function addSubcategory(cat: Category, name: string): boolean {
   name = name.trim()
   if (!name || cat.subcategories.includes(name)) return false
   cat.subcategories.push(name)
+  push('POST', `/categories/${enc(cat.id)}/subcategories`, { name })
   return true
 }
 
@@ -111,6 +166,7 @@ export function renameSubcategory(cat: Category, oldName: string, newName: strin
   state.entries.forEach((e) => {
     if (e.type === cat.type && e.category === cat.name && e.subcategory === oldName) e.subcategory = newName
   })
+  push('PUT', `/categories/${enc(cat.id)}/subcategories/${enc(oldName)}`, { name: newName })
   return true
 }
 
@@ -120,19 +176,21 @@ export const entriesUsing = (cat: Category, sub?: string): number =>
 export function removeSubcategory(cat: Category, sub: string): boolean {
   if (entriesUsing(cat, sub)) return false
   cat.subcategories = cat.subcategories.filter((s) => s !== sub)
+  push('DELETE', `/categories/${enc(cat.id)}/subcategories/${enc(sub)}`)
   return true
 }
 
 export function removeCategory(cat: Category): boolean {
   if (entriesUsing(cat)) return false
   state.categories.splice(state.categories.indexOf(cat), 1)
+  push('DELETE', `/categories/${enc(cat.id)}`)
   return true
 }
 
 // Makes sure a category/subcategory pair exists (used by import and new entries).
 export function ensureCategory(type: EntryType, name: string, sub?: string): Category {
   const cat = findCategory(type, name) ?? addCategory({ type, name, subcategories: [sub || 'Other'] })!
-  if (sub && !cat.subcategories.includes(sub)) cat.subcategories.push(sub)
+  if (sub && !cat.subcategories.includes(sub)) addSubcategory(cat, sub)
   return cat
 }
 
@@ -144,17 +202,20 @@ export function saveEntry(entry: EntryDraft): Entry {
     const i = state.entries.findIndex((e) => e.id === entry.id)
     if (i >= 0) {
       state.entries[i] = { ...entry, id: entry.id }
+      push('PUT', `/entries/${enc(entry.id)}`, state.entries[i])
       return state.entries[i]
     }
   }
   const e: Entry = { ...entry, id: uid() }
   state.entries.push(e)
+  push('PUT', `/entries/${enc(e.id)}`, e)
   return e
 }
 
 export function deleteEntry(id: string): void {
   const i = state.entries.findIndex((e) => e.id === id)
   if (i >= 0) state.entries.splice(i, 1)
+  push('DELETE', `/entries/${enc(id)}`)
 }
 
 export const yearsAvailable = (): number[] => [...new Set(state.entries.map((e) => +e.date.slice(0, 4)))].sort((a, b) => b - a)
@@ -275,10 +336,12 @@ export function saveSnapshot(date: string, values: Record<string, number>): void
   const existing = state.netWorth.snapshots.find((s) => s.date === date)
   if (existing) existing.values = { ...values }
   else state.netWorth.snapshots.push({ date, values: { ...values } })
+  push('PUT', `/net-worth/snapshots/${enc(date)}`, values)
 }
 
 export function deleteSnapshot(date: string): void {
   state.netWorth.snapshots = state.netWorth.snapshots.filter((s) => s.date !== date)
+  push('DELETE', `/net-worth/snapshots/${enc(date)}`)
 }
 
 export function addAccount(name: string, group: AccountGroup): Account | null {
@@ -286,6 +349,7 @@ export function addAccount(name: string, group: AccountGroup): Account | null {
   if (!name) return null
   const a: Account = { id: uid('a'), name, group }
   state.netWorth.accounts.push(a)
+  push('PUT', `/net-worth/accounts/${enc(a.id)}`, a)
   return a
 }
 
@@ -293,10 +357,13 @@ export function addAccount(name: string, group: AccountGroup): Account | null {
 
 /** Save a subscription; `index` null adds a new one. */
 export function saveSubscription(index: number | null, sub: Subscription): void {
-  if (index === null) state.subscriptions.push(sub)
-  else state.subscriptions.splice(index, 1, sub)
+  const s = { ...sub, id: sub.id || uid('s') }
+  if (index === null) state.subscriptions.push(s)
+  else state.subscriptions.splice(index, 1, s)
+  push('PUT', `/subscriptions/${enc(s.id!)}`, s)
 }
 
 export function deleteSubscription(index: number): void {
-  state.subscriptions.splice(index, 1)
+  const [s] = state.subscriptions.splice(index, 1)
+  if (s?.id) push('DELETE', `/subscriptions/${enc(s.id)}`)
 }
