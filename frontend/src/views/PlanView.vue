@@ -62,7 +62,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
     <header class="page-head">
       <div>
         <h1>My numbers</h1>
-        <p class="muted">Your current pay, contributions, taxes and rent in one place. Other screens use these figures.</p>
+        <p class="muted">Your current pay, contributions, taxes and rent in one place.</p>
       </div>
     </header>
 
