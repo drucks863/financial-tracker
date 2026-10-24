@@ -27,6 +27,11 @@ const k401Pct = percent('k401')
 const matchPct = percent('match')
 const setShare = (h: SharedCost, v: number | null) => (h.share = clampPct(v))
 const setRate = (l: Loan, v: number | null) => (l.rate = clampPct(v))
+// Yearly change can be negative (a car loses value), so it isn't clamped to 0–100.
+const setChange = (l: Loan, v: number | null) => l.property && (l.property.yearlyChange = (v ?? 0) / 100)
+function toggleProperty(l: Loan, on: boolean): void {
+  l.property = on ? { name: /car|auto|vehicle/i.test(l.name) ? 'Car' : 'Home', value: l.amount, valuedOn: new Date().toISOString().slice(0, 7), yearlyChange: 0 } : null
+}
 const loanInfo = (id: string) => n.value.loans.find((x) => x.loan.id === id)
 const ymLabel = (ym: string | null) => (ym ? new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—')
 
@@ -225,7 +230,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
               <InputText v-model="l.name" placeholder="Name, e.g. Mortgage" aria-label="Loan name" fluid />
               <Button icon="pi pi-trash" text rounded severity="secondary" :aria-label="`Remove ${l.name || 'loan'}`" @click="remove(p.loans, l.id)" />
             </div>
-            <div class="grid loan-grid">
+            <div class="loan-grid">
               <label class="field">
                 <span>Amount borrowed</span>
                 <InputNumber v-model="l.amount" mode="currency" currency="USD" locale="en-US" :max-fraction-digits="0" fluid />
@@ -240,16 +245,48 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
               </label>
               <label class="field">
                 <span>First payment</span>
-                <InputText v-model="l.start" type="month" fluid />
+                <InputText v-model="l.start" type="month" class="month-input" fluid />
               </label>
               <label class="field">
                 <span>Extra each month</span>
                 <InputNumber v-model="l.extraMonthly" mode="currency" currency="USD" locale="en-US" fluid />
               </label>
             </div>
+            <label class="switch prop-switch">
+              <ToggleSwitch :model-value="!!l.property" @update:model-value="toggleProperty(l, $event)" />
+              <span>Count what it bought as an asset (home, car)</span>
+            </label>
+            <div v-if="l.property" class="loan-grid">
+              <label class="field">
+                <span>Asset name</span>
+                <InputText v-model="l.property.name" fluid />
+              </label>
+              <label class="field">
+                <span>Conservative market value</span>
+                <InputNumber v-model="l.property.value" mode="currency" currency="USD" locale="en-US" :max-fraction-digits="0" fluid />
+              </label>
+              <label class="field">
+                <span>Valued as of</span>
+                <InputText v-model="l.property.valuedOn" type="month" class="month-input" fluid />
+              </label>
+              <label class="field">
+                <span>Yearly change</span>
+                <InputNumber
+                  :model-value="Math.round(l.property.yearlyChange * 10000) / 100"
+                  suffix="%"
+                  :min="-50"
+                  :max="50"
+                  :max-fraction-digits="2"
+                  fluid
+                  @update:model-value="setChange(l, $event)"
+                />
+                <small class="muted">0% holds it flat; use a negative number for a car</small>
+              </label>
+            </div>
             <p v-if="loanInfo(l.id)" class="muted small loan-sum num">
               {{ money2(loanInfo(l.id)!.payment) }} a month · owe {{ money(loanInfo(l.id)!.balance) }} now · paid off {{ ymLabel(loanInfo(l.id)!.payoff) }} ·
               {{ money(loanInfo(l.id)!.interestTotal) }} interest over the loan
+              <template v-if="loanInfo(l.id)!.equity !== null"> · equity {{ money(loanInfo(l.id)!.equity!) }}</template>
             </p>
           </div>
           <Button label="Add loan" icon="pi pi-plus" text size="small" @click="p.loans.push(newLoan())" />
@@ -408,8 +445,19 @@ h3 {
   margin-top: 6px;
 }
 .loan-grid {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px 14px;
   margin-top: 10px;
+  align-items: start;
+}
+/* native month inputs have a wide intrinsic size; let the grid decide */
+.month-input {
+  min-width: 0;
+  width: 100%;
+}
+.prop-switch {
+  margin-top: 14px;
 }
 .loan-sum {
   margin: 10px 0 0;

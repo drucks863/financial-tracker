@@ -50,7 +50,14 @@ const shown = computed(() => {
 })
 
 const GROUP_COLOR: Record<AccountGroup, number> = { Cash: ROLE.cash, Investments: ROLE.investments, 'Other assets': ROLE.other, Debt: ROLE.debt }
-const groupsInUse = computed(() => NW_GROUPS.filter((g) => state.netWorth.accounts.some((a) => a.group === g)))
+const groupsInUse = computed(() =>
+  NW_GROUPS.filter(
+    (g) =>
+      state.netWorth.accounts.some((a) => a.group === g) ||
+      (g === 'Other assets' && all.value.some((p) => Object.keys(p.properties).length)) ||
+      (g === 'Debt' && all.value.some((p) => Object.keys(p.loans).length))
+  )
+)
 
 // Groups are drawn as stacked areas (pre-summed so the net worth line stays unstacked);
 // tooltips report each group's own balance.
@@ -156,6 +163,22 @@ const accountRows = computed(() => {
             value,
             change: before === null ? null : before - value,
             note: 'from My numbers'
+          }
+        }),
+      // ...and the property each loan bought, at its conservative value.
+      (state.plan?.loans ?? [])
+        .filter((ln) => (l.properties[ln.id] || 0) > 0)
+        .map((ln) => {
+          const value = l.properties[ln.id] || 0
+          const before = p ? p.properties[ln.id] ?? null : null
+          return {
+            id: `${ln.id}-property`,
+            name: ln.property?.name || 'Property',
+            group: 'Other assets' as AccountGroup,
+            debt: false,
+            value,
+            change: before === null ? null : value - before,
+            note: `${l.assets ? pct(value / l.assets) : ''} of assets · conservative value`
           }
         })
     )
@@ -323,6 +346,10 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
           <p class="muted num">
             Owe {{ money(loan.balance) }} · paid {{ money(loan.principalPaid) }} principal and {{ money(loan.interestPaid) }} interest so far · paid off {{ ymLabel(loan.payoff) }}
           </p>
+          <p v-if="loan.equity !== null" class="num equity">
+            Equity <strong :class="loan.equity >= 0 ? 'pos' : 'neg'">{{ money(loan.equity) }}</strong>&nbsp;
+            <span class="muted">· {{ loan.loan.property?.name || 'Property' }} worth {{ money(loan.value) }} (conservative) − {{ money(loan.balance) }} owed</span>
+          </p>
         </div>
         <Select
           v-if="loans.length > 1"
@@ -446,6 +473,10 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 </template>
 
 <style scoped>
+.equity {
+  margin: 6px 0 0;
+  font-size: 0.875rem;
+}
 .paid {
   display: block;
   font-size: 0.6875rem;

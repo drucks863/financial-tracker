@@ -74,13 +74,30 @@ export function loanSummary(l: Loan, ym = currentYm()) {
   const rows = loanSchedule(l)
   const done = rows.filter((x) => x.ym <= ym)
   const sum = (xs: LoanRow[], k: 'interest' | 'principal') => xs.reduce((a, x) => a + x[k], 0)
+  const balance = loanBalanceAt(l, ym)
+  const value = propertyValueAt(l, ym)
   return {
     payment: loanPayment(l) + (l.extraMonthly || 0),
-    balance: loanBalanceAt(l, ym),
+    balance,
+    value,
+    /** what you own of the property: its value minus what's still owed */
+    equity: value ? value - balance : null,
     payoff: rows.at(-1)?.ym ?? null,
     interestPaid: sum(done, 'interest'),
     principalPaid: sum(done, 'principal'),
     interestTotal: sum(rows, 'interest'),
     rows
   }
+}
+
+/**
+ * Value of the loan's property at the end of month `ym`: the conservative value, grown (or
+ * shrunk) by its yearly change from the valuation month. Zero before the loan closed.
+ */
+export function propertyValueAt(l: Loan, ym: string): number {
+  const p = l.property
+  if (!p || !p.value || !/^\d{4}-\d{2}$/.test(p.valuedOn)) return 0
+  if (/^\d{4}-\d{2}$/.test(l.start) && monthsBetween(l.start, ym) < -1) return 0
+  const months = monthsBetween(p.valuedOn, ym)
+  return Math.max(0, p.value * Math.pow(1 + (p.yearlyChange || 0), months / 12))
 }

@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import seed from '@seed'
-import { loanBalanceAt } from '../lib/loan'
+import { loanBalanceAt, propertyValueAt } from '../lib/loan'
 import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
 // Single in-memory store for the prototype, persisted to localStorage.
@@ -249,17 +249,25 @@ export function netWorthSeries(): NetWorthPoint[] {
     const byGroup = Object.fromEntries(NW_GROUPS.map((g) => [g, 0])) as Record<AccountGroup, number>
     // Debt balances count as amounts owed whichever sign they were entered with.
     for (const a of accounts) byGroup[a.group] += a.group === 'Debt' ? Math.abs(s.values[a.id] || 0) : s.values[a.id] || 0
-    // Loans from My numbers add their balance for that month.
+    // Loans from My numbers add their balance for that month, and the property they bought
+    // (valued conservatively) counts under Other assets.
     const loans: Record<string, number> = {}
+    const properties: Record<string, number> = {}
     for (const l of state.plan?.loans ?? []) {
-      const b = loanBalanceAt(l, s.date.slice(0, 7))
+      const ym = s.date.slice(0, 7)
+      const b = loanBalanceAt(l, ym)
       if (b > 0) {
         loans[l.id] = b
         byGroup.Debt += b
       }
+      const v = propertyValueAt(l, ym)
+      if (v > 0) {
+        properties[l.id] = v
+        byGroup['Other assets'] += v
+      }
     }
     const assets = byGroup.Cash + byGroup.Investments + byGroup['Other assets']
-    return { date: s.date, byGroup, assets, debt: byGroup.Debt, loans, total: assets - byGroup.Debt, values: s.values }
+    return { date: s.date, byGroup, assets, debt: byGroup.Debt, loans, properties, total: assets - byGroup.Debt, values: s.values }
   })
 }
 

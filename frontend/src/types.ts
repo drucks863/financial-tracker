@@ -80,6 +80,19 @@ export interface Loan {
   start: string
   /** extra principal paid each month */
   extraMonthly: number
+  /** what the loan bought (a home, a car), counted as an asset on Net worth */
+  property?: LoanProperty | null
+}
+
+/** The asset behind a loan, valued conservatively by the person. */
+export interface LoanProperty {
+  name: string
+  /** conservative market value as of `valuedOn` */
+  value: number
+  /** YYYY-MM */
+  valuedOn: string
+  /** yearly change in value, e.g. 0.02 for +2% (negative for a car) */
+  yearlyChange: number
 }
 
 /**
@@ -139,6 +152,8 @@ export interface NetWorthPoint {
   debt: number
   /** loan balances that month, by loan id */
   loans: Record<string, number>
+  /** values of the properties behind loans that month, by loan id */
+  properties: Record<string, number>
   total: number
   values: Record<string, number>
 }

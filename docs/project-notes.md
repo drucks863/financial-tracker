@@ -72,6 +72,10 @@ docs/       these notes, the todo list, architecture
 - Loans (amount, rate, term, first payment month, extra/month) live on My numbers;
   `lib/loan.ts` amortizes them. Net worth adds each loan's balance as debt for every snapshot
   month (owed from the month before the first payment), so loans are never typed into snapshots.
+- A loan can carry the property it bought (name, conservative market value, valued-as-of month,
+  yearly change). Net worth counts it under Other assets every month (value grown/shrunk from the
+  valuation month; zero before the loan closed) and shows equity = value − balance. Devin wants
+  this value kept conservative; there's no live price lookup, he updates it himself.
 - Debt accounts typed into snapshots count as owed whichever sign is entered.
 
 ## The Google Sheets are reference only
