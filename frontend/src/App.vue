@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Toast from 'primevue/toast'
-import Button from 'primevue/button'
 import EntryDialog from './components/EntryDialog.vue'
 import OverviewView from './views/OverviewView.vue'
 import CashFlowView from './views/CashFlowView.vue'
@@ -9,14 +8,13 @@ import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
 import SettingsView from './views/SettingsView.vue'
 import PlanView from './views/PlanView.vue'
-import { openEntry } from './store/ui'
 import { isSampleData, state } from './store/finance'
 
 const VIEWS = [
   { id: 'overview', label: 'Overview', icon: 'pi pi-home', component: OverviewView },
   { id: 'cashflow', label: 'Cash flow', icon: 'pi pi-list', component: CashFlowView },
-  { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
   { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView },
+  { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
   // opened from the avatar, not listed in the nav
   { id: 'plan', label: 'My numbers', icon: 'pi pi-calculator', component: PlanView, hidden: true },
   { id: 'data', label: 'Data', icon: 'pi pi-sliders-h', component: SettingsView }
@@ -87,7 +85,6 @@ onMounted(() => {
           <span class="me-sub">My numbers</span>
         </span>
       </button>
-      <button type="button" class="rail-add" @click="openEntry()"><i class="pi pi-plus" aria-hidden="true"></i><span>Add entry</span></button>
     </nav>
 
     <main class="main">
@@ -95,7 +92,6 @@ onMounted(() => {
       <component :is="view.component" @navigate="go" />
     </main>
 
-    <Button class="fab" icon="pi pi-plus" rounded aria-label="Add entry" @click="openEntry()" />
     <EntryDialog />
     <Toast position="top-center" />
   </div>
@@ -110,7 +106,7 @@ onMounted(() => {
   margin: 0 auto;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 16px calc(var(--nav-h) + 88px + env(safe-area-inset-bottom, 0px));
+  padding-block: 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom, 0px));
 }
 
 .sample-note {
@@ -137,8 +133,7 @@ onMounted(() => {
   padding-left: max(4px, env(safe-area-inset-left, 0px));
   padding-right: max(4px, env(safe-area-inset-right, 0px));
 }
-.brand,
-.rail-add {
+.brand {
   display: none;
 }
 .nav-item {
@@ -161,15 +156,6 @@ onMounted(() => {
 }
 .nav-item[aria-current='page'] {
   color: var(--accent);
-}
-.fab {
-  position: fixed;
-  right: calc(16px + env(safe-area-inset-right, 0px));
-  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px));
-  z-index: 21;
-  width: 56px !important;
-  height: 56px !important;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* Avatar: opens My numbers. A tab on phones, the bottom-left corner of the rail on desktop. */
@@ -254,8 +240,7 @@ onMounted(() => {
     color: var(--p-primary-contrast-color, #fff);
     font-weight: 700;
   }
-  .nav-item,
-  .rail-add {
+  .nav-item {
     flex: none;
     display: flex;
     align-items: center;
@@ -270,8 +255,7 @@ onMounted(() => {
     font-size: 0.9rem;
     cursor: pointer;
   }
-  .nav-item .pi,
-  .rail-add .pi {
+  .nav-item .pi {
     font-size: 1rem;
     width: 18px;
     text-align: center;
@@ -332,20 +316,6 @@ onMounted(() => {
   }
   .me[aria-current='page'] .me-sub {
     color: var(--accent);
-  }
-  .rail-add {
-    order: -1;
-    margin-bottom: 10px;
-    justify-content: center;
-    border: 1px solid var(--line);
-    color: var(--ink);
-    font-weight: 500;
-  }
-  .rail-add:hover {
-    background: var(--panel-2);
-  }
-  .fab {
-    display: none;
   }
   .main {
     max-width: 1320px;

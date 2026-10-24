@@ -238,11 +238,6 @@ const spendLegend = computed(() => [
 /* ---------- recent activity ---------- */
 const periodEntries = computed(() => state.entries.filter(inPeriod).sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount))
 const ACTIVITY_ROWS = 6
-const activityMenu = ref<InstanceType<typeof Menu> | null>(null)
-const activityItems = [
-  { label: 'Add entry', icon: 'pi pi-plus', command: () => openEntry() },
-  { label: 'All entries', icon: 'pi pi-list', command: () => emit('navigate', 'cashflow') }
-]
 const day = (iso: string) => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
 
 /* ---------- spending mix ---------- */
@@ -323,7 +318,6 @@ const widget = (id: string) => ({
 })
 const pageMenu = ref<InstanceType<typeof Menu> | null>(null)
 const pageItems = computed(() => [
-  { label: 'Add entry', icon: 'pi pi-plus', command: () => openEntry() },
   { label: 'Import or manage data', icon: 'pi pi-sliders-h', command: () => emit('navigate', 'data') },
   { separator: true },
   { label: 'Reset layout', icon: 'pi pi-undo', disabled: !customOrder.value, command: () => layout.reset() }
@@ -449,8 +443,7 @@ const pageItems = computed(() => [
           <h2 id="activity-title">Recent activity</h2>
           <div class="head-end">
             <span class="pill num">{{ periodEntries.length }} entries</span>
-            <Button icon="pi pi-ellipsis-h" text rounded size="small" aria-label="Activity options" aria-haspopup="true" @click="activityMenu?.toggle($event)" />
-            <Menu ref="activityMenu" :model="activityItems" popup />
+            <Button label="All entries" text size="small" @click="emit('navigate', 'cashflow')" />
           </div>
         </div>
         <table v-if="periodEntries.length" class="table">

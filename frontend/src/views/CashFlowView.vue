@@ -77,9 +77,12 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
 
 <template>
   <div class="stack">
-    <header>
-      <h1>Cash flow</h1>
-      <p class="muted">Every entry for {{ monthLabel(selectedYm) }}, grouped the way your sheet groups them</p>
+    <header class="head">
+      <div>
+        <h1>Cash flow</h1>
+        <p class="muted">Every entry for {{ monthLabel(selectedYm) }}, grouped the way your sheet groups them</p>
+      </div>
+      <Button class="add-top" label="Add entry" icon="pi pi-plus" @click="openEntry()" />
     </header>
 
     <MonthStrip />
@@ -140,10 +143,45 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
       <Button v-if="!query" label="Add entry" icon="pi pi-plus" @click="openEntry()" />
       <Button v-else label="Clear search" text @click="query = ''" />
     </section>
+    <Button class="fab" icon="pi pi-plus" rounded aria-label="Add entry" @click="openEntry()" />
   </div>
 </template>
 
 <style scoped>
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.add-top {
+  display: none !important;
+  flex: none;
+}
+.fab {
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px));
+  z-index: 21;
+  width: 56px !important;
+  height: 56px !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+/* room so the last entry can scroll above the button */
+.stack {
+  padding-bottom: 72px;
+}
+@media (min-width: 960px) {
+  .add-top {
+    display: inline-flex !important;
+  }
+  .fab {
+    display: none !important;
+  }
+  .stack {
+    padding-bottom: 0;
+  }
+}
 .toolbar {
   display: grid;
   gap: 10px;
