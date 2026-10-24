@@ -10,8 +10,8 @@ import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import { ui, selectedYm } from '../store/ui'
 import { categoriesOf, findCategory, saveEntry, deleteEntry, addSubcategory, addCategory } from '../store/finance'
-import { money2 } from '../lib/format'
-import { planned } from '../store/plan'
+import { money2, localIso } from '../lib/format'
+import { planned, normName as norm, sameName } from '../store/plan'
 import type { EntryType } from '../types'
 
 const toast = useToast()
@@ -42,13 +42,10 @@ function toDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
-function toIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 function defaultDate(): Date {
   const today = new Date()
   const ym = selectedYm.value
-  if (toIso(today).startsWith(ym)) return today
+  if (localIso(today).startsWith(ym)) return today
   return toDate(`${ym}-01`)
 }
 
@@ -69,8 +66,6 @@ const subOptions = computed(() => findCategory(form.type, form.category)?.subcat
 
 // Suggested amount from the financial profile for the picked category: paycheck take-home for wage income,
 // your share for a rent or bill item, or a loan payment. Matched by name.
-const norm = (v: string | null | undefined) => (v || '').toLowerCase().replace(/[^a-z]/g, '')
-const sameName = (a: string, b: string) => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
 const suggestion = computed<{ amount: number; label: string } | null>(() => {
   const n = planned.value
   const sub = norm(form.subcategory)
@@ -155,7 +150,7 @@ function save(another = false): void {
   const saved = saveEntry({
     id: form.id,
     type: form.type,
-    date: toIso(form.date),
+    date: localIso(form.date),
     category: form.category,
     subcategory: form.subcategory,
     description: form.description.trim(),

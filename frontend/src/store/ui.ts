@@ -2,11 +2,12 @@ import { reactive, computed } from 'vue'
 import type { Entry } from '../types'
 import { state, categoryTotals } from './finance'
 import { series, otherColor } from '../lib/chart-colors'
+import { localYm } from '../lib/format'
 
 // View state shared across screens (not persisted).
 function latestMonth(): { year: number; month: number } {
   const months = state.entries.filter((e) => e.type === 'income').map((e) => e.date.slice(0, 7))
-  const latest = months.sort().pop() || new Date().toISOString().slice(0, 7)
+  const latest = months.sort().pop() || localYm()
   return { year: +latest.slice(0, 4), month: +latest.slice(5, 7) - 1 }
 }
 

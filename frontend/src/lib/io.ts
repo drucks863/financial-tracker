@@ -263,7 +263,12 @@ export async function parseCashFlowWorkbook(file: File, year: number): Promise<P
 
   const entries: EntryDraft[] = []
   const found: Record<string, number> = {}
-  const findCat = (name: Cell) => expense.find((c) => norm(c.name) === norm(name) || norm(c.name).startsWith(norm(name).slice(0, 6)))
+  // Exact name, or a shared prefix of 4+ letters ("Health" ~ "Health/medical"). Short cells like
+  // "-" or "E" must not count as category headers.
+  const findCat = (name: Cell) => {
+    const n = norm(name)
+    return expense.find((c) => norm(c.name) === n || (n.length >= 4 && norm(c.name).startsWith(n.slice(0, 6))))
+  }
 
   // 2) itemized month tabs
   MONTHS_LONG.forEach((monthName, mi) => {

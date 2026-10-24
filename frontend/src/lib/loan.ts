@@ -1,4 +1,5 @@
 import type { Loan } from '../types'
+import { localYm } from './format'
 
 // Standard amortization, month by month. Pure functions so Net worth, the financial profile and charts agree.
 
@@ -67,7 +68,7 @@ export function loanBalanceAt(l: Loan, ym: string): number {
   return i < rows.length ? rows[i].balance : 0
 }
 
-export const currentYm = (): string => new Date().toISOString().slice(0, 7)
+export const currentYm = (): string => localYm()
 
 /** Totals paid so far (through `ym`) and over the whole loan. */
 export function loanSummary(l: Loan, ym = currentYm()) {

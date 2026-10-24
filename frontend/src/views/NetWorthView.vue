@@ -10,7 +10,7 @@ import SelectButton from 'primevue/selectbutton'
 import { useToast } from 'primevue/usetoast'
 import BaseChart from '../components/BaseChart.vue'
 import { state, netWorthSeries, saveSnapshot, deleteSnapshot, addAccount, NW_GROUPS } from '../store/finance'
-import { money, signedMoney, pct, shortDate } from '../lib/format'
+import { money, signedMoney, pct, shortDate, ymLabel, localIso } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
 import type { ChartBuilder } from '../lib/chart-types'
 import { loanSummary, currentYm } from '../lib/loan'
@@ -230,7 +230,6 @@ const loanChart = computed<ChartBuilder>(() => {
     }
   })
 })
-const ymLabel = (ym: string | null) => (ym ? new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—')
 
 /* ---- snapshot dialog ---- */
 const dlg = reactive({ open: false, date: null as Date | null, values: {} as Record<string, number>, editing: false })
@@ -239,9 +238,9 @@ const newAcct = reactive<{ name: string; group: AccountGroup }>({ name: '', grou
 function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0)
 }
-const iso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 function openSnapshot(point: NetWorthPoint | null = null): void {
+  confirmDelete.value = false // a cancelled delete must not carry over to the next snapshot
   if (point) {
     const [y, m, d] = point.date.split('-').map(Number)
     Object.assign(dlg, { open: true, date: new Date(y, m - 1, d), values: { ...point.values }, editing: true })
@@ -261,13 +260,13 @@ function addAcct() {
 }
 function saveDlg() {
   if (!dlg.date) return
-  saveSnapshot(iso(dlg.date), dlg.values)
+  saveSnapshot(localIso(dlg.date), dlg.values)
   dlg.open = false
-  toast.add({ severity: 'success', summary: 'Snapshot saved', detail: `${shortDate(iso(dlg.date))} · ${money(dlgTotal.value)}`, life: 2200 })
+  toast.add({ severity: 'success', summary: 'Snapshot saved', detail: `${shortDate(localIso(dlg.date))} · ${money(dlgTotal.value)}`, life: 2200 })
 }
 const confirmDelete = ref(false)
 function removeDlg() {
-  if (dlg.date) deleteSnapshot(iso(dlg.date))
+  if (dlg.date) deleteSnapshot(localIso(dlg.date))
   dlg.open = false
   confirmDelete.value = false
   toast.add({ severity: 'info', summary: 'Snapshot deleted', life: 2000 })

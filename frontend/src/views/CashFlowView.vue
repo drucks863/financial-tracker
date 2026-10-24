@@ -8,7 +8,7 @@ import Button from 'primevue/button'
 import MonthStrip from '../components/MonthStrip.vue'
 import { ui, selectedYm, openEntry, categoryColor } from '../store/ui'
 import { state, categoriesOf, monthTotals } from '../store/finance'
-import { money, money2, monthLabel, MONTHS } from '../lib/format'
+import { money, money2, monthLabel, dayLabel } from '../lib/format'
 import { isDark } from '../lib/theme-mode'
 import type { Entry, EntryType } from '../types'
 
@@ -71,7 +71,6 @@ const groups = computed(() => {
 })
 
 const shownTotal = computed(() => groups.value.reduce((a, g) => a + g.total, 0))
-const dayLabel = (iso: string): string => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
 const swatch = (name: string): string => (type.value === 'expense' ? categoryColor(name, isDark.value) : 'var(--series-income)')
 </script>
 

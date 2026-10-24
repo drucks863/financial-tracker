@@ -5,7 +5,7 @@ import SelectButton from 'primevue/selectbutton'
 import BaseChart from '../components/BaseChart.vue'
 import { ui, categoryRank, categoryColor } from '../store/ui'
 import { monthTotals, avgNonZero, yearGrid, yearsAvailable, categoriesOf, findCategory } from '../store/finance'
-import { planned } from '../store/plan'
+import { planned, normName as norm, sameName } from '../store/plan'
 import { money, signedMoney, pct, MONTHS } from '../lib/format'
 import { series, otherColor, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
@@ -35,8 +35,6 @@ const stats = computed(() => {
 
 /* ---- planned amounts from the financial profile ---- */
 const planTakeHome = computed(() => planned.value.monthly.takeHome)
-const norm = (v: string) => v.toLowerCase().replace(/[^a-z]/g, '')
-const sameName = (a: string, b: string) => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
 /** Planned monthly amount for one category, when the financial profile has one (wages, rent, bills, loans). */
 function planFor(type: EntryType, name: string): number {
   const n = planned.value
@@ -80,7 +78,7 @@ const stacked = computed<ChartBuilder>(() => {
             ]
           : []),
         {
-          label: 'Other',
+          label: top.includes('Other') ? 'Everything else' : 'Other',
           data: MONTHS.map((_, m) => rest.reduce((a, n) => a + grid[n].months[m], 0)),
           backgroundColor: otherColor(dark),
           borderColor: c.surface,
@@ -97,7 +95,7 @@ const stacked = computed<ChartBuilder>(() => {
     }
   })
 })
-const stackedLegend = computed(() => [...categoryRank.value.slice(0, 7).map((n, i) => ({ name: n, i })), { name: 'Other', i: -1 }])
+const stackedLegend = computed(() => [...categoryRank.value.slice(0, 7).map((n, i) => ({ name: n, i })), { name: categoryRank.value.slice(0, 7).includes('Other') ? 'Everything else' : 'Other', i: -1 }])
 const otherNames = computed(() => categoryRank.value.slice(7).join(', '))
 
 /* ---- one category over time ---- */

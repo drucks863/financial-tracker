@@ -7,7 +7,7 @@ import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { state } from '../store/finance'
 import { planned, newDeduction, newSharedCost, newLoan, PAY_FREQUENCIES } from '../store/plan'
-import { money, money2, pct } from '../lib/format'
+import { money, money2, pct, ymLabel, localYm } from '../lib/format'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -62,10 +62,9 @@ const setRate = (l: Loan, v: number | null) => (l.rate = clampPct(v))
 // Yearly change can be negative (a car loses value), so it isn't clamped to 0–100.
 const setChange = (l: Loan, v: number | null) => l.property && (l.property.yearlyChange = (v ?? 0) / 100)
 function toggleProperty(l: Loan, on: boolean): void {
-  l.property = on ? { name: /car|auto|vehicle/i.test(l.name) ? 'Car' : 'Home', value: l.amount, valuedOn: new Date().toISOString().slice(0, 7), yearlyChange: 0 } : null
+  l.property = on ? { name: /car|auto|vehicle/i.test(l.name) ? 'Car' : 'Home', value: l.amount, valuedOn: localYm(), yearlyChange: 0 } : null
 }
 const loanInfo = (id: string) => n.value.loans.find((x) => x.loan.id === id)
-const ymLabel = (ym: string | null) => (ym ? new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—')
 
 const takeHomeActual = computed<boolean>({
   get: () => p.value.takeHome !== null,
@@ -241,7 +240,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
               <ToggleSwitch v-model="takeHomeActual" />
               <span>Use my actual take-home<UsedBy :where="USES.takeHome" /></span>
             </label>
-            <InputNumber v-if="takeHomeActual" v-model="p.takeHome" mode="currency" currency="USD" locale="en-US" aria-label="Take-home per paycheck" class="th-input" />
+            <InputNumber v-if="takeHomeActual" :model-value="p.takeHome" @update:model-value="(v: number | null) => (p.takeHome = v ?? 0)" mode="currency" currency="USD" locale="en-US" aria-label="Take-home per paycheck" class="th-input" />
             <span class="muted small">
               {{ takeHomeActual ? `per paycheck · estimate would be ${money2(n.paycheck.estTakeHome)}` : `Estimated ${money2(n.paycheck.estTakeHome)} a paycheck, ${freqLabel}` }}
             </span>

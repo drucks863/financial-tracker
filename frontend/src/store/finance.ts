@@ -30,32 +30,50 @@ const withPlan = (d: FinanceData): FinanceData => {
   return { ...d, plan: { ...plan, loans: plan.loans ?? [] } }
 }
 
+// Saved data from another version is kept when its shape still fits (missing pieces get
+// defaults); otherwise a copy is set aside before the seed replaces it, so nothing is lost.
+const usable = (d: Partial<FinanceData> | null): d is FinanceData =>
+  !!d && Array.isArray(d.categories) && Array.isArray(d.entries) && !!d.netWorth && Array.isArray(d.netWorth.snapshots)
+
 function load(): FinanceData {
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as FinanceData
-      if (parsed?.version === seed.version) return withPlan(parsed)
+      const parsed = JSON.parse(raw) as Partial<FinanceData> | null
+      if (parsed?.version === seed.version && usable(parsed)) return withPlan(parsed)
+      if (usable(parsed)) return withPlan({ ...parsed, subscriptions: parsed.subscriptions ?? [], version: seed.version })
+      localStorage.setItem(`${KEY}.backup`, raw)
     }
   } catch {
-    /* storage blocked: fall back to seed */
+    /* storage blocked or unreadable: fall back to seed */
   }
   return withPlan(clone(seed))
 }
 
 export const state = reactive<FinanceData>(load())
 
+// Save shortly after edits stop (typing shouldn't rewrite the whole store every keystroke),
+// and right away when the page is hidden or closed.
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+function save(): void {
+  clearTimeout(saveTimer)
+  saveTimer = undefined
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state))
+  } catch {
+    /* ignore */
+  }
+}
 watch(
   state,
-  (s) => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(s))
-    } catch {
-      /* ignore */
-    }
+  () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(save, 400)
   },
   { deep: true }
 )
+addEventListener('pagehide', () => saveTimer !== undefined && save())
+addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && saveTimer !== undefined && save())
 
 export function resetToSheetData(): void {
   Object.assign(state, withPlan(clone(seed)))

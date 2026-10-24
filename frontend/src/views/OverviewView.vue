@@ -8,7 +8,7 @@ import Menu from 'primevue/menu'
 import BaseChart from '../components/BaseChart.vue'
 import { ui, openEntry, categoryColor, categoryRank } from '../store/ui'
 import { state, monthTotals, avgNonZero, categoryTotals, netWorthSeries, yearsAvailable, findCategory } from '../store/finance'
-import { money, money2, moneyCompact, signedMoney, pct, MONTHS, MONTHS_LONG, shortDate } from '../lib/format'
+import { money, money2, moneyCompact, signedMoney, pct, MONTHS, MONTHS_LONG, shortDate, dayLabel as day } from '../lib/format'
 import { series, otherColor, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
 import { useWidgetOrder } from '../lib/widget-order'
@@ -196,24 +196,27 @@ const flowChart = computed<ChartBuilder>(() => {
 })
 
 const topCats = computed(() => categoryRank.value.slice(0, 6))
+const REST = '\u0000rest'
+const restLabel = computed(() => (topCats.value.includes('Other') ? 'Everything else' : 'Other'))
 const spendChart = computed<ChartBuilder>(() => {
   const yr = String(ui.year)
   const top = topCats.value
   const grid: Record<string, number[]> = {}
   for (const e of state.entries) {
     if (e.type !== 'expense' || !e.date.startsWith(yr)) continue
-    const k = top.includes(e.category) ? e.category : 'Other'
+    // The catch-all gets its own key so a real category called "Other" isn't merged into it.
+    const k = top.includes(e.category) ? e.category : REST
     ;(grid[k] ??= Array<number>(12).fill(0))[+e.date.slice(5, 7) - 1] += e.amount
   }
-  const names = [...top.filter((n) => grid[n]), ...(grid.Other ? ['Other'] : [])]
+  const names = [...top.filter((n) => grid[n]), ...(grid[REST] ? [REST] : [])]
   return (dark, c) => ({
     type: 'bar',
     data: {
       labels: MONTHS,
       datasets: names.map((n) => ({
-        label: n,
+        label: n === REST ? restLabel.value : n,
         data: grid[n],
-        backgroundColor: n === 'Other' ? otherColor(dark) : categoryColor(n, dark),
+        backgroundColor: n === REST ? otherColor(dark) : categoryColor(n, dark),
         borderColor: c.surface,
         borderWidth: { top: 1 },
         borderSkipped: false as const,
@@ -232,13 +235,12 @@ const spendChart = computed<ChartBuilder>(() => {
 })
 const spendLegend = computed(() => [
   ...topCats.value.map((n) => ({ name: n, color: categoryColor(n, isDark.value) })),
-  { name: 'Other', color: otherColor(isDark.value) }
+  { name: restLabel.value, color: otherColor(isDark.value) }
 ])
 
 /* ---------- recent activity ---------- */
 const periodEntries = computed(() => state.entries.filter(inPeriod).sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount))
 const ACTIVITY_ROWS = 6
-const day = (iso: string) => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
 
 /* ---------- spending mix ---------- */
 const catAvg = computed(() => {

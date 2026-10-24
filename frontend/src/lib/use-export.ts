@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { saveFile, entriesCsv, workbookBytes, netWorthCsv } from './io'
 import type { SaveError } from './io'
+import { localIso } from './format'
 
 export type ExportKind = 'csv' | 'xlsx' | 'nw'
 
@@ -9,7 +10,7 @@ export type ExportKind = 'csv' | 'xlsx' | 'nw'
 export function useExport() {
   const toast = useToast()
   const exporting = ref<ExportKind | null>(null)
-  const stamp = () => new Date().toISOString().slice(0, 10)
+  const stamp = () => localIso()
 
   async function doExport(kind: ExportKind): Promise<void> {
     exporting.value = kind

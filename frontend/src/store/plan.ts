@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { state, uid } from './finance'
 import { loanSummary } from '../lib/loan'
+import { localYm } from '../lib/format'
 import type { Loan, PayDeduction, PayFrequency, SharedCost } from '../types'
 
 // The financial profile page: steady-state pay, contributions, taxes and housing. Mirrors the
@@ -15,7 +16,12 @@ export const PAY_FREQUENCIES: { label: string; value: PayFrequency; perYear: num
 ]
 
 export const newDeduction = (): PayDeduction => ({ id: uid('p'), name: '', perPaycheck: 0 })
-export const newLoan = (): Loan => ({ id: uid('p'), name: '', amount: 0, rate: 0.065, termYears: 30, start: new Date().toISOString().slice(0, 7), extraMonthly: 0 })
+export const newLoan = (): Loan => ({ id: uid('p'), name: '', amount: 0, rate: 0.065, termYears: 30, start: localYm(), extraMonthly: 0 })
+// Profile items are matched to entries by name ("Rent" ~ "Rent/Mortgage"). Shared by the
+// Add entry suggestion and the Trends planned line so both screens agree.
+export const normName = (v: string | null | undefined): string => (v || '').toLowerCase().replace(/[^a-z]/g, '')
+export const sameName = (a: string, b: string): boolean => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
+
 export const newSharedCost = (): SharedCost => ({ id: uid('p'), name: '', monthly: 0, share: 1 })
 
 export const planned = computed(() => {
