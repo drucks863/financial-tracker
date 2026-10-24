@@ -231,13 +231,12 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
   justify-content: space-between;
   align-items: baseline;
   font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--accent);
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: var(--accent-soft);
+  color: var(--ink-2);
+  padding: 4px 0 5px;
+  border-bottom: 1px solid var(--line);
 }
 .sub-row .num {
   letter-spacing: 0;
