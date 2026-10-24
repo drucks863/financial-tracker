@@ -100,6 +100,8 @@ export interface LoanProperty {
  * One source of truth that other screens can read (see store/plan.ts for the derived figures).
  */
 export interface Plan {
+  /** display name for the avatar (until there's a login) */
+  name?: string
   /** gross yearly salary */
   salary: number
   payFrequency: PayFrequency

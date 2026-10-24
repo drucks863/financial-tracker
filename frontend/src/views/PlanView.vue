@@ -40,6 +40,15 @@ const takeHomeActual = computed<boolean>({
   set: (on) => (p.value.takeHome = on ? Math.round(n.value.paycheck.estTakeHome * 100) / 100 : null)
 })
 
+const initials = computed(() =>
+  (p.value.name || '')
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0] || '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+)
 const freqLabel = computed(() => PAY_FREQUENCIES.find((f) => f.value === p.value.payFrequency)?.label.toLowerCase())
 
 function remove<T extends { id: string }>(list: T[], id: string): void {
@@ -68,6 +77,13 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 <template>
   <div class="stack">
     <header class="page-head">
+      <div class="who">
+        <span class="avatar-lg" aria-hidden="true">
+          <template v-if="initials">{{ initials }}</template>
+          <i v-else class="pi pi-user"></i>
+        </span>
+        <InputText v-model="p.name" placeholder="Your name" aria-label="Your name" class="name-input" />
+      </div>
       <div>
         <h1>My numbers</h1>
         <p class="muted">Your current pay, contributions, taxes and rent in one place.</p>
@@ -297,6 +313,32 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 </template>
 
 <style scoped>
+.page-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar-lg {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.name-input {
+  width: 220px;
+  font-weight: 600;
+}
 .layout {
   display: grid;
   gap: 16px;

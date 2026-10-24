@@ -10,16 +10,29 @@ import NetWorthView from './views/NetWorthView.vue'
 import SettingsView from './views/SettingsView.vue'
 import PlanView from './views/PlanView.vue'
 import { openEntry } from './store/ui'
-import { isSampleData } from './store/finance'
+import { isSampleData, state } from './store/finance'
 
 const VIEWS = [
   { id: 'overview', label: 'Overview', icon: 'pi pi-home', component: OverviewView },
   { id: 'cashflow', label: 'Cash flow', icon: 'pi pi-list', component: CashFlowView },
   { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
   { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView },
-  { id: 'plan', label: 'My numbers', short: 'Numbers', icon: 'pi pi-calculator', component: PlanView },
+  // opened from the avatar, not listed in the nav
+  { id: 'plan', label: 'My numbers', icon: 'pi pi-calculator', component: PlanView, hidden: true },
   { id: 'data', label: 'Data', icon: 'pi pi-sliders-h', component: SettingsView }
 ]
+
+const NAV = VIEWS.filter((v) => !('hidden' in v))
+const me = computed(() => {
+  const name = (state.plan?.name || '').trim()
+  const initials = name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+  return { name, initials }
+})
 
 const current = ref('overview')
 const view = computed(() => VIEWS.find((v) => v.id === current.value) || VIEWS[0])
@@ -52,7 +65,7 @@ onMounted(() => {
         <span class="brand-name">Financial Tracker</span>
       </div>
       <button
-        v-for="v in VIEWS"
+        v-for="v in NAV"
         :key="v.id"
         type="button"
         class="nav-item"
@@ -62,7 +75,17 @@ onMounted(() => {
         @click="go(v.id)"
       >
         <i :class="v.icon" aria-hidden="true"></i>
-        <span class="full">{{ v.label }}</span><span v-if="v.short" class="short">{{ v.short }}</span>
+        <span class="full">{{ v.label }}</span>
+      </button>
+      <button type="button" class="me" :aria-current="current === 'plan' ? 'page' : undefined" :aria-label="`${me.name || 'You'}: My numbers`" @click="go('plan')">
+        <span class="avatar" aria-hidden="true">
+          <template v-if="me.initials">{{ me.initials }}</template>
+          <i v-else class="pi pi-user"></i>
+        </span>
+        <span class="me-text">
+          <span class="me-name">{{ me.name || 'You' }}</span>
+          <span class="me-sub">My numbers</span>
+        </span>
       </button>
       <button type="button" class="rail-add" @click="openEntry()"><i class="pi pi-plus" aria-hidden="true"></i><span>Add entry</span></button>
     </nav>
@@ -149,20 +172,49 @@ onMounted(() => {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* Phones: one-line tab labels, with a short form where the full one is long */
-.nav-item .short {
+/* Avatar: opens My numbers. A tab on phones, the bottom-left corner of the rail on desktop. */
+.me {
+  flex: 1;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  height: var(--nav-h);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.avatar .pi {
+  font-size: 0.7rem;
+}
+.me[aria-current='page'] {
+  color: var(--accent);
+}
+.me[aria-current='page'] .avatar {
+  border-color: var(--accent);
+}
+.me-sub {
   display: none;
 }
-@media (max-width: 959px) {
-  .nav-item {
-    white-space: nowrap;
-  }
-  .nav-item .short {
-    display: inline;
-  }
-  .nav-item:has(.short) .full {
-    display: none;
-  }
+.nav-item {
+  white-space: nowrap;
 }
 /* Desktop: narrow left rail with icon + label rows. The Data screen sits at the bottom like settings. */
 @media (min-width: 960px) {
@@ -238,6 +290,48 @@ onMounted(() => {
   }
   .nav-item.end {
     margin-top: auto;
+  }
+  .me {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-items: start;
+    gap: 10px;
+    height: auto;
+    margin-top: 10px;
+    padding: 12px 8px 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    text-align: left;
+    color: var(--ink);
+    font-size: 0.875rem;
+  }
+  .me:hover .avatar {
+    border-color: var(--muted);
+  }
+  .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 0.8125rem;
+  }
+  .me-text {
+    display: grid;
+    min-width: 0;
+  }
+  .me-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .me-sub {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .me[aria-current='page'] .me-sub {
+    color: var(--accent);
   }
   .rail-add {
     order: -1;
