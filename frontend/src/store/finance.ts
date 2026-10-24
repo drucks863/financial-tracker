@@ -52,16 +52,14 @@ interface NewCategory {
   type: EntryType
   name: string
   essential?: boolean
-  fromPaycheck?: boolean
   subcategories?: string[]
 }
 
-export function addCategory({ type, name, essential = false, fromPaycheck = false, subcategories = [] }: NewCategory): Category | null {
+export function addCategory({ type, name, essential = false, subcategories = [] }: NewCategory): Category | null {
   name = name.trim()
   if (!name || findCategory(type, name)) return null
   const cat: Category = { id: uid('c'), type, name, subcategories: subcategories.length ? subcategories : ['Other'] }
   if (type === 'expense') cat.essential = essential
-  if (type === 'savings') cat.fromPaycheck = fromPaycheck
   state.categories.push(cat)
   return cat
 }
@@ -141,10 +139,9 @@ export const yearsAvailable = (): number[] => [...new Set(state.entries.map((e) 
 /* ---------- aggregates ---------- */
 
 // Per-month totals for one year. Mirrors the sheet's Summary tab:
-// net = income - expenses; leftover = net - savings that come out of take-home pay.
+// net = income - expenses.
 export function monthTotals(year: number): MonthTotals[] {
   const essential = new Set(state.categories.filter((c) => c.type === 'expense' && c.essential).map((c) => c.name))
-  const paycheck = new Set(state.categories.filter((c) => c.type === 'savings' && c.fromPaycheck).map((c) => c.name))
   const rows: MonthTotals[] = Array.from({ length: 12 }, (_, m) => ({
     month: m,
     ym: `${year}-${String(m + 1).padStart(2, '0')}`,
@@ -152,11 +149,8 @@ export function monthTotals(year: number): MonthTotals[] {
     expense: 0,
     essential: 0,
     discretionary: 0,
-    saved: 0,
-    savedFromCash: 0,
     count: 0,
     net: 0,
-    leftover: 0,
     savingsRate: null
   }))
   for (const e of state.entries) {
@@ -164,18 +158,14 @@ export function monthTotals(year: number): MonthTotals[] {
     const r = rows[+e.date.slice(5, 7) - 1]
     r.count++
     if (e.type === 'income') r.income += e.amount
-    else if (e.type === 'expense') {
+    else {
       r.expense += e.amount
       if (essential.has(e.category)) r.essential += e.amount
       else r.discretionary += e.amount
-    } else {
-      r.saved += e.amount
-      if (!paycheck.has(e.category)) r.savedFromCash += e.amount
     }
   }
   for (const r of rows) {
     r.net = r.income - r.expense
-    r.leftover = r.net - r.savedFromCash
     r.savingsRate = r.income ? r.net / r.income : null
   }
   return rows

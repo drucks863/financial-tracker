@@ -16,8 +16,7 @@ import type { EntryType } from '../types'
 const toast = useToast()
 const TYPES: { label: string; value: EntryType }[] = [
   { label: 'Expense', value: 'expense' },
-  { label: 'Income', value: 'income' },
-  { label: 'Savings', value: 'savings' }
+  { label: 'Income', value: 'income' }
 ]
 
 interface EntryForm {

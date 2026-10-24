@@ -1,6 +1,6 @@
 // Domain types. These mirror the planned DynamoDB items so the API swap is mechanical.
 
-export type EntryType = 'income' | 'expense' | 'savings'
+export type EntryType = 'income' | 'expense'
 
 export interface Category {
   id: string
@@ -9,8 +9,6 @@ export interface Category {
   subcategories: string[]
   /** expenses only: counts toward essentials (rent, utilities) instead of discretionary */
   essential?: boolean
-  /** savings only: taken out before the paycheck lands (401k, HSA) */
-  fromPaycheck?: boolean
 }
 
 export interface Entry {
@@ -67,11 +65,8 @@ export interface MonthTotals {
   expense: number
   essential: number
   discretionary: number
-  saved: number
-  savedFromCash: number
   count: number
   net: number
-  leftover: number
   savingsRate: number | null
 }
 

@@ -4,7 +4,7 @@
 
 - [x] Read Cash Flow '26 (all tabs) and the Net Worth tracker tab
 - [x] Vue 3 + PrimeVue app scaffold with Vite, mobile-first layout (bottom tabs, desktop rail)
-- [x] Overview: month strip, net cash flow, income/expense chart, spending donut, saved and invested, net worth card
+- [x] Overview: month strip, net cash flow, income/expense chart, spending donut, net worth card
 - [x] Cash flow: entries for the month grouped by category and subcategory, search, edit and delete
 - [x] Add entry dialog with new category/subcategory inline
 - [x] Trends: averages, stacked spending by category, one category over time, year over year, sheet-style year grid
@@ -14,6 +14,7 @@
 - [x] Data: category manager (add, rename, remove, essential flag), subscriptions list
 - [x] Keep real numbers out of the public repo (local seed + generated sample seed)
 - [x] Convert the frontend to TypeScript (strict, vue-tsc type-check in the build)
+- [x] Remove the Savings entry type (contribution boxes were only a reminder)
 - [ ] Devin reviews the preview and sends tweaks
 
 ## Next

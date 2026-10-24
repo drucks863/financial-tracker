@@ -161,8 +161,7 @@ function commitImport(): void {
 const catType = ref<EntryType>('expense')
 const CAT_TYPES: { label: string; value: EntryType }[] = [
   { label: 'Expenses', value: 'expense' },
-  { label: 'Income', value: 'income' },
-  { label: 'Savings', value: 'savings' }
+  { label: 'Income', value: 'income' }
 ]
 const cats = computed(() => categoriesOf(catType.value))
 const newCat = ref('')
@@ -267,7 +266,7 @@ function reset() {
         <div class="imp">
           <SelectButton v-model="imp.kind" :options="KINDS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Import type" @change="parse" />
           <p class="ink2 small" v-if="imp.kind === 'entries'">
-            Columns: <strong>Date, Type, Category, Subcategory, Description, Amount</strong>. Type is Income, Expense or Savings. New categories are created for you.
+            Columns: <strong>Date, Type, Category, Subcategory, Description, Amount</strong>. Type is Income or Expense. New categories are created for you.
           </p>
           <div v-else-if="imp.kind === 'cashflow'" class="cf-year">
             <p class="ink2 small">Reads a Cash Flow workbook laid out like your ’26 sheet: the Expenses and Income tabs plus each month tab’s itemized lines.</p>
@@ -365,10 +364,6 @@ function reset() {
               <label v-if="cat.type === 'expense'" class="flag">
                 <ToggleSwitch v-model="cat.essential" :input-id="`ess-${cat.id}`" />
                 <span class="small ink2">Essential</span>
-              </label>
-              <label v-if="cat.type === 'savings'" class="flag">
-                <ToggleSwitch v-model="cat.fromPaycheck" :input-id="`pay-${cat.id}`" />
-                <span class="small ink2">From paycheck</span>
               </label>
               <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" :aria-label="`Rename ${cat.name}`" @click="startEdit(cat.id, cat.name)" />
               <Button icon="pi pi-trash" text rounded size="small" severity="secondary" :aria-label="`Remove ${cat.name}`" @click="tryRemoveCat(cat)" />
