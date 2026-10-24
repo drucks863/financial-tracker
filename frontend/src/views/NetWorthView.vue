@@ -71,7 +71,7 @@ const chart = computed<ChartBuilder>(() => {
           label: g,
           data: top,
           borderColor: series(GROUP_COLOR[g], dark),
-          backgroundColor: series(GROUP_COLOR[g], dark) + (dark ? '55' : '40'),
+          backgroundColor: series(GROUP_COLOR[g], dark) + (dark ? '8c' : '40'),
           borderWidth: 1.5,
           pointRadius: 0,
           pointHoverRadius: 4,

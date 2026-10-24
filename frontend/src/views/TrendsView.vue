@@ -37,7 +37,7 @@ const stacked = computed<ChartBuilder>(() => {
   const grid = yearGrid('expense', ui.year)
   const top = categoryRank.value.slice(0, 7)
   const rest = Object.keys(grid).filter((n) => !top.includes(n))
-  return (dark) => ({
+  return (dark, c) => ({
     type: 'bar',
     data: {
       labels: MONTHS,
@@ -46,7 +46,7 @@ const stacked = computed<ChartBuilder>(() => {
           label: name,
           data: grid[name]?.months || Array(12).fill(0),
           backgroundColor: series(i, dark),
-          borderColor: dark ? '#0f172a' : '#ffffff',
+          borderColor: c.surface,
           borderWidth: { top: 2 },
           borderSkipped: 'start' as const
         })),
@@ -54,7 +54,7 @@ const stacked = computed<ChartBuilder>(() => {
           label: 'Other',
           data: MONTHS.map((_, m) => rest.reduce((a, n) => a + grid[n].months[m], 0)),
           backgroundColor: otherColor(dark),
-          borderColor: dark ? '#0f172a' : '#ffffff',
+          borderColor: c.surface,
           borderWidth: { top: 2 },
           borderRadius: { topLeft: 4, topRight: 4 },
           borderSkipped: 'start' as const

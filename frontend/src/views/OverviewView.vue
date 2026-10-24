@@ -136,12 +136,12 @@ const nwSpark = computed<ChartBuilder>(() => {
         {
           label: 'Net worth',
           data: s.map((p) => p.total),
-          borderColor: series(ROLE.investments, dark),
-          backgroundColor: dark ? 'rgba(57,135,229,.16)' : 'rgba(42,120,214,.10)',
+          borderColor: dark ? '#d4a443' : '#7f591d',
+          backgroundColor: dark ? 'rgba(212,164,67,.14)' : 'rgba(127,89,29,.08)',
           fill: true,
           borderWidth: 2,
           pointRadius: s.map((_, i) => (i === s.length - 1 ? 4 : 0)),
-          pointBackgroundColor: series(ROLE.investments, dark),
+          pointBackgroundColor: dark ? '#d4a443' : '#7f591d',
           tension: 0.3
         }
       ]

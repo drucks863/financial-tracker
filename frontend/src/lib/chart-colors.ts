@@ -30,6 +30,6 @@ export interface ChartChrome {
 
 export function chrome(dark: boolean): ChartChrome {
   return dark
-    ? { ink: '#f0efec', ink2: '#c3c2b7', muted: '#9a998f', grid: '#2c2c2a', axis: '#383835', surface: '#0f172a' }
-    : { ink: '#0b0b0b', ink2: '#52514e', muted: '#7a7973', grid: '#e9e8e3', axis: '#c3c2b7', surface: '#ffffff' }
+    ? { ink: '#ece8df', ink2: '#c3bfb4', muted: '#9d988c', grid: '#2f2d29', axis: '#46433d', surface: '#211f1c' }
+    : { ink: '#211f1c', ink2: '#5f5b52', muted: '#7b766b', grid: '#eceae5', axis: '#c3bfb4', surface: '#ffffff' }
 }

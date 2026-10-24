@@ -1,59 +1,43 @@
 /* Layout: mobile-first single column with a bottom tab bar; a left rail and two-column grids from 960px.
-   Color comes from PrimeVue's Aura tokens (--p-*) so app chrome and components always agree;
-   the few app-level tokens below are derived from them. */
+   Palette: warm graphite with a brass accent, dark by default. Light applies only when the
+   viewer explicitly chooses it (data-theme="light"). Component colors come from PrimeVue's
+   --p-* tokens (see theme.ts) so app chrome and components always agree. */
 :root {
   --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --bg: #f3f6f8;
-  --panel: var(--p-surface-0, #ffffff);
-  --ink: var(--p-surface-900, #0f172a);
-  --ink-2: var(--p-surface-600, #475569);
-  --muted: var(--p-surface-500, #64748b);
-  --line: var(--p-surface-200, #e2e8f0);
-  --accent: var(--p-primary-color, #0e7490);
-  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
-  --good: #0a7d24;
-  --bad: #c62f2f;
+  --bg: #171614;
+  --panel: #211f1c;
+  --ink: #ece8df;
+  --ink-2: #c3bfb4;
+  --muted: #9d988c;
+  --line: #2f2d29;
+  --accent: var(--p-primary-color, #d4a443);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --good: #5fbf8f;
+  --bad: #ec8a76;
   --radius-panel: 14px;
   --nav-h: 64px;
-  --series-income: #2a78d6;
-  --series-expense: #eb6834;
-  --nw-cash: #1baf7a;
-  --nw-investments: #2a78d6;
-  --nw-other-assets: #6250d6;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #0b1220;
-    --panel: var(--p-surface-900, #0f172a);
-    --ink: var(--p-surface-0, #f8fafc);
-    --ink-2: var(--p-surface-300, #cbd5e1);
-    --muted: var(--p-surface-400, #94a3b8);
-    --line: var(--p-surface-800, #1e293b);
-    --good: #3ccf63;
-    --bad: #f07575;
-    --series-income: #3987e5;
-    --series-expense: #d95926;
-    --nw-cash: #199e70;
-    --nw-investments: #3987e5;
-    --nw-other-assets: #9085e9;
-    color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
-  --bg: #0b1220;
-  --panel: var(--p-surface-900, #0f172a);
-  --ink: var(--p-surface-0, #f8fafc);
-  --ink-2: var(--p-surface-300, #cbd5e1);
-  --muted: var(--p-surface-400, #94a3b8);
-  --line: var(--p-surface-800, #1e293b);
-  --good: #3ccf63;
-  --bad: #f07575;
   --series-income: #3987e5;
   --series-expense: #d95926;
   --nw-cash: #199e70;
   --nw-investments: #3987e5;
   --nw-other-assets: #9085e9;
   color-scheme: dark;
+}
+:root[data-theme='light'] {
+  --bg: #f6f5f2;
+  --panel: #ffffff;
+  --ink: #211f1c;
+  --ink-2: #5f5b52;
+  --muted: #7b766b;
+  --line: #e4e1da;
+  --good: #1d7a4a;
+  --bad: #b8432c;
+  --series-income: #2a78d6;
+  --series-expense: #eb6834;
+  --nw-cash: #1baf7a;
+  --nw-investments: #2a78d6;
+  --nw-other-assets: #6250d6;
+  color-scheme: light;
 }
 
 html,
@@ -185,12 +169,12 @@ p {
   font-weight: 500;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--p-surface-100, #f1f5f9);
+  background: #eceae5;
   color: var(--ink-2);
   white-space: nowrap;
 }
 .app-dark .delta {
-  background: var(--p-surface-800);
+  background: #2f2d29;
 }
 .delta .pi {
   font-size: 0.625rem;
