@@ -16,12 +16,12 @@ import org.springframework.web.server.ResponseStatusException
 /** The budget setup and the figures derived from it. */
 @RestController
 @RequestMapping("/api/plan")
-class PlanController(private val svc: FinanceService, private val user: CurrentUser) {
-    @GetMapping fun get() = svc.plan(user.id())
-    @PutMapping fun put(@RequestBody p: Plan) = svc.savePlan(user.id(), p)
-    @GetMapping("/summary") fun summary() = svc.planSummary(user.id())
+class PlanController(private val financeService: FinanceService, private val currentUser: CurrentUser) {
+    @GetMapping fun get() = financeService.plan(currentUser.id())
+    @PutMapping fun put(@RequestBody plan: Plan) = financeService.savePlan(currentUser.id(), plan)
+    @GetMapping("/summary") fun summary() = financeService.planSummary(currentUser.id())
 
-    @GetMapping("/loans/{id}/schedule")
-    fun schedule(@PathVariable id: String) = svc.plan(user.id()).loans.find { it.id == id }?.let(LoanMath::summary)
-        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No loan $id")
+    @GetMapping("/loans/{loanId}/schedule")
+    fun schedule(@PathVariable loanId: String) = financeService.plan(currentUser.id()).loans.find { it.id == loanId }?.let(LoanMath::summary)
+        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No loan $loanId")
 }

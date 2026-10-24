@@ -11,57 +11,57 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Mock storage until DynamoDB: everything lives in memory and is lost on restart. Each user
- * starts from [seed] (the sample data, or seed.local.json when running locally).
+ * starts from [seedData] (the sample data, or seed.local.json when running locally).
  */
-class InMemoryFinanceRepository(private val seed: () -> FinanceData) : FinanceRepository {
+class InMemoryFinanceRepository(private val seedData: () -> FinanceData) : FinanceRepository {
 
-    private class Store(data: FinanceData) {
-        var sample = data.sample
+    private class UserStore(data: FinanceData) {
+        var isSample = data.sample
         val categories = LinkedHashMap(data.categories.associateBy { it.id })
         val entries = LinkedHashMap(data.entries.associateBy { it.id })
         val accounts = LinkedHashMap(data.netWorth.accounts.associateBy { it.id })
-        val snapshots = sortedMapOf<String, Snapshot>().apply { data.netWorth.snapshots.forEach { put(it.date, it) } }
+        val snapshots = sortedMapOf<String, Snapshot>().apply { data.netWorth.snapshots.forEach { snapshot -> put(snapshot.date, snapshot) } }
         val subscriptions = LinkedHashMap(data.subscriptions.associateBy { it.id })
         var plan: Plan? = data.plan
     }
 
-    private val users = ConcurrentHashMap<String, Store>()
+    private val storesByUserId = ConcurrentHashMap<String, UserStore>()
 
-    private fun <T> with(userId: String, f: Store.() -> T): T {
-        val store = users.computeIfAbsent(userId) { Store(seed()) }
-        return synchronized(store) { store.f() }
+    private fun <T> withStore(userId: String, action: UserStore.() -> T): T {
+        val store = storesByUserId.computeIfAbsent(userId) { UserStore(seedData()) }
+        return synchronized(store) { store.action() }
     }
 
-    override fun categories(userId: String) = with(userId) { categories.values.toList() }
-    override fun saveCategory(userId: String, category: Category) = with(userId) { categories[category.id] = category }
-    override fun deleteCategory(userId: String, id: String) = with(userId) { categories.remove(id); Unit }
+    override fun categories(userId: String) = withStore(userId) { categories.values.toList() }
+    override fun saveCategory(userId: String, category: Category) = withStore(userId) { categories[category.id] = category }
+    override fun deleteCategory(userId: String, categoryId: String) = withStore(userId) { categories.remove(categoryId); Unit }
 
-    override fun entries(userId: String, from: String?, to: String?) = with(userId) {
+    override fun entries(userId: String, from: String?, to: String?) = withStore(userId) {
         entries.values
-            .filter { (from == null || it.date >= from) && (to == null || it.date <= to) }
+            .filter { entry -> (from == null || entry.date >= from) && (to == null || entry.date <= to) }
             .sortedBy { it.date }
     }
-    override fun saveEntries(userId: String, entries: Collection<Entry>) = with(userId) { entries.forEach { this.entries[it.id] = it } }
-    override fun deleteEntries(userId: String, ids: Collection<String>) = with(userId) { ids.forEach { entries.remove(it) } }
+    override fun saveEntries(userId: String, entries: Collection<Entry>) = withStore(userId) { entries.forEach { entry -> this.entries[entry.id] = entry } }
+    override fun deleteEntries(userId: String, entryIds: Collection<String>) = withStore(userId) { entryIds.forEach { entryId -> entries.remove(entryId) } }
 
-    override fun accounts(userId: String) = with(userId) { accounts.values.toList() }
-    override fun saveAccount(userId: String, account: Account) = with(userId) { accounts[account.id] = account }
-    override fun deleteAccount(userId: String, id: String) = with(userId) { accounts.remove(id); Unit }
+    override fun accounts(userId: String) = withStore(userId) { accounts.values.toList() }
+    override fun saveAccount(userId: String, account: Account) = withStore(userId) { accounts[account.id] = account }
+    override fun deleteAccount(userId: String, accountId: String) = withStore(userId) { accounts.remove(accountId); Unit }
 
-    override fun snapshots(userId: String) = with(userId) { snapshots.values.toList() }
-    override fun saveSnapshot(userId: String, snapshot: Snapshot) = with(userId) { snapshots[snapshot.date] = snapshot }
-    override fun deleteSnapshot(userId: String, date: String) = with(userId) { snapshots.remove(date); Unit }
+    override fun snapshots(userId: String) = withStore(userId) { snapshots.values.toList() }
+    override fun saveSnapshot(userId: String, snapshot: Snapshot) = withStore(userId) { snapshots[snapshot.date] = snapshot }
+    override fun deleteSnapshot(userId: String, date: String) = withStore(userId) { snapshots.remove(date); Unit }
 
-    override fun subscriptions(userId: String) = with(userId) { subscriptions.values.toList() }
-    override fun saveSubscription(userId: String, subscription: Subscription) = with(userId) { subscriptions[subscription.id] = subscription }
-    override fun deleteSubscription(userId: String, id: String) = with(userId) { subscriptions.remove(id); Unit }
+    override fun subscriptions(userId: String) = withStore(userId) { subscriptions.values.toList() }
+    override fun saveSubscription(userId: String, subscription: Subscription) = withStore(userId) { subscriptions[subscription.id] = subscription }
+    override fun deleteSubscription(userId: String, subscriptionId: String) = withStore(userId) { subscriptions.remove(subscriptionId); Unit }
 
-    override fun plan(userId: String) = with(userId) { plan }
-    override fun savePlan(userId: String, plan: Plan) = with(userId) { this.plan = plan }
+    override fun plan(userId: String) = withStore(userId) { plan }
+    override fun savePlan(userId: String, plan: Plan) = withStore(userId) { this.plan = plan }
 
-    override fun isSample(userId: String) = with(userId) { sample }
+    override fun isSample(userId: String) = withStore(userId) { isSample }
 
     override fun replaceAll(userId: String, data: FinanceData) {
-        users[userId] = Store(data)
+        storesByUserId[userId] = UserStore(data)
     }
 }

@@ -18,26 +18,28 @@ data class FinanceProperties(
 class RepositoryConfig {
     /** What a new user (and a reset) starts from. */
     @Bean
-    fun seedData(props: FinanceProperties, mapper: JsonMapper): SeedData =
-        SeedData(normalize(props.seed.inputStream.use { mapper.readValue<FinanceData>(it) }))
+    fun seedData(financeProperties: FinanceProperties, jsonMapper: JsonMapper): SeedData =
+        SeedData(normalize(financeProperties.seed.inputStream.use { stream -> jsonMapper.readValue<FinanceData>(stream) }))
 
     // Swap this bean for a DynamoDB-backed FinanceRepository when that exists.
     @Bean
-    fun financeRepository(seed: SeedData): FinanceRepository = InMemoryFinanceRepository { seed.data }
+    fun financeRepository(seedData: SeedData): FinanceRepository = InMemoryFinanceRepository { seedData.data }
 }
 
 class SeedData(val data: FinanceData)
 
 /** Older data has subscriptions without ids; give them stable ones that don't clash with ids already there. */
 fun normalize(data: FinanceData): FinanceData {
-    val taken = data.subscriptions.map { it.id }.filter { it.isNotBlank() }.toMutableSet()
-    var next = 1
-    fun freeId(): String {
-        while ("s$next" in taken) next++
-        return "s$next".also { taken += it }
+    val takenIds = data.subscriptions.map { it.id }.filter { it.isNotBlank() }.toMutableSet()
+    var nextNumber = 1
+    fun nextFreeId(): String {
+        while ("s$nextNumber" in takenIds) nextNumber++
+        return "s$nextNumber".also { takenIds += it }
     }
     return data.copy(
         version = FinanceData.VERSION,
-        subscriptions = data.subscriptions.map { s -> if (s.id.isBlank()) s.copy(id = freeId()) else s },
+        subscriptions = data.subscriptions.map { subscription ->
+            if (subscription.id.isBlank()) subscription.copy(id = nextFreeId()) else subscription
+        },
     )
 }

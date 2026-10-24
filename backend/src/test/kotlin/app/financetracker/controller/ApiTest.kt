@@ -14,16 +14,16 @@ import org.springframework.test.web.servlet.put
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class ApiTest(@Autowired val mvc: MockMvc) {
+class ApiTest(@Autowired val mockMvc: MockMvc) {
     // Each test starts from the seed; resetting is much cheaper than a fresh Spring context per test.
     @BeforeEach
     fun reset() {
-        mvc.post("/api/data/reset").andExpect { status { isOk() } }
+        mockMvc.post("/api/data/reset").andExpect { status { isOk() } }
     }
 
     @Test
     fun `serves the sample data in the frontend's shape`() {
-        mvc.get("/api/data").andExpect {
+        mockMvc.get("/api/data").andExpect {
             status { isOk() }
             jsonPath("$.version") { value(2) }
             jsonPath("$.sample") { value(true) }
@@ -38,59 +38,59 @@ class ApiTest(@Autowired val mvc: MockMvc) {
     @Test
     fun `upserts and deletes an entry by the client's id`() {
         val body = """{"id":"","date":"2026-03-04","type":"expense","category":"Food","subcategory":"Groceries","description":"Test","amount":12.5}"""
-        mvc.put("/api/entries/e-test") { contentType = MediaType.APPLICATION_JSON; content = body }.andExpect {
+        mockMvc.put("/api/entries/e-test") { contentType = MediaType.APPLICATION_JSON; content = body }.andExpect {
             status { isOk() }
             jsonPath("$.id") { value("e-test") }
         }
-        mvc.get("/api/entries?year=2026&month=3").andExpect { jsonPath("$[?(@.id == 'e-test')].amount") { value(12.5) } }
-        mvc.delete("/api/entries/e-test").andExpect { status { isNoContent() } }
-        mvc.get("/api/entries?year=2026&month=3").andExpect { jsonPath("$[?(@.id == 'e-test')]") { isEmpty() } }
+        mockMvc.get("/api/entries?year=2026&month=3").andExpect { jsonPath("$[?(@.id == 'e-test')].amount") { value(12.5) } }
+        mockMvc.delete("/api/entries/e-test").andExpect { status { isNoContent() } }
+        mockMvc.get("/api/entries?year=2026&month=3").andExpect { jsonPath("$[?(@.id == 'e-test')]") { isEmpty() } }
     }
 
     @Test
     fun `rejects bad input with 400`() {
         val body = """{"id":"","date":"March 4","type":"expense","category":"Food","subcategory":"Groceries","description":"","amount":1}"""
-        mvc.put("/api/entries/x") { contentType = MediaType.APPLICATION_JSON; content = body }.andExpect { status { isBadRequest() } }
-        mvc.get("/api/entries?month=3").andExpect { status { isBadRequest() } }
+        mockMvc.put("/api/entries/x") { contentType = MediaType.APPLICATION_JSON; content = body }.andExpect { status { isBadRequest() } }
+        mockMvc.get("/api/entries?month=3").andExpect { status { isBadRequest() } }
     }
 
     @Test
     fun `renames a subcategory whose name has a slash`() {
         val body = """{"name":"Hobbies/Toys"}"""
-        mvc.put("/api/categories/exp-entertainment/subcategories?name={n}", "Hobby/Toys") { contentType = MediaType.APPLICATION_JSON; content = body }
+        mockMvc.put("/api/categories/exp-entertainment/subcategories?name={n}", "Hobby/Toys") { contentType = MediaType.APPLICATION_JSON; content = body }
             .andExpect { status { isOk() } }
-        mvc.put("/api/categories/exp-entertainment/subcategories?name={n}", "Hobbies/Toys") { contentType = MediaType.APPLICATION_JSON; content = """{"name":"Spare/Unused"}""" }
+        mockMvc.put("/api/categories/exp-entertainment/subcategories?name={n}", "Hobbies/Toys") { contentType = MediaType.APPLICATION_JSON; content = """{"name":"Spare/Unused"}""" }
             .andExpect { status { isOk() } }
-        mvc.get("/api/categories").andExpect { jsonPath("$[?(@.id == 'exp-entertainment')].subcategories[*]") { value(org.hamcrest.Matchers.hasItem("Spare/Unused")) } }
+        mockMvc.get("/api/categories").andExpect { jsonPath("$[?(@.id == 'exp-entertainment')].subcategories[*]") { value(org.hamcrest.Matchers.hasItem("Spare/Unused")) } }
     }
 
     @Test
     fun `refuses to delete a category with entries`() {
-        mvc.delete("/api/categories/exp-food").andExpect { status { isConflict() } }
+        mockMvc.delete("/api/categories/exp-food").andExpect { status { isConflict() } }
     }
 
     @Test
     fun `plan summary and loan schedule`() {
-        mvc.get("/api/plan/summary").andExpect {
+        mockMvc.get("/api/plan/summary").andExpect {
             status { isOk() }
             jsonPath("$.perYear") { value(26) }
             jsonPath("$.monthly.takeHome") { isNumber() }
         }
-        mvc.get("/api/plan/loans/p5/schedule").andExpect {
+        mockMvc.get("/api/plan/loans/p5/schedule").andExpect {
             status { isOk() }
             jsonPath("$.rows.length()") { value(60) }
         }
-        mvc.get("/api/plan/loans/nope/schedule").andExpect { status { isNotFound() } }
+        mockMvc.get("/api/plan/loans/nope/schedule").andExpect { status { isNotFound() } }
     }
 
     @Test
     fun `month totals and net worth series`() {
-        mvc.get("/api/summary/months?year=2026").andExpect { jsonPath("$.length()") { value(12) } }
-        mvc.get("/api/net-worth/series").andExpect { jsonPath("$[0].byGroup.Cash") { isNumber() } }
+        mockMvc.get("/api/summary/months?year=2026").andExpect { jsonPath("$.length()") { value(12) } }
+        mockMvc.get("/api/net-worth/series").andExpect { jsonPath("$[0].byGroup.Cash") { isNumber() } }
     }
 
     @Test
     fun `health check for the load balancer`() {
-        mvc.get("/actuator/health").andExpect { jsonPath("$.status") { value("UP") } }
+        mockMvc.get("/actuator/health").andExpect { jsonPath("$.status") { value("UP") } }
     }
 }

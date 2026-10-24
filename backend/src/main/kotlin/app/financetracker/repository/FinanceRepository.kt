@@ -16,16 +16,16 @@ import app.financetracker.model.Subscription
 interface FinanceRepository {
     fun categories(userId: String): List<Category>
     fun saveCategory(userId: String, category: Category)
-    fun deleteCategory(userId: String, id: String)
+    fun deleteCategory(userId: String, categoryId: String)
 
     /** Entries with `from <= date <= to` (YYYY-MM-DD, either bound optional), oldest first. */
     fun entries(userId: String, from: String? = null, to: String? = null): List<Entry>
     fun saveEntries(userId: String, entries: Collection<Entry>)
-    fun deleteEntries(userId: String, ids: Collection<String>)
+    fun deleteEntries(userId: String, entryIds: Collection<String>)
 
     fun accounts(userId: String): List<Account>
     fun saveAccount(userId: String, account: Account)
-    fun deleteAccount(userId: String, id: String)
+    fun deleteAccount(userId: String, accountId: String)
 
     /** Oldest first. */
     fun snapshots(userId: String): List<Snapshot>
@@ -34,7 +34,7 @@ interface FinanceRepository {
 
     fun subscriptions(userId: String): List<Subscription>
     fun saveSubscription(userId: String, subscription: Subscription)
-    fun deleteSubscription(userId: String, id: String)
+    fun deleteSubscription(userId: String, subscriptionId: String)
 
     fun plan(userId: String): Plan?
     fun savePlan(userId: String, plan: Plan)

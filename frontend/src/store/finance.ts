@@ -1,7 +1,7 @@
 import { computed, reactive, watch } from 'vue'
 import seed from '@seed'
 import { loanBalanceAt, propertyValueAt } from '../lib/loan'
-import { enc, loadRemote, send, sync } from '../lib/api'
+import { encodePathPart, loadRemote, send, sync } from '../lib/api'
 import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
 // Single in-memory store. With the API running it loads from and saves to the server (see
@@ -30,14 +30,14 @@ const validPlan = (p: unknown): p is Plan => {
 const withPlan = (d: FinanceData): FinanceData => {
   const plan = validPlan(d.plan) ? d.plan : validPlan(seed.plan) ? clone(seed.plan) : emptyPlan()
   // subscriptions from older data have no ids; skip ids already taken
-  const taken = new Set(d.subscriptions.map((s) => s.id).filter(Boolean))
-  let next = 1
-  const freeId = () => {
-    while (taken.has(`s${next}`)) next++
-    taken.add(`s${next}`)
-    return `s${next}`
+  const takenIds = new Set(d.subscriptions.map((subscription) => subscription.id).filter(Boolean))
+  let nextNumber = 1
+  const nextFreeId = () => {
+    while (takenIds.has(`s${nextNumber}`)) nextNumber++
+    takenIds.add(`s${nextNumber}`)
+    return `s${nextNumber}`
   }
-  const subscriptions = d.subscriptions.map((s) => (s.id ? s : { ...s, id: freeId() }))
+  const subscriptions = d.subscriptions.map((subscription) => (subscription.id ? subscription : { ...subscription, id: nextFreeId() }))
   return { ...d, subscriptions, plan: { ...plan, loans: plan.loans ?? [] } }
 }
 
@@ -71,22 +71,24 @@ watch(
 
 // A cleared number field (PrimeVue InputNumber) leaves null in the plan; the API's numbers aren't
 // nullable (only takeHome is), so send those as 0 instead of failing every save.
-const n0 = (v: number | null | undefined): number => v ?? 0
-export const planForApi = (p: Plan): Plan => ({
-  ...p,
-  salary: n0(p.salary),
-  taxRate: n0(p.taxRate),
-  k401: n0(p.k401),
-  match: n0(p.match),
-  deductions: p.deductions.map((d) => ({ ...d, perPaycheck: n0(d.perPaycheck) })),
-  housing: p.housing.map((h) => ({ ...h, monthly: n0(h.monthly), share: n0(h.share) })),
-  loans: (p.loans ?? []).map((l) => ({
-    ...l,
-    amount: n0(l.amount),
-    rate: n0(l.rate),
-    termYears: n0(l.termYears),
-    extraMonthly: n0(l.extraMonthly),
-    property: l.property ? { ...l.property, value: n0(l.property.value), yearlyChange: n0(l.property.yearlyChange) } : null
+const numberOrZero = (value: number | null | undefined): number => value ?? 0
+export const planForApi = (plan: Plan): Plan => ({
+  ...plan,
+  salary: numberOrZero(plan.salary),
+  taxRate: numberOrZero(plan.taxRate),
+  k401: numberOrZero(plan.k401),
+  match: numberOrZero(plan.match),
+  deductions: plan.deductions.map((deduction) => ({ ...deduction, perPaycheck: numberOrZero(deduction.perPaycheck) })),
+  housing: plan.housing.map((cost) => ({ ...cost, monthly: numberOrZero(cost.monthly), share: numberOrZero(cost.share) })),
+  loans: (plan.loans ?? []).map((loan) => ({
+    ...loan,
+    amount: numberOrZero(loan.amount),
+    rate: numberOrZero(loan.rate),
+    termYears: numberOrZero(loan.termYears),
+    extraMonthly: numberOrZero(loan.extraMonthly),
+    property: loan.property
+      ? { ...loan.property, value: numberOrZero(loan.property.value), yearlyChange: numberOrZero(loan.property.yearlyChange) }
+      : null
   }))
 })
 
@@ -96,41 +98,41 @@ export const planForApi = (p: Plan): Plan => ({
  * after each edit.
  */
 export async function initStore(): Promise<void> {
-  const remote = await loadRemote()
-  if (!remote) return
-  Object.assign(state, withPlan(remote))
+  const remoteData = await loadRemote()
+  if (!remoteData) return
+  Object.assign(state, withPlan(remoteData))
   sync.remote = true
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let planSaveTimer: ReturnType<typeof setTimeout> | undefined
   watch(
     () => state.plan,
     () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => send('PUT', '/plan', planForApi(state.plan!)), 600)
+      clearTimeout(planSaveTimer)
+      planSaveTimer = setTimeout(() => send('PUT', '/plan', planForApi(state.plan!)), 600)
     },
     { deep: true }
   )
 }
 
-let quiet = false
+let bulkChangeRunning = false
 /** Send a change unless a bulk change (import) is running; that one saves everything at the end. */
-const push = (method: Parameters<typeof send>[0], path: string, body?: unknown) => {
-  if (!quiet) void send(method, path, body)
+const sendChange = (method: Parameters<typeof send>[0], path: string, body?: unknown) => {
+  if (!bulkChangeRunning) void send(method, path, body)
 }
 
 /** Make many changes locally (an import), then save the whole document in one call. */
-export function bulkChange(fn: () => void): void {
-  quiet = true
+export function bulkChange(makeChanges: () => void): void {
+  bulkChangeRunning = true
   try {
-    fn()
+    makeChanges()
   } finally {
-    quiet = false
+    bulkChangeRunning = false
   }
   void send('PUT', '/data', { ...state, plan: state.plan && planForApi(state.plan) })
 }
 
 export function resetToSheetData(): void {
   if (sync.remote) {
-    void send<FinanceData>('POST', '/data/reset').then((d) => d && Object.assign(state, withPlan(d)))
+    void send<FinanceData>('POST', '/data/reset').then((resetData) => resetData && Object.assign(state, withPlan(resetData)))
     return
   }
   Object.assign(state, withPlan(clone(seed)))
@@ -159,7 +161,7 @@ export function addCategory({ type, name, essential = false, subcategories = [] 
   const cat: Category = { id: uid('c'), type, name, subcategories: subcategories.length ? subcategories : ['Other'] }
   if (type === 'expense') cat.essential = essential
   state.categories.push(cat)
-  push('PUT', `/categories/${enc(cat.id)}`, cat)
+  sendChange('PUT', `/categories/${encodePathPart(cat.id)}`, cat)
   return cat
 }
 
@@ -170,20 +172,20 @@ export function renameCategory(cat: Category, newName: string): boolean {
     if (e.type === cat.type && e.category === cat.name) e.category = newName
   })
   cat.name = newName
-  push('PATCH', `/categories/${enc(cat.id)}`, { name: newName })
+  sendChange('PATCH', `/categories/${encodePathPart(cat.id)}`, { name: newName })
   return true
 }
 
 export function setEssential(cat: Category, essential: boolean): void {
   cat.essential = essential
-  push('PATCH', `/categories/${enc(cat.id)}`, { essential })
+  sendChange('PATCH', `/categories/${encodePathPart(cat.id)}`, { essential })
 }
 
 export function addSubcategory(cat: Category, name: string): boolean {
   name = name.trim()
   if (!name || cat.subcategories.includes(name)) return false
   cat.subcategories.push(name)
-  push('POST', `/categories/${enc(cat.id)}/subcategories`, { name })
+  sendChange('POST', `/categories/${encodePathPart(cat.id)}/subcategories`, { name })
   return true
 }
 
@@ -194,7 +196,7 @@ export function renameSubcategory(cat: Category, oldName: string, newName: strin
   state.entries.forEach((e) => {
     if (e.type === cat.type && e.category === cat.name && e.subcategory === oldName) e.subcategory = newName
   })
-  push('PUT', `/categories/${enc(cat.id)}/subcategories?name=${enc(oldName)}`, { name: newName })
+  sendChange('PUT', `/categories/${encodePathPart(cat.id)}/subcategories?name=${encodePathPart(oldName)}`, { name: newName })
   return true
 }
 
@@ -204,14 +206,14 @@ export const entriesUsing = (cat: Category, sub?: string): number =>
 export function removeSubcategory(cat: Category, sub: string): boolean {
   if (entriesUsing(cat, sub)) return false
   cat.subcategories = cat.subcategories.filter((s) => s !== sub)
-  push('DELETE', `/categories/${enc(cat.id)}/subcategories?name=${enc(sub)}`)
+  sendChange('DELETE', `/categories/${encodePathPart(cat.id)}/subcategories?name=${encodePathPart(sub)}`)
   return true
 }
 
 export function removeCategory(cat: Category): boolean {
   if (entriesUsing(cat)) return false
   state.categories.splice(state.categories.indexOf(cat), 1)
-  push('DELETE', `/categories/${enc(cat.id)}`)
+  sendChange('DELETE', `/categories/${encodePathPart(cat.id)}`)
   return true
 }
 
@@ -230,20 +232,20 @@ export function saveEntry(entry: EntryDraft): Entry {
     const i = state.entries.findIndex((e) => e.id === entry.id)
     if (i >= 0) {
       state.entries[i] = { ...entry, id: entry.id }
-      push('PUT', `/entries/${enc(entry.id)}`, state.entries[i])
+      sendChange('PUT', `/entries/${encodePathPart(entry.id)}`, state.entries[i])
       return state.entries[i]
     }
   }
   const e: Entry = { ...entry, id: uid() }
   state.entries.push(e)
-  push('PUT', `/entries/${enc(e.id)}`, e)
+  sendChange('PUT', `/entries/${encodePathPart(e.id)}`, e)
   return e
 }
 
 export function deleteEntry(id: string): void {
   const i = state.entries.findIndex((e) => e.id === id)
   if (i >= 0) state.entries.splice(i, 1)
-  push('DELETE', `/entries/${enc(id)}`)
+  sendChange('DELETE', `/entries/${encodePathPart(id)}`)
 }
 
 export const yearsAvailable = (): number[] => [...new Set(state.entries.map((e) => +e.date.slice(0, 4)))].sort((a, b) => b - a)
@@ -364,12 +366,12 @@ export function saveSnapshot(date: string, values: Record<string, number>): void
   const existing = state.netWorth.snapshots.find((s) => s.date === date)
   if (existing) existing.values = { ...values }
   else state.netWorth.snapshots.push({ date, values: { ...values } })
-  push('PUT', `/net-worth/snapshots/${enc(date)}`, values)
+  sendChange('PUT', `/net-worth/snapshots/${encodePathPart(date)}`, values)
 }
 
 export function deleteSnapshot(date: string): void {
   state.netWorth.snapshots = state.netWorth.snapshots.filter((s) => s.date !== date)
-  push('DELETE', `/net-worth/snapshots/${enc(date)}`)
+  sendChange('DELETE', `/net-worth/snapshots/${encodePathPart(date)}`)
 }
 
 export function addAccount(name: string, group: AccountGroup): Account | null {
@@ -377,7 +379,7 @@ export function addAccount(name: string, group: AccountGroup): Account | null {
   if (!name) return null
   const a: Account = { id: uid('a'), name, group }
   state.netWorth.accounts.push(a)
-  push('PUT', `/net-worth/accounts/${enc(a.id)}`, a)
+  sendChange('PUT', `/net-worth/accounts/${encodePathPart(a.id)}`, a)
   return a
 }
 
@@ -385,13 +387,13 @@ export function addAccount(name: string, group: AccountGroup): Account | null {
 
 /** Save a subscription; `index` null adds a new one. */
 export function saveSubscription(index: number | null, sub: Subscription): void {
-  const s = { ...sub, id: sub.id || uid('s') }
-  if (index === null) state.subscriptions.push(s)
-  else state.subscriptions.splice(index, 1, s)
-  push('PUT', `/subscriptions/${enc(s.id!)}`, s)
+  const subscription = { ...sub, id: sub.id || uid('s') }
+  if (index === null) state.subscriptions.push(subscription)
+  else state.subscriptions.splice(index, 1, subscription)
+  sendChange('PUT', `/subscriptions/${encodePathPart(subscription.id)}`, subscription)
 }
 
 export function deleteSubscription(index: number): void {
-  const [s] = state.subscriptions.splice(index, 1)
-  if (s?.id) push('DELETE', `/subscriptions/${enc(s.id)}`)
+  const [removed] = state.subscriptions.splice(index, 1)
+  if (removed?.id) sendChange('DELETE', `/subscriptions/${encodePathPart(removed.id)}`)
 }

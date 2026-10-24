@@ -13,81 +13,90 @@ import kotlin.math.roundToInt
 // Standard amortization, month by month. A port of frontend/src/lib/loan.ts; keep the two in step.
 
 object LoanMath {
-    private val YM = Regex("""^\d{4}-\d{2}$""")
+    private val YEAR_MONTH_PATTERN = Regex("""^\d{4}-\d{2}$""")
 
-    fun isYm(s: String) = YM.matches(s)
-    private fun ym(s: String): YearMonth = YearMonth.parse(s)
-    fun monthsBetween(a: String, b: String): Int = ((ym(b).year - ym(a).year) * 12 + (ym(b).monthValue - ym(a).monthValue))
+    fun isYearMonth(value: String) = YEAR_MONTH_PATTERN.matches(value)
 
-    /** Required monthly payment (principal + interest), before any extra. */
-    fun payment(l: Loan): Double {
-        val n = (l.termYears * 12).roundToInt()
-        if (l.amount == 0.0 || n <= 0) return 0.0
-        val r = l.rate / 12
-        return if (r != 0.0) l.amount * r / (1 - (1 + r).pow(-n)) else l.amount / n
+    fun monthsBetween(fromYearMonth: String, toYearMonth: String): Int {
+        val from = YearMonth.parse(fromYearMonth)
+        val to = YearMonth.parse(toYearMonth)
+        return (to.year - from.year) * 12 + (to.monthValue - from.monthValue)
     }
 
-    fun schedule(l: Loan): List<LoanRow> {
-        val base = payment(l)
-        if (!isYm(l.start) || base <= 0) return emptyList()
-        val r = l.rate / 12
-        val start = ym(l.start)
-        var bal = l.amount
+    /** Required monthly payment (principal + interest), before any extra. */
+    fun payment(loan: Loan): Double {
+        val paymentCount = (loan.termYears * 12).roundToInt()
+        if (loan.amount == 0.0 || paymentCount <= 0) return 0.0
+        val monthlyRate = loan.rate / 12
+        return if (monthlyRate != 0.0) {
+            loan.amount * monthlyRate / (1 - (1 + monthlyRate).pow(-paymentCount))
+        } else {
+            loan.amount / paymentCount
+        }
+    }
+
+    fun schedule(loan: Loan): List<LoanRow> {
+        val requiredPayment = payment(loan)
+        if (!isYearMonth(loan.start) || requiredPayment <= 0) return emptyList()
+        val monthlyRate = loan.rate / 12
+        val firstMonth = YearMonth.parse(loan.start)
+        val maxPayments = (loan.termYears * 12).roundToInt()
+        var balance = loan.amount
         val rows = mutableListOf<LoanRow>()
-        val max = (l.termYears * 12).roundToInt()
-        var i = 0
-        while (i < max && bal > 0.005) {
-            val interest = bal * r
-            val principal = min(bal, base - interest + l.extraMonthly)
-            bal -= principal
-            rows += LoanRow(start.plusMonths(i.toLong()).toString(), interest + principal, interest, principal, max(0.0, bal))
-            i++
+        var paymentIndex = 0
+        while (paymentIndex < maxPayments && balance > 0.005) {
+            val interest = balance * monthlyRate
+            val principal = min(balance, requiredPayment - interest + loan.extraMonthly)
+            balance -= principal
+            val month = firstMonth.plusMonths(paymentIndex.toLong()).toString()
+            rows += LoanRow(month, interest + principal, interest, principal, max(0.0, balance))
+            paymentIndex++
         }
         return rows
     }
 
     /**
-     * Balance owed at the end of month [ym]. The month before the first payment (when the loan
+     * Balance owed at the end of [yearMonth]. The month before the first payment (when the loan
      * closed) owes the full amount; earlier than that the loan didn't exist yet.
      */
-    fun balanceAt(l: Loan, ym: String, rows: List<LoanRow> = schedule(l)): Double {
-        if (!isYm(l.start) || l.amount == 0.0) return 0.0
-        val i = monthsBetween(l.start, ym)
+    fun balanceAt(loan: Loan, yearMonth: String, schedule: List<LoanRow> = schedule(loan)): Double {
+        if (!isYearMonth(loan.start) || loan.amount == 0.0) return 0.0
+        val paymentIndex = monthsBetween(loan.start, yearMonth)
         return when {
-            i < -1 -> 0.0
-            i == -1 -> l.amount
-            i < rows.size -> rows[i].balance
+            paymentIndex < -1 -> 0.0
+            paymentIndex == -1 -> loan.amount
+            paymentIndex < schedule.size -> schedule[paymentIndex].balance
             else -> 0.0
         }
     }
 
     /**
-     * Value of the loan's property at the end of [ym]: the conservative value grown (or shrunk) by
-     * its yearly change from the valuation month. Zero before the loan closed.
+     * Value of the loan's property at the end of [yearMonth]: the conservative value grown (or shrunk)
+     * by its yearly change from the valuation month. Zero before the loan closed.
      */
-    fun propertyValueAt(l: Loan, ym: String): Double {
-        val p = l.property ?: return 0.0
-        if (p.value == 0.0 || !isYm(p.valuedOn)) return 0.0
-        if (isYm(l.start) && monthsBetween(l.start, ym) < -1) return 0.0
-        val months = monthsBetween(p.valuedOn, ym)
-        return max(0.0, p.value * (1 + p.yearlyChange).pow(months / 12.0))
+    fun propertyValueAt(loan: Loan, yearMonth: String): Double {
+        val property = loan.property ?: return 0.0
+        if (property.value == 0.0 || !isYearMonth(property.valuedOn)) return 0.0
+        if (isYearMonth(loan.start) && monthsBetween(loan.start, yearMonth) < -1) return 0.0
+        val monthsSinceValuation = monthsBetween(property.valuedOn, yearMonth)
+        return max(0.0, property.value * (1 + property.yearlyChange).pow(monthsSinceValuation / 12.0))
     }
 
-    fun summary(l: Loan, ym: String = YearMonth.now().toString()): LoanSummary {
-        val rows = schedule(l)
-        val done = rows.filter { it.ym <= ym }
-        val balance = balanceAt(l, ym, rows)
-        val value = propertyValueAt(l, ym)
+    fun summary(loan: Loan, yearMonth: String = YearMonth.now().toString()): LoanSummary {
+        val schedule = schedule(loan)
+        val paidSoFar = schedule.filter { row -> row.ym <= yearMonth }
+        val balance = balanceAt(loan, yearMonth, schedule)
+        val propertyValue = propertyValueAt(loan, yearMonth)
         return LoanSummary(
-            payment = payment(l) + l.extraMonthly,
+            payment = payment(loan) + loan.extraMonthly,
             balance = balance,
-            value = value,
-            equity = if (abs(value) > 0) value - balance else null,
-            payoff = rows.lastOrNull()?.ym,
-            interestPaid = done.sumOf { it.interest },
-            principalPaid = done.sumOf { it.principal },
-            interestTotal = rows.sumOf { it.interest },
-            rows = rows,
+            value = propertyValue,
+            equity = if (abs(propertyValue) > 0) propertyValue - balance else null,
+            payoff = schedule.lastOrNull()?.ym,
+            interestPaid = paidSoFar.sumOf { it.interest },
+            principalPaid = paidSoFar.sumOf { it.principal },
+            interestTotal = schedule.sumOf { it.interest },
+            rows = schedule,
         )
     }
 }

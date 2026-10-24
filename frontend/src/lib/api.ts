@@ -17,37 +17,40 @@ export const sync = reactive({
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-async function request<T>(method: Method, path: string, body?: unknown, timeout = 10_000): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+async function request<T>(method: Method, path: string, body?: unknown, timeoutMs = 10_000): Promise<T> {
+  const response = await fetch(`/api${path}`, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(timeout)
+    signal: AbortSignal.timeout(timeoutMs)
   })
-  if (!res.ok) {
-    const detail = await res.json().then((j: { detail?: string; message?: string }) => j.detail || j.message).catch(() => null)
-    throw new Error(detail || `${method} ${path} failed (${res.status})`)
+  if (!response.ok) {
+    const detail = await response
+      .json()
+      .then((problem: { detail?: string; message?: string }) => problem.detail || problem.message)
+      .catch(() => null)
+    throw new Error(detail || `${method} ${path} failed (${response.status})`)
   }
-  return (res.status === 204 ? undefined : await res.json()) as T
+  return (response.status === 204 ? undefined : await response.json()) as T
 }
 
-let queue: Promise<unknown> = Promise.resolve()
+let requestQueue: Promise<unknown> = Promise.resolve()
 
 /** Queue a write. Failures don't throw; they show in the app shell. Resolves with the response, or null. */
 export function send<T = unknown>(method: Method, path: string, body?: unknown): Promise<T | null> {
   if (!sync.remote) return Promise.resolve(null)
-  const p = queue.then(() => request<T>(method, path, body)).then(
-    (r) => {
+  const queuedRequest = requestQueue.then(() => request<T>(method, path, body)).then(
+    (result) => {
       sync.error = null
-      return r
+      return result
     },
-    (e: Error) => {
-      sync.error = e.message
+    (error: Error) => {
+      sync.error = error.message
       return null
     }
   )
-  queue = p
-  return p
+  requestQueue = queuedRequest
+  return queuedRequest
 }
 
 /** The whole document, or null when there's no API to talk to. */
@@ -59,4 +62,5 @@ export async function loadRemote(): Promise<FinanceData | null> {
   }
 }
 
-export const enc = encodeURIComponent
+/** Encode an id or date for use inside a URL path. */
+export const encodePathPart = encodeURIComponent

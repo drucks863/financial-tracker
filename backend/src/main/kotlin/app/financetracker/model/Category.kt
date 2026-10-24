@@ -18,4 +18,4 @@ data class Category(
 /** Partial update of a category; null fields are left as they are. */
 data class CategoryPatch(val name: String? = null, val essential: Boolean? = null)
 
-data class NameBody(val name: String)
+data class NameRequest(val name: String)

@@ -16,14 +16,14 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/subscriptions")
-class SubscriptionController(private val svc: FinanceService, private val user: CurrentUser) {
-    @GetMapping fun list() = svc.subscriptions(user.id())
+class SubscriptionController(private val financeService: FinanceService, private val currentUser: CurrentUser) {
+    @GetMapping fun list() = financeService.subscriptions(currentUser.id())
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    fun create(@RequestBody s: Subscription) = svc.saveSubscription(user.id(), s.copy(id = ""))
+    fun create(@RequestBody subscription: Subscription) = financeService.saveSubscription(currentUser.id(), subscription.copy(id = ""))
 
-    @PutMapping("/{id}") fun put(@PathVariable id: String, @RequestBody s: Subscription) = svc.saveSubscription(user.id(), s.copy(id = id))
+    @PutMapping("/{subscriptionId}") fun put(@PathVariable subscriptionId: String, @RequestBody subscription: Subscription) = financeService.saveSubscription(currentUser.id(), subscription.copy(id = subscriptionId))
 
-    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable id: String) = svc.deleteSubscription(user.id(), id)
+    @DeleteMapping("/{subscriptionId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable subscriptionId: String) = financeService.deleteSubscription(currentUser.id(), subscriptionId)
 }

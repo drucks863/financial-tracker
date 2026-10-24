@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/summary")
-class SummaryController(private val svc: FinanceService, private val user: CurrentUser) {
+class SummaryController(private val financeService: FinanceService, private val currentUser: CurrentUser) {
     /** Per-month income, expenses, essentials and net for a year, like the sheet's Summary tab. */
-    @GetMapping("/months") fun months(@RequestParam year: Int) = svc.monthTotals(user.id(), year)
+    @GetMapping("/months") fun months(@RequestParam year: Int) = financeService.monthTotals(currentUser.id(), year)
 }

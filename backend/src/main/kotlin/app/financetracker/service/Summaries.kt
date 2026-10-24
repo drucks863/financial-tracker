@@ -16,44 +16,68 @@ import kotlin.math.abs
 object Summaries {
     /** Per-month totals for one year, like the sheet's Summary tab: net = income - expenses. */
     fun monthTotals(year: Int, entries: List<Entry>, categories: List<Category>): List<MonthTotals> {
-        val essential = categories.filter { it.type == EntryType.EXPENSE && it.essential == true }.map { it.name }.toSet()
-        val byMonth = entries.filter { it.date.take(4).toInt() == year }.groupBy { it.date.substring(5, 7).toInt() - 1 }
-        return (0 until 12).map { m ->
-            val es = byMonth[m].orEmpty()
-            val income = es.filter { it.type == EntryType.INCOME }.sumOf { it.amount }
-            val expenses = es.filter { it.type == EntryType.EXPENSE }
-            val expense = expenses.sumOf { it.amount }
-            val ess = expenses.filter { it.category in essential }.sumOf { it.amount }
+        val essentialCategoryNames = categories
+            .filter { it.type == EntryType.EXPENSE && it.essential == true }
+            .map { it.name }
+            .toSet()
+        val entriesByMonthIndex = entries
+            .filter { it.date.take(4).toInt() == year }
+            .groupBy { it.date.substring(5, 7).toInt() - 1 }
+        return (0 until 12).map { monthIndex ->
+            val monthEntries = entriesByMonthIndex[monthIndex].orEmpty()
+            val income = monthEntries.filter { it.type == EntryType.INCOME }.sumOf { it.amount }
+            val expenseEntries = monthEntries.filter { it.type == EntryType.EXPENSE }
+            val expense = expenseEntries.sumOf { it.amount }
+            val essential = expenseEntries.filter { it.category in essentialCategoryNames }.sumOf { it.amount }
             val net = income - expense
-            MonthTotals(m, "%d-%02d".format(year, m + 1), income, expense, ess, expense - ess, es.size, net, if (income != 0.0) net / income else null)
+            MonthTotals(
+                month = monthIndex,
+                ym = "%d-%02d".format(year, monthIndex + 1),
+                income = income,
+                expense = expense,
+                essential = essential,
+                discretionary = expense - essential,
+                count = monthEntries.size,
+                net = net,
+                savingsRate = if (income != 0.0) net / income else null,
+            )
         }
     }
 
     /** Averages skip zero months, matching the sheet's Average column. */
-    fun avgNonZero(values: List<Double>): Double = values.filter { abs(it) > 0.004 }.let { if (it.isEmpty()) 0.0 else it.average() }
+    fun averageOfNonZero(values: List<Double>): Double =
+        values.filter { abs(it) > 0.004 }.let { nonZero -> if (nonZero.isEmpty()) 0.0 else nonZero.average() }
 
     fun netWorthSeries(accounts: List<Account>, snapshots: List<Snapshot>, loans: List<Loan>): List<NetWorthPoint> {
-        val schedules = loans.associate { it.id to LoanMath.schedule(it) }
-        return snapshots.sortedBy { it.date }.map { s ->
-            val byGroup = AccountGroup.entries.associateWith { 0.0 }.toMutableMap()
+        val schedulesByLoanId = loans.associate { loan -> loan.id to LoanMath.schedule(loan) }
+        return snapshots.sortedBy { it.date }.map { snapshot ->
+            val totalsByGroup = AccountGroup.entries.associateWith { 0.0 }.toMutableMap()
             // Debt balances count as amounts owed whichever sign they were entered with.
-            for (a in accounts) {
-                val v = s.values[a.id] ?: 0.0
-                byGroup.merge(a.group, if (a.group == AccountGroup.DEBT) abs(v) else v, Double::plus)
+            for (account in accounts) {
+                val balance = snapshot.values[account.id] ?: 0.0
+                totalsByGroup.merge(account.group, if (account.group == AccountGroup.DEBT) abs(balance) else balance, Double::plus)
             }
             // Loans from the budget setup add their balance, and the property they bought counts under Other assets.
-            val ym = s.date.take(7)
+            val yearMonth = snapshot.date.take(7)
             val loanBalances = mutableMapOf<String, Double>()
-            val properties = mutableMapOf<String, Double>()
-            for (l in loans) {
-                val b = LoanMath.balanceAt(l, ym, schedules.getValue(l.id))
-                if (b > 0) { loanBalances[l.id] = b; byGroup.merge(AccountGroup.DEBT, b, Double::plus) }
-                val v = LoanMath.propertyValueAt(l, ym)
-                if (v > 0) { properties[l.id] = v; byGroup.merge(AccountGroup.OTHER_ASSETS, v, Double::plus) }
+            val propertyValues = mutableMapOf<String, Double>()
+            for (loan in loans) {
+                val loanBalance = LoanMath.balanceAt(loan, yearMonth, schedulesByLoanId.getValue(loan.id))
+                if (loanBalance > 0) {
+                    loanBalances[loan.id] = loanBalance
+                    totalsByGroup.merge(AccountGroup.DEBT, loanBalance, Double::plus)
+                }
+                val propertyValue = LoanMath.propertyValueAt(loan, yearMonth)
+                if (propertyValue > 0) {
+                    propertyValues[loan.id] = propertyValue
+                    totalsByGroup.merge(AccountGroup.OTHER_ASSETS, propertyValue, Double::plus)
+                }
             }
-            val assets = byGroup.getValue(AccountGroup.CASH) + byGroup.getValue(AccountGroup.INVESTMENTS) + byGroup.getValue(AccountGroup.OTHER_ASSETS)
-            val debt = byGroup.getValue(AccountGroup.DEBT)
-            NetWorthPoint(s.date, byGroup, assets, debt, loanBalances, properties, assets - debt, s.values)
+            val assets = totalsByGroup.getValue(AccountGroup.CASH) +
+                totalsByGroup.getValue(AccountGroup.INVESTMENTS) +
+                totalsByGroup.getValue(AccountGroup.OTHER_ASSETS)
+            val debt = totalsByGroup.getValue(AccountGroup.DEBT)
+            NetWorthPoint(snapshot.date, totalsByGroup, assets, debt, loanBalances, propertyValues, assets - debt, snapshot.values)
         }
     }
 }

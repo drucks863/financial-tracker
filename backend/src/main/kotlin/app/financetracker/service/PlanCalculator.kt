@@ -12,47 +12,47 @@ import kotlin.math.max
 // The budget setup's derived figures. A port of `planned` in frontend/src/store/plan.ts.
 
 object PlanCalculator {
-    fun summarize(p: Plan, ym: String = YearMonth.now().toString()): PlanSummary {
-        val perYear = p.payFrequency.perYear
-        fun toMonthly(perPaycheck: Double) = perPaycheck * perYear / 12
+    fun summarize(plan: Plan, yearMonth: String = YearMonth.now().toString()): PlanSummary {
+        val paychecksPerYear = plan.payFrequency.perYear
+        fun toMonthly(perPaycheck: Double) = perPaycheck * paychecksPerYear / 12
 
-        val gross = p.salary / perYear
-        val k401 = gross * p.k401
-        val match = gross * p.match
-        val deductions = p.deductions.sumOf { it.perPaycheck }
+        val grossPay = plan.salary / paychecksPerYear
+        val your401k = grossPay * plan.k401
+        val company401k = grossPay * plan.match
+        val otherDeductions = plan.deductions.sumOf { it.perPaycheck }
         // Estimate: what's left after 401k and other deductions, taxed at the effective rate.
-        val taxable = max(0.0, gross - k401 - deductions)
-        val taxes = taxable * p.taxRate
-        val estTakeHome = taxable - taxes
-        val takeHome = p.takeHome ?: estTakeHome
+        val taxablePay = max(0.0, grossPay - your401k - otherDeductions)
+        val taxes = taxablePay * plan.taxRate
+        val estimatedTakeHome = taxablePay - taxes
+        val takeHome = plan.takeHome ?: estimatedTakeHome
 
-        val housing = p.housing.map { HousingLine(it, it.monthly * it.share) }
-        val loans = p.loans.map { LoanLine(it, LoanMath.summary(it, ym)) }
-        val loanPayments = loans.filter { it.summary.balance > 0 }.sumOf { it.summary.payment }
+        val housingLines = plan.housing.map { cost -> HousingLine(cost, cost.monthly * cost.share) }
+        val loanLines = plan.loans.map { loan -> LoanLine(loan, LoanMath.summary(loan, yearMonth)) }
+        val loanPayments = loanLines.filter { it.summary.balance > 0 }.sumOf { it.summary.payment }
 
-        val takeHomeMonthly = toMonthly(takeHome)
-        val housingMine = housing.sumOf { it.mine }
-        val saved = toMonthly(k401 + match + deductions)
+        val monthlyTakeHome = toMonthly(takeHome)
+        val myMonthlyHousing = housingLines.sumOf { it.mine }
+        val savedMonthly = toMonthly(your401k + company401k + otherDeductions)
         return PlanSummary(
-            perYear = perYear,
-            paycheck = Paycheck(gross, k401, match, deductions, taxes, estTakeHome, takeHome),
+            perYear = paychecksPerYear,
+            paycheck = Paycheck(grossPay, your401k, company401k, otherDeductions, taxes, estimatedTakeHome, takeHome),
             monthly = Monthly(
-                gross = toMonthly(gross),
-                k401 = toMonthly(k401),
-                match = toMonthly(match),
-                deductions = toMonthly(deductions),
+                gross = toMonthly(grossPay),
+                k401 = toMonthly(your401k),
+                match = toMonthly(company401k),
+                deductions = toMonthly(otherDeductions),
                 taxes = toMonthly(taxes),
-                takeHome = takeHomeMonthly,
-                housingTotal = p.housing.sumOf { it.monthly },
-                housingMine = housingMine,
+                takeHome = monthlyTakeHome,
+                housingTotal = plan.housing.sumOf { it.monthly },
+                housingMine = myMonthlyHousing,
                 loanPayments = loanPayments,
-                afterHousing = takeHomeMonthly - housingMine - loanPayments,
-                saved = saved,
+                afterHousing = monthlyTakeHome - myMonthlyHousing - loanPayments,
+                saved = savedMonthly,
             ),
-            housing = housing,
-            loans = loans,
-            savedYearly = saved * 12,
-            savedRate = if (p.salary != 0.0) saved * 12 / p.salary else null,
+            housing = housingLines,
+            loans = loanLines,
+            savedYearly = savedMonthly * 12,
+            savedRate = if (plan.salary != 0.0) savedMonthly * 12 / plan.salary else null,
         )
     }
 }

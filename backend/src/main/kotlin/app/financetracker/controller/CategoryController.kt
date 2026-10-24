@@ -2,7 +2,7 @@ package app.financetracker.controller
 
 import app.financetracker.model.Category
 import app.financetracker.model.CategoryPatch
-import app.financetracker.model.NameBody
+import app.financetracker.model.NameRequest
 import app.financetracker.service.CurrentUser
 import app.financetracker.service.FinanceService
 import app.financetracker.service.newId
@@ -21,26 +21,26 @@ import org.springframework.web.bind.annotation.RestController
 
 @RestController
 @RequestMapping("/api/categories")
-class CategoryController(private val svc: FinanceService, private val user: CurrentUser) {
-    @GetMapping fun list() = svc.categories(user.id())
+class CategoryController(private val financeService: FinanceService, private val currentUser: CurrentUser) {
+    @GetMapping fun list() = financeService.categories(currentUser.id())
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    fun create(@RequestBody c: Category) = svc.saveCategory(user.id(), c.copy(id = newId("c")))
+    fun create(@RequestBody category: Category) = financeService.saveCategory(currentUser.id(), category.copy(id = newId("c")))
 
-    @PutMapping("/{id}") fun put(@PathVariable id: String, @RequestBody c: Category) = svc.saveCategory(user.id(), c.copy(id = id))
-    @PatchMapping("/{id}") fun patch(@PathVariable id: String, @RequestBody p: CategoryPatch) = svc.patchCategory(user.id(), id, p)
+    @PutMapping("/{categoryId}") fun put(@PathVariable categoryId: String, @RequestBody category: Category) = financeService.saveCategory(currentUser.id(), category.copy(id = categoryId))
+    @PatchMapping("/{categoryId}") fun patch(@PathVariable categoryId: String, @RequestBody patch: CategoryPatch) = financeService.patchCategory(currentUser.id(), categoryId, patch)
 
-    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun delete(@PathVariable id: String) = svc.deleteCategory(user.id(), id)
+    @DeleteMapping("/{categoryId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun delete(@PathVariable categoryId: String) = financeService.deleteCategory(currentUser.id(), categoryId)
 
-    @PostMapping("/{id}/subcategories")
-    fun addSub(@PathVariable id: String, @RequestBody b: NameBody) = svc.addSubcategory(user.id(), id, b.name)
+    @PostMapping("/{categoryId}/subcategories")
+    fun addSubcategory(@PathVariable categoryId: String, @RequestBody body: NameRequest) = financeService.addSubcategory(currentUser.id(), categoryId, body.name)
 
     // The subcategory goes in `?name=` rather than the path: names like "Hobby/Toys" would need an
     // encoded slash (%2F), which Tomcat rejects.
-    @PutMapping("/{id}/subcategories")
-    fun renameSub(@PathVariable id: String, @RequestParam name: String, @RequestBody b: NameBody) = svc.renameSubcategory(user.id(), id, name, b.name)
+    @PutMapping("/{categoryId}/subcategories")
+    fun renameSubcategory(@PathVariable categoryId: String, @RequestParam("name") subcategory: String, @RequestBody body: NameRequest) = financeService.renameSubcategory(currentUser.id(), categoryId, subcategory, body.name)
 
-    @DeleteMapping("/{id}/subcategories")
-    fun removeSub(@PathVariable id: String, @RequestParam name: String) = svc.removeSubcategory(user.id(), id, name)
+    @DeleteMapping("/{categoryId}/subcategories")
+    fun removeSubcategory(@PathVariable categoryId: String, @RequestParam("name") subcategory: String) = financeService.removeSubcategory(currentUser.id(), categoryId, subcategory)
 }

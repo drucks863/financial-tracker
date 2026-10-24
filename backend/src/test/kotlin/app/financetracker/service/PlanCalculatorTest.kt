@@ -20,14 +20,14 @@ class PlanCalculatorTest {
 
     @Test
     fun `paycheck math`() {
-        val p = PlanCalculator.summarize(plan).paycheck
-        assertEquals(3000.0, p.gross, 1e-9)
-        assertEquals(300.0, p.k401, 1e-9)
-        assertEquals(150.0, p.match, 1e-9)
-        assertEquals(100.0, p.deductions, 1e-9)
+        val paycheck = PlanCalculator.summarize(plan).paycheck
+        assertEquals(3000.0, paycheck.gross, 1e-9)
+        assertEquals(300.0, paycheck.k401, 1e-9)
+        assertEquals(150.0, paycheck.match, 1e-9)
+        assertEquals(100.0, paycheck.deductions, 1e-9)
         // taxable = 3000 - 300 - 100 = 2600; taxes 20%
-        assertEquals(520.0, p.taxes, 1e-9)
-        assertEquals(2080.0, p.takeHome, 1e-9)
+        assertEquals(520.0, paycheck.taxes, 1e-9)
+        assertEquals(2080.0, paycheck.takeHome, 1e-9)
     }
 
     @Test
@@ -37,12 +37,12 @@ class PlanCalculatorTest {
 
     @Test
     fun `monthly figures use paychecks per year and my share of housing`() {
-        val m = PlanCalculator.summarize(plan).monthly
-        assertEquals(2080.0 * 26 / 12, m.takeHome, 1e-9)
-        assertEquals(2100.0, m.housingTotal, 1e-9)
-        assertEquals(1100.0, m.housingMine, 1e-9)
-        assertEquals(m.takeHome - 1100.0, m.afterHousing, 1e-9)
-        assertEquals(550.0 * 26 / 12, m.saved, 1e-9)
+        val monthly = PlanCalculator.summarize(plan).monthly
+        assertEquals(2080.0 * 26 / 12, monthly.takeHome, 1e-9)
+        assertEquals(2100.0, monthly.housingTotal, 1e-9)
+        assertEquals(1100.0, monthly.housingMine, 1e-9)
+        assertEquals(monthly.takeHome - 1100.0, monthly.afterHousing, 1e-9)
+        assertEquals(550.0 * 26 / 12, monthly.saved, 1e-9)
     }
 
     @Test

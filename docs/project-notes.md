@@ -26,6 +26,13 @@ monthly and yearly averages, and net worth.
 - **Monorepo.** The Vue UI gets bundled into the Spring Boot jar for deployment, but must
   also run on its own locally (`npm run dev` in `frontend/`, proxying `/api` to `localhost:8080`).
 
+## Code style
+
+- Descriptive names over abbreviations, including injected services (`financeService: FinanceService`,
+  not `svc`) and lambda parameters that do more than a one-liner (Devin, 2026-10-24).
+- JSON field names stay as they are in `frontend/src/types.ts` (`ym`, `k401`...) so the API and the
+  store keep matching; renaming one means renaming it on both sides.
+
 ## Git
 
 - Branch names are short and descriptive (e.g. `initial-backend`), with no `claude/` prefix (Devin, 2026-10-24).

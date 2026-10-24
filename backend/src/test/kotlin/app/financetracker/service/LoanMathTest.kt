@@ -53,11 +53,11 @@ class LoanMathTest {
 
     @Test
     fun `summary splits interest and principal paid so far`() {
-        val s = LoanMath.summary(car, "2024-08")
-        val rows = LoanMath.schedule(car).take(3)
-        assertEquals(rows.sumOf { it.interest }, s.interestPaid, 1e-9)
-        assertEquals(rows.sumOf { it.principal }, s.principalPaid, 1e-9)
-        assertEquals("2029-05", s.payoff)
-        assertNull(s.equity)
+        val summary = LoanMath.summary(car, "2024-08")
+        val firstThreePayments = LoanMath.schedule(car).take(3)
+        assertEquals(firstThreePayments.sumOf { it.interest }, summary.interestPaid, 1e-9)
+        assertEquals(firstThreePayments.sumOf { it.principal }, summary.principalPaid, 1e-9)
+        assertEquals("2029-05", summary.payoff)
+        assertNull(summary.equity)
     }
 }

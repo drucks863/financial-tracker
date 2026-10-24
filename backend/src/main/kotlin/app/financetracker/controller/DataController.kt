@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RestController
 /** The whole document: what the frontend loads at startup, plus full replace (import a backup) and reset. */
 @RestController
 @RequestMapping("/api/data")
-class DataController(private val svc: FinanceService, private val user: CurrentUser) {
-    @GetMapping fun get() = svc.data(user.id())
-    @PutMapping fun replace(@RequestBody data: FinanceData) = svc.replaceAll(user.id(), data)
-    @PostMapping("/reset") fun reset() = svc.reset(user.id())
+class DataController(private val financeService: FinanceService, private val currentUser: CurrentUser) {
+    @GetMapping fun get() = financeService.data(currentUser.id())
+    @PutMapping fun replace(@RequestBody data: FinanceData) = financeService.replaceAll(currentUser.id(), data)
+    @PostMapping("/reset") fun reset() = financeService.reset(currentUser.id())
 }
