@@ -1,0 +1,6 @@
+node_modules/
+dist/
+dist-preview/
+# real financial data: never commit
+src/data/seed.local.json
+*.local.json

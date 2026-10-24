@@ -1,0 +1,265 @@
+<script setup>
+import { computed, reactive, ref } from 'vue'
+import SelectButton from 'primevue/selectbutton'
+import InputText from 'primevue/inputtext'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import Button from 'primevue/button'
+import MonthStrip from '../components/MonthStrip.vue'
+import { ui, selectedYm, openEntry, categoryColor } from '../store/ui'
+import { state, categoriesOf, monthTotals } from '../store/finance'
+import { money, money2, monthLabel, MONTHS } from '../lib/format'
+import { isDark } from '../lib/theme-mode'
+
+const type = ref('expense')
+const query = ref('')
+const collapsed = reactive({})
+
+const totals = computed(() => monthTotals(ui.year)[ui.month])
+const TYPES = computed(() => [
+  { label: 'Expenses', value: 'expense', total: totals.value.expense },
+  { label: 'Income', value: 'income', total: totals.value.income },
+  { label: 'Savings', value: 'savings', total: totals.value.saved }
+])
+
+// Category → subcategory → entries, in the category order from the sheet.
+const groups = computed(() => {
+  const ym = selectedYm.value
+  const q = query.value.trim().toLowerCase()
+  const list = state.entries.filter(
+    (e) =>
+      e.type === type.value &&
+      e.date.startsWith(ym) &&
+      (!q || `${e.description} ${e.category} ${e.subcategory}`.toLowerCase().includes(q))
+  )
+  const order = categoriesOf(type.value).map((c) => c.name)
+  const byCat = {}
+  for (const e of list) {
+    const c = (byCat[e.category] ||= { name: e.category, total: 0, subs: {} })
+    c.total += e.amount
+    const s = (c.subs[e.subcategory] ||= { name: e.subcategory, total: 0, entries: [] })
+    s.total += e.amount
+    s.entries.push(e)
+  }
+  const cats = Object.values(byCat).sort((a, b) => {
+    const ia = order.indexOf(a.name)
+    const ib = order.indexOf(b.name)
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+  })
+  const catDef = (name) => categoriesOf(type.value).find((c) => c.name === name)
+  return cats.map((c) => {
+    const subOrder = catDef(c.name)?.subcategories || []
+    return {
+      ...c,
+      essential: !!catDef(c.name)?.essential,
+      subs: Object.values(c.subs)
+        .sort((a, b) => subOrder.indexOf(a.name) - subOrder.indexOf(b.name))
+        .map((s) => ({ ...s, entries: s.entries.sort((a, b) => b.amount - a.amount) }))
+    }
+  })
+})
+
+const shownTotal = computed(() => groups.value.reduce((a, g) => a + g.total, 0))
+const dayLabel = (iso) => `${MONTHS[+iso.slice(5, 7) - 1]} ${+iso.slice(8, 10)}`
+const swatch = (name) => (type.value === 'expense' ? categoryColor(name, isDark.value) : 'var(--series-income)')
+</script>
+
+<template>
+  <div class="stack">
+    <header>
+      <h1>Cash flow</h1>
+      <p class="muted">Every entry for {{ monthLabel(selectedYm) }}, grouped the way your sheet groups them</p>
+    </header>
+
+    <MonthStrip />
+
+    <div class="toolbar">
+      <SelectButton v-model="type" :options="TYPES" option-value="value" :allow-empty="false" aria-label="Entry type" class="type-switch">
+        <template #option="{ option }">
+          <span class="opt">
+            <span>{{ option.label }}</span>
+            <small class="num">{{ money(option.total) }}</small>
+          </span>
+        </template>
+      </SelectButton>
+      <IconField class="search">
+        <InputIcon class="pi pi-search" />
+        <InputText id="cashflow-search" v-model="query" placeholder="Search this month" fluid />
+      </IconField>
+    </div>
+
+    <section v-if="groups.length" class="panel list-panel">
+      <div class="list-head">
+        <span class="muted">{{ groups.length }} categories</span>
+        <span class="num"><span class="muted">Total</span> {{ money2(shownTotal) }}</span>
+      </div>
+      <div v-for="g in groups" :key="g.name" class="cat">
+        <button type="button" class="cat-row" :aria-expanded="!collapsed[g.name]" @click="collapsed[g.name] = !collapsed[g.name]">
+          <span class="swatch" :style="{ background: swatch(g.name) }"></span>
+          <span class="cat-name">
+            {{ g.name }}
+            <small v-if="g.essential" class="tag">Essential</small>
+          </span>
+          <span class="num cat-total">{{ money2(g.total) }}</span>
+          <i class="pi" :class="collapsed[g.name] ? 'pi-chevron-down' : 'pi-chevron-up'" aria-hidden="true"></i>
+        </button>
+        <div v-if="!collapsed[g.name]" class="subs">
+          <div v-for="s in g.subs" :key="s.name" class="sub">
+            <div class="sub-row">
+              <span>{{ s.name }}</span>
+              <span class="num ink2">{{ money2(s.total) }}</span>
+            </div>
+            <ul class="entries">
+              <li v-for="e in s.entries" :key="e.id">
+                <button type="button" class="entry" @click="openEntry(e)">
+                  <span class="desc">{{ e.description || s.name }}</span>
+                  <span class="date muted">{{ dayLabel(e.date) }}</span>
+                  <span class="num amt">{{ money2(e.amount) }}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-else class="panel empty-state">
+      <h2>{{ query ? 'No matches' : `No ${type === 'expense' ? 'expenses' : type} for ${monthLabel(selectedYm)}` }}</h2>
+      <p class="muted">{{ query ? 'Try a different search, or clear it.' : 'Add the first one and it will show up here.' }}</p>
+      <Button v-if="!query" label="Add entry" icon="pi pi-plus" @click="openEntry()" />
+      <Button v-else label="Clear search" text @click="query = ''" />
+    </section>
+  </div>
+</template>
+
+<style scoped>
+.toolbar {
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 720px) {
+  .toolbar {
+    grid-template-columns: auto minmax(0, 320px);
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+.type-switch {
+  display: flex;
+  width: 100%;
+}
+.type-switch :deep(.p-togglebutton) {
+  flex: 1;
+}
+.opt {
+  display: grid;
+  line-height: 1.15;
+  text-align: center;
+}
+.opt small {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+.list-panel {
+  padding: 0;
+  overflow: hidden;
+}
+.list-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid var(--line);
+}
+.cat + .cat {
+  border-top: 1px solid var(--line);
+}
+.cat-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.cat-row:hover {
+  background: var(--accent-soft);
+}
+.cat-name {
+  font-weight: 600;
+}
+.tag {
+  margin-left: 6px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.cat-total {
+  font-weight: 600;
+}
+.cat-row .pi {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.subs {
+  padding: 0 16px 12px 36px;
+  display: grid;
+  gap: 10px;
+}
+.sub-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--line);
+}
+.entries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.entry {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.entry:hover {
+  background: var(--accent-soft);
+}
+.desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.date {
+  font-size: 0.75rem;
+}
+.empty-state {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 24px 16px;
+}
+</style>
