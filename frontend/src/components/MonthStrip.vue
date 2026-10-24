@@ -49,7 +49,7 @@ watch(() => [ui.month, ui.year], scrollToActive)
           ></span>
         </span>
         <span class="label">{{ MONTHS[r.month] }}</span>
-        <span class="net num">{{ r.count ? signedMoney(r.net) : '—' }}</span>
+        <span class="net num" :class="r.count ? (r.net >= 0 ? 'up' : 'down') : ''">{{ r.count ? signedMoney(r.net) : '—' }}</span>
       </button>
     </div>
   </div>
@@ -133,7 +133,7 @@ watch(() => [ui.month, ui.year], scrollToActive)
 }
 .bar.up {
   bottom: 23px;
-  background: var(--accent);
+  background: var(--good);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -150,6 +150,12 @@ watch(() => [ui.month, ui.year], scrollToActive)
 .net {
   font-size: 0.6875rem;
   color: var(--muted);
+}
+.net.up {
+  color: var(--good);
+}
+.net.down {
+  color: var(--bad);
 }
 .m.empty .label {
   color: var(--muted);

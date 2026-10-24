@@ -168,6 +168,9 @@ function remove(): void {
             autofocus
           />
           <small v-if="errors.amount" class="err">{{ errors.amount }}</small>
+          <small v-else-if="form.amount !== null && form.amount < 0" class="hint">
+            {{ form.type === 'expense' ? 'A negative expense counts as a refund and adds back to the month.' : 'A negative income entry lowers the month’s income.' }}
+          </small>
         </label>
         <label class="field">
           <span>Date</span>
@@ -285,6 +288,10 @@ function remove(): void {
 }
 .err {
   color: var(--bad);
+}
+.hint {
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 .actions {
   display: flex;
