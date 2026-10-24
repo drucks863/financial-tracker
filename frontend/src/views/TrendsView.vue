@@ -69,7 +69,7 @@ const stacked = computed<ChartBuilder>(() => {
           ? [
               {
                 type: 'line' as const,
-                label: 'Planned take-home',
+                label: 'Take-home pay',
                 data: MONTHS.map(() => planTakeHome.value),
                 borderColor: c.ink,
                 borderDash: [5, 4],
@@ -258,7 +258,7 @@ const yoy = computed(() => {
           <span v-for="l in stackedLegend" :key="l.name" :title="l.i < 0 ? otherNames : ''">
             <i class="swatch" :style="{ background: l.i < 0 ? otherColor(isDark) : series(l.i, isDark) }"></i>{{ l.name }}
           </span>
-          <span v-if="planTakeHome > 0"><i class="swatch line" style="background: var(--ink)"></i>Planned take-home</span>
+          <span v-if="planTakeHome > 0"><i class="swatch line" style="background: var(--ink)"></i>Take-home pay</span>
         </div>
         <BaseChart :build="stacked" height="280px" :label="`Monthly spending by category for ${ui.year}`" />
       </section>
