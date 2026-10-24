@@ -8,6 +8,7 @@ import CashFlowView from './views/CashFlowView.vue'
 import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
 import SettingsView from './views/SettingsView.vue'
+import PlanView from './views/PlanView.vue'
 import { openEntry } from './store/ui'
 import { isSampleData } from './store/finance'
 
@@ -16,6 +17,7 @@ const VIEWS = [
   { id: 'cashflow', label: 'Cash flow', icon: 'pi pi-list', component: CashFlowView },
   { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
   { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView },
+  { id: 'plan', label: 'My numbers', short: 'Numbers', icon: 'pi pi-calculator', component: PlanView },
   { id: 'data', label: 'Data', icon: 'pi pi-sliders-h', component: SettingsView }
 ]
 
@@ -55,11 +57,12 @@ onMounted(() => {
         type="button"
         class="nav-item"
         :class="{ end: v.id === 'data' }"
+        :aria-label="v.label"
         :aria-current="current === v.id ? 'page' : undefined"
         @click="go(v.id)"
       >
         <i :class="v.icon" aria-hidden="true"></i>
-        <span>{{ v.label }}</span>
+        <span class="full">{{ v.label }}</span><span v-if="v.short" class="short">{{ v.short }}</span>
       </button>
       <button type="button" class="rail-add" @click="openEntry()"><i class="pi pi-plus" aria-hidden="true"></i><span>Add entry</span></button>
     </nav>
@@ -146,6 +149,21 @@ onMounted(() => {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
+/* Phones: one-line tab labels, with a short form where the full one is long */
+.nav-item .short {
+  display: none;
+}
+@media (max-width: 959px) {
+  .nav-item {
+    white-space: nowrap;
+  }
+  .nav-item .short {
+    display: inline;
+  }
+  .nav-item:has(.short) .full {
+    display: none;
+  }
+}
 /* Desktop: narrow left rail with icon + label rows. The Data screen sits at the bottom like settings. */
 @media (min-width: 960px) {
   .shell {

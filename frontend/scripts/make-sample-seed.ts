@@ -2,7 +2,7 @@
 // the real data, so the repo (which is public) never carries real finances.
 // Real data lives in src/data/seed.local.json, which is gitignored.
 import { writeFileSync } from 'node:fs'
-import type { Account, Category, Entry, EntryType, FinanceData, Snapshot, Subscription } from '../src/types.ts'
+import type { Account, Category, Entry, EntryType, FinanceData, Plan, Snapshot, Subscription } from '../src/types.ts'
 
 let s = 42
 const rand = () => ((s = (s * 1103515245 + 12345) % 2 ** 31) / 2 ** 31)
@@ -100,8 +100,31 @@ const subscriptions: Subscription[] = [
   { service: 'Car insurance', price: 420, category: 'Essential', frequency: 'Semiannual', when: 'Mar & Sep', from: 'Credit Card' }
 ]
 
+const plan: Plan = {
+  salary: 85000,
+  taxRate: 0.2,
+  takeHome: null,
+  k401: 0.08,
+  match: 0.04,
+  contributions: [
+    { id: 'p1', name: 'HSA', monthly: 150, fromPaycheck: true },
+    { id: 'p2', name: 'Roth IRA', monthly: 300 }
+  ],
+  housing: {
+    rent: 2200,
+    split: true,
+    rentShare: 0.5,
+    bills: [
+      { id: 'p3', name: 'Water', monthly: 90 },
+      { id: 'p4', name: 'Electric', monthly: 160 }
+    ],
+    billsShare: 0.5
+  },
+  living: { useAverage: true, monthly: 0 }
+}
+
 writeFileSync(
   new URL('../src/data/seed.sample.json', import.meta.url),
-  JSON.stringify({ version: 2, sample: true, categories, entries, netWorth: { accounts, snapshots }, subscriptions } satisfies FinanceData)
+  JSON.stringify({ version: 2, sample: true, categories, entries, netWorth: { accounts, snapshots }, subscriptions, plan } satisfies FinanceData)
 )
 console.log(`sample seed: ${entries.length} entries, ${snapshots.length} snapshots`)

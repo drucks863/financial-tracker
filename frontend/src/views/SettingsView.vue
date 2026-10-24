@@ -6,6 +6,8 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Checkbox from 'primevue/checkbox'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Dialog from 'primevue/dialog'
+import Select from 'primevue/select'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import {
@@ -20,13 +22,15 @@ import {
   entriesUsing,
   ensureCategory,
   uid,
-  resetToSheetData
+  resetToSheetData,
+  saveSubscription,
+  deleteSubscription
 } from '../store/finance'
 import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook } from '../lib/io'
 import { money, money2, shortDate } from '../lib/format'
 import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
 import { useExport } from '../lib/use-export'
-import type { Category, EntryType } from '../types'
+import type { Category, EntryType, Subscription } from '../types'
 
 const toast = useToast()
 
@@ -188,6 +192,35 @@ const subsMonthly = computed(() =>
     return a + (f.startsWith('year') ? p / 12 : f.startsWith('semi') ? p / 6 : p)
   }, 0)
 )
+
+const FREQUENCIES = ['Monthly', 'Yearly', 'Semiannual', 'Quarterly', 'Weekly']
+const SUB_KINDS = ['Essential', 'Discretionary']
+const blankSub = (): Subscription => ({ service: '', price: null, category: 'Discretionary', frequency: 'Monthly', when: '', from: '' })
+const subEdit = reactive({ open: false, index: null as number | null, form: blankSub(), error: '' })
+const paidFromOptions = computed(() => [...new Set(state.subscriptions.map((s) => s.from).filter(Boolean))])
+function openSub(index: number | null): void {
+  subEdit.index = index
+  subEdit.form = index === null ? blankSub() : { ...state.subscriptions[index] }
+  subEdit.error = ''
+  subEdit.open = true
+}
+function saveSub(): void {
+  const f = subEdit.form
+  if (!f.service.trim()) {
+    subEdit.error = 'Give it a name'
+    return
+  }
+  saveSubscription(subEdit.index, { ...f, service: f.service.trim() })
+  subEdit.open = false
+  toast.add({ severity: 'success', summary: subEdit.index === null ? 'Subscription added' : 'Subscription updated', life: 2000 })
+}
+function removeSub(): void {
+  if (subEdit.index === null) return
+  const name = state.subscriptions[subEdit.index]?.service
+  deleteSubscription(subEdit.index)
+  subEdit.open = false
+  toast.add({ severity: 'info', summary: `${name} removed`, life: 2000 })
+}
 
 /* ---------- reset ---------- */
 const confirmReset = ref(false)
@@ -382,12 +415,13 @@ function reset() {
         <div class="panel-head">
           <div>
             <h2>Subscriptions</h2>
-            <p class="muted num">About {{ money(subsMonthly) }} a month, from your Subscriptions tab</p>
+            <p class="muted num">About {{ money(subsMonthly) }} a month. Tap one to edit it.</p>
           </div>
+          <Button label="Add" icon="pi pi-plus" text size="small" @click="openSub(null)" />
         </div>
         <table class="subs-t">
           <tbody>
-            <tr v-for="s in state.subscriptions" :key="s.service">
+            <tr v-for="(s, i) in state.subscriptions" :key="`${i}-${s.service}`" class="sub-tr" tabindex="0" @click="openSub(i)" @keydown.enter="openSub(i)">
               <td>
                 {{ s.service }}
                 <small class="muted">{{ s.frequency }} · {{ s.when }} · {{ s.from }}</small>
@@ -397,7 +431,48 @@ function reset() {
             </tr>
           </tbody>
         </table>
+        <p v-if="!state.subscriptions.length" class="empty">No subscriptions yet.</p>
       </section>
+
+      <Dialog v-model:visible="subEdit.open" modal :header="subEdit.index === null ? 'Add subscription' : 'Edit subscription'" :style="{ width: 'min(440px, calc(100vw - 32px))' }">
+        <form class="sub-form" @submit.prevent="saveSub">
+          <label class="sub-field">
+            <span>Service</span>
+            <InputText v-model="subEdit.form.service" :invalid="!!subEdit.error" autofocus fluid />
+            <small v-if="subEdit.error" class="err">{{ subEdit.error }}</small>
+          </label>
+          <div class="sub-2">
+            <label class="sub-field">
+              <span>Price</span>
+              <InputNumber v-model="subEdit.form.price" mode="currency" currency="USD" locale="en-US" fluid />
+            </label>
+            <label class="sub-field">
+              <span>How often</span>
+              <Select v-model="subEdit.form.frequency" :options="FREQUENCIES" fluid />
+            </label>
+          </div>
+          <div class="sub-2">
+            <label class="sub-field">
+              <span>Type</span>
+              <Select v-model="subEdit.form.category" :options="SUB_KINDS" fluid />
+            </label>
+            <label class="sub-field">
+              <span>When</span>
+              <InputText v-model="subEdit.form.when" placeholder="e.g. 15th, March" fluid />
+            </label>
+          </div>
+          <label class="sub-field">
+            <span>Paid from</span>
+            <Select v-model="subEdit.form.from" :options="paidFromOptions" editable placeholder="Card or account" fluid />
+          </label>
+          <div class="sub-actions">
+            <Button v-if="subEdit.index !== null" label="Delete" icon="pi pi-trash" text severity="danger" @click="removeSub" />
+            <span class="spacer"></span>
+            <Button label="Cancel" text severity="secondary" @click="subEdit.open = false" />
+            <Button type="submit" label="Save" />
+          </div>
+        </form>
+      </Dialog>
 
       <section class="panel">
         <div class="panel-head">
@@ -420,6 +495,40 @@ function reset() {
 </template>
 
 <style scoped>
+.err {
+  color: var(--bad);
+}
+.sub-tr {
+  cursor: pointer;
+}
+.sub-tr:hover,
+.sub-tr:focus-visible {
+  background: var(--panel-2);
+  outline: none;
+}
+.sub-form {
+  display: grid;
+  gap: 14px;
+}
+.sub-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sub-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+.sub-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sub-actions .spacer {
+  flex: 1;
+}
 .small {
   font-size: 0.8125rem;
 }

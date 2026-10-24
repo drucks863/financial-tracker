@@ -58,6 +58,16 @@ docs/       these notes, the todo list, architecture
   Roth IRA, 401k, HSA, REIT (investments); Other assets and Debt sections are empty so far.
 - Older years exist as separate files: Cash Flow '22, '23, '24, '25.
 
+## My numbers (plan)
+
+- Mirrors the **Misc. Calculations** tab of "Net Worth / Retirement Calculator": rent split
+  (a share of rent plus a share of shared bills), take-home income, avg expenses,
+  monthly/yearly amount saved and percent saved.
+- Stored as `plan` on the data (`types.ts` `Plan`); derived figures in `store/plan.ts` (`planned`).
+  Other screens should read `planned`, not recompute.
+- Contributions can be marked "from paycheck" (taken before take-home, like HSA and the
+  sheet's retirement line) or paid from take-home.
+
 ## Privacy
 
 The GitHub repo is **public**. Never commit real figures.

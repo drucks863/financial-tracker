@@ -1,23 +1,37 @@
 import { reactive, watch } from 'vue'
 import seed from '@seed'
-import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint } from '../types'
+import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
 // Single in-memory store for the prototype, persisted to localStorage.
 
 const KEY = 'financial-tracker.v1'
 const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o))
 
+export const emptyPlan = (): Plan => ({
+  salary: 0,
+  taxRate: 0.22,
+  takeHome: null,
+  k401: 0,
+  match: 0,
+  contributions: [],
+  housing: { rent: 0, split: false, rentShare: 0.5, bills: [], billsShare: 0.5 },
+  living: { useAverage: true, monthly: 0 }
+})
+
+// Older saved data (and seeds without one) have no plan; fill in defaults.
+const withPlan = (d: FinanceData): FinanceData => ({ ...d, plan: d.plan ?? emptyPlan() })
+
 function load(): FinanceData {
   try {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as FinanceData
-      if (parsed?.version === seed.version) return parsed
+      if (parsed?.version === seed.version) return withPlan(parsed)
     }
   } catch {
     /* storage blocked: fall back to seed */
   }
-  return clone(seed)
+  return withPlan(clone(seed))
 }
 
 export const state = reactive<FinanceData>(load())
@@ -35,7 +49,7 @@ watch(
 )
 
 export function resetToSheetData(): void {
-  Object.assign(state, clone(seed))
+  Object.assign(state, withPlan(clone(seed)))
 }
 
 export const isSampleData = !!seed.sample
@@ -246,4 +260,16 @@ export function addAccount(name: string, group: AccountGroup): Account | null {
   const a: Account = { id: uid('a'), name, group }
   state.netWorth.accounts.push(a)
   return a
+}
+
+/* ---------- subscriptions ---------- */
+
+/** Save a subscription; `index` null adds a new one. */
+export function saveSubscription(index: number | null, sub: Subscription): void {
+  if (index === null) state.subscriptions.push(sub)
+  else state.subscriptions.splice(index, 1, sub)
+}
+
+export function deleteSubscription(index: number): void {
+  state.subscriptions.splice(index, 1)
 }
