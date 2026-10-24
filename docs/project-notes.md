@@ -66,6 +66,9 @@ docs/       these notes, the todo list, architecture
   name. Until then the name is typed at the top of the page and the avatar shows initials.
 - The profile is tabbed: Pay & bills (the plan), Categories, Subscriptions, Import & export
   (also the prototype reset). There is no separate Data page; `#data` links open Import & export.
+- Fields other screens read carry a small link marker (`components/UsedBy.vue`); hover or tap
+  lists where they're used. The lists live in `USES` in PlanView; keep them in step when a
+  screen starts or stops reading a profile value.
 
 - The app does the math. Inputs: yearly salary, pay frequency (weekly, every two weeks, twice
   a month, monthly), effective tax rate, your 401k % and company 401k %, other paycheck

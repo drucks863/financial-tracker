@@ -12,10 +12,28 @@ import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
 import SettingsView from './SettingsView.vue'
+import UsedBy from '../components/UsedBy.vue'
 import { ui, PROFILE_TABS } from '../store/ui'
 import type { Loan, Plan, SharedCost } from '../types'
 
 const emit = defineEmits<{ navigate: [id: string] }>()
+
+// Where each group of fields shows up on other screens (the link markers).
+const TAKE_HOME = ['Overview: plan check compares income to it', 'Trends: the take-home pay line', 'Add entry: fills in your paycheck']
+const SAVING = ['Net worth: expected growth each month']
+const USES = {
+  takeHome: TAKE_HOME,
+  saving: SAVING,
+  pay: [...TAKE_HOME, ...SAVING],
+  housing: ['Overview: plan check, rent and utilities', 'Trends: a planned line for that category', 'Add entry: fills in your share'],
+  loans: [
+    'Net worth: what you owe each month, and the loan chart',
+    'Net worth: principal counts toward expected growth',
+    'Overview: plan check, loan payments',
+    'Trends and Add entry: the monthly payment'
+  ],
+  property: ['Net worth: counted under Other assets, with equity on the loan chart']
+}
 const tab = computed(() => PROFILE_TABS.find((t) => t.id === ui.profileTab) ?? PROFILE_TABS[0])
 // On phones the tab row scrolls; keep the open tab in view.
 const tabsEl = ref<HTMLElement | null>(null)
@@ -174,16 +192,16 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
           <h2>Pay</h2>
           <div class="grid">
             <label class="field">
-              <span>Gross salary, yearly</span>
+              <span>Gross salary, yearly<UsedBy :where="USES.pay" note="Sets your take-home pay and 401k amounts." /></span>
               <InputNumber v-model="p.salary" mode="currency" currency="USD" locale="en-US" :max-fraction-digits="0" fluid />
             </label>
             <label class="field">
-              <span>Paid</span>
+              <span>Paid<UsedBy :where="USES.pay" note="Sets your take-home pay and 401k amounts." /></span>
               <Select v-model="p.payFrequency" :options="PAY_FREQUENCIES" option-label="label" option-value="value" fluid />
               <small class="muted">{{ n.perYear }} paychecks a year · {{ money2(n.paycheck.gross) }} gross each</small>
             </label>
             <label class="field">
-              <span>Effective tax rate</span>
+              <span>Effective tax rate<UsedBy :where="USES.takeHome" note="Sets your take-home pay." /></span>
               <InputNumber v-model="taxPct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
             </label>
           </div>
@@ -194,18 +212,18 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
           <h2>Contributions</h2>
           <div class="grid">
             <label class="field">
-              <span>Your 401k</span>
+              <span>Your 401k<UsedBy :where="USES.pay" note="Lowers your take-home pay and counts as saving." /></span>
               <InputNumber v-model="k401Pct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
               <small class="muted">{{ money2(n.paycheck.k401) }} a paycheck</small>
             </label>
             <label class="field">
-              <span>Company 401k</span>
+              <span>Company 401k<UsedBy :where="USES.saving" /></span>
               <InputNumber v-model="matchPct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
               <small class="muted">{{ money2(n.paycheck.match) }} a paycheck, on top of your pay</small>
             </label>
           </div>
 
-          <h3>Other paycheck deductions</h3>
+          <h3>Other paycheck deductions<UsedBy :where="USES.pay" note="Lower your take-home pay and count as saving." /></h3>
           <ul class="line-list">
             <li v-for="d in p.deductions" :key="d.id">
               <InputText v-model="d.name" placeholder="Name, e.g. HSA" aria-label="Deduction name" fluid />
@@ -221,7 +239,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
           <div class="take-home">
             <label class="switch">
               <ToggleSwitch v-model="takeHomeActual" />
-              <span>Use my actual take-home</span>
+              <span>Use my actual take-home<UsedBy :where="USES.takeHome" /></span>
             </label>
             <InputNumber v-if="takeHomeActual" v-model="p.takeHome" mode="currency" currency="USD" locale="en-US" aria-label="Take-home per paycheck" class="th-input" />
             <span class="muted small">
@@ -232,7 +250,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 
         <!-- Housing -->
         <section class="panel">
-          <h2>Rent and bills</h2>
+          <h2>Rent and bills<UsedBy :where="USES.housing" note="Matched to entries by name, so name items like your subcategories." /></h2>
           <p class="muted">Monthly cost and your share. Living alone? Use 100%.</p>
           <div class="house-head" aria-hidden="true">
             <span>Item</span><span>Monthly cost</span><span>Your share</span><span class="r">You pay</span><span></span>
@@ -264,7 +282,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 
         <!-- Loans -->
         <section class="panel">
-          <h2>Loans</h2>
+          <h2>Loans<UsedBy :where="USES.loans" note="Payments are matched to entries by loan name." /></h2>
           <p class="muted">Mortgage, car loan and so on. Net worth uses these to work out what you owe each month.</p>
           <div v-for="l in p.loans" :key="l.id" class="loan">
             <div class="loan-top">
@@ -295,7 +313,7 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
             </div>
             <label class="switch prop-switch">
               <ToggleSwitch :model-value="!!l.property" @update:model-value="toggleProperty(l, $event)" />
-              <span>Count what it bought as an asset (home, car)</span>
+              <span>Count what it bought as an asset (home, car)<UsedBy :where="USES.property" /></span>
             </label>
             <div v-if="l.property" class="loan-grid">
               <label class="field">
