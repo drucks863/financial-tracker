@@ -112,7 +112,8 @@ const plan: Plan = {
     { id: 'p2', name: 'Rent', monthly: 2200, share: 0.5 },
     { id: 'p3', name: 'Water', monthly: 90, share: 0.5 },
     { id: 'p4', name: 'Electric', monthly: 160, share: 0.5 }
-  ]
+  ],
+  loans: [{ id: 'p5', name: 'Car loan', amount: 24000, rate: 0.059, termYears: 5, start: '2024-06', extraMonthly: 0 }]
 }
 
 writeFileSync(

@@ -67,6 +67,21 @@ export interface SharedCost {
   share: number
 }
 
+/** An amortizing loan (mortgage, car loan...). Net worth derives its balance from this. */
+export interface Loan {
+  id: string
+  name: string
+  /** original amount borrowed */
+  amount: number
+  /** yearly interest rate, 0–1 */
+  rate: number
+  termYears: number
+  /** first payment month, YYYY-MM */
+  start: string
+  /** extra principal paid each month */
+  extraMonthly: number
+}
+
 /**
  * The person's current, steady-state numbers: pay, contributions, taxes, housing.
  * One source of truth that other screens can read (see store/plan.ts for the derived figures).
@@ -87,6 +102,8 @@ export interface Plan {
   deductions: PayDeduction[]
   /** rent and bills with my share of each */
   housing: SharedCost[]
+  /** loans; their balances count as debt on Net worth */
+  loans: Loan[]
 }
 
 export interface FinanceData {
@@ -115,9 +132,13 @@ export interface MonthTotals {
 
 export interface NetWorthPoint {
   date: string
+  /** per group; Debt is the amount owed, as a positive number */
   byGroup: Record<AccountGroup, number>
   assets: number
+  /** amount owed, positive (debt accounts plus loan balances) */
   debt: number
+  /** loan balances that month, by loan id */
+  loans: Record<string, number>
   total: number
   values: Record<string, number>
 }

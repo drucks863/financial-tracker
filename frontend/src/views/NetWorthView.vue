@@ -13,6 +13,7 @@ import { state, netWorthSeries, saveSnapshot, deleteSnapshot, addAccount, NW_GRO
 import { money, signedMoney, pct, shortDate } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
 import type { ChartBuilder } from '../lib/chart-types'
+import { loanSummary, currentYm } from '../lib/loan'
 import type { AccountGroup, NetWorthPoint } from '../types'
 
 const toast = useToast()
@@ -25,6 +26,8 @@ const yearAgo = computed(() => {
   return all.value.find((p) => p.date.startsWith(target)) || null
 })
 const first = computed(() => all.value[0])
+// Percent change only makes sense against a positive starting value.
+const rel = (now: number, then: number) => (then > 0 ? pct((now - then) / then) : '')
 
 const range = ref<number | 'all'>('all')
 const RANGES: { label: string; value: number | 'all' }[] = [
@@ -51,6 +54,8 @@ const chart = computed<ChartBuilder>(() => {
     running = running.map((v, i) => v + raw[i])
     return { g, raw, top: running }
   })
+  const hasDebt = pts.some((p) => p.debt > 0)
+  const offset = hasDebt ? 2 : 1 // datasets before the group layers
   return (dark, c) => ({
     type: 'line',
     data: {
@@ -67,6 +72,21 @@ const chart = computed<ChartBuilder>(() => {
           tension: 0.25,
           fill: false
         },
+        ...(hasDebt
+          ? [
+              {
+                label: 'Debt',
+                data: pts.map((p) => -p.debt),
+                borderColor: series(ROLE.debt, dark),
+                backgroundColor: series(ROLE.debt, dark) + (dark ? '66' : '33'),
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.25,
+                fill: 'origin' as const
+              }
+            ]
+          : []),
         ...layers.map(({ g, top }, i) => ({
           label: g,
           data: top,
@@ -84,8 +104,14 @@ const chart = computed<ChartBuilder>(() => {
       scales: { y: { beginAtZero: true } },
       plugins: {
         tooltip: {
-          // dataset 0 is the net worth line; the rest are the pre-summed group layers
-          callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.datasetIndex ? layers[ctx.datasetIndex - 1].raw[ctx.dataIndex] : ctx.parsed.y)}` }
+          // dataset 0 is the net worth line, then debt (drawn below zero), then the pre-summed group layers
+          callbacks: {
+            label: (ctx) => {
+              const i = ctx.datasetIndex
+              const v = i >= offset ? layers[i - offset].raw[ctx.dataIndex] : ctx.parsed.y
+              return ` ${ctx.dataset.label}: ${money(v)}`
+            }
+          }
         }
       }
     }
@@ -97,14 +123,82 @@ const accountRows = computed(() => {
   const p = prev.value
   if (!l) return []
   return state.netWorth.accounts
-    .map((a) => ({
-      ...a,
-      value: l.values[a.id] || 0,
-      change: p ? (l.values[a.id] || 0) - (p.values[a.id] || 0) : null,
-      share: l.assets ? (l.values[a.id] || 0) / l.assets : null
-    }))
+    .map((a) => {
+      const debt = a.group === 'Debt'
+      const val = (pt: NetWorthPoint) => (debt ? Math.abs(pt.values[a.id] || 0) : pt.values[a.id] || 0)
+      const value = val(l)
+      // For debt, "change" is how much was paid down, so positive is good either way.
+      const change = p ? (debt ? val(p) - value : value - val(p)) : null
+      const note = debt ? (l.debt ? `${pct(value / l.debt)} of debt` : 'debt') : l.assets ? `${pct(value / l.assets)} of assets` : ''
+      return { ...a, debt, value, change, note }
+    })
+    .concat(
+      // Loans from My numbers appear as debt rows; their balances are worked out, not entered.
+      (state.plan?.loans ?? [])
+        .filter((ln) => (l.loans[ln.id] || 0) > 0)
+        .map((ln) => {
+          const value = l.loans[ln.id] || 0
+          const before = p ? p.loans[ln.id] ?? ln.amount : null
+          return {
+            id: ln.id,
+            name: ln.name || 'Loan',
+            group: 'Debt' as AccountGroup,
+            debt: true,
+            value,
+            change: before === null ? null : before - value,
+            note: 'from My numbers'
+          }
+        })
+    )
     .sort((a, b) => NW_GROUPS.indexOf(a.group) - NW_GROUPS.indexOf(b.group) || b.value - a.value)
 })
+
+/* ---- loans: principal vs interest ---- */
+const loans = computed(() => (state.plan?.loans ?? []).filter((l) => l.amount > 0).map((l) => ({ loan: l, ...loanSummary(l) })))
+const loanPick = ref<string | null>(null)
+const loan = computed(() => loans.value.find((x) => x.loan.id === loanPick.value) ?? loans.value[0])
+const loanChart = computed<ChartBuilder>(() => {
+  const L = loan.value
+  const years: Record<string, { p: number; i: number }> = {}
+  for (const r of L?.rows ?? []) {
+    const y = r.ym.slice(0, 4)
+    const t = (years[y] ??= { p: 0, i: 0 })
+    t.p += r.principal
+    t.i += r.interest
+  }
+  const labels = Object.keys(years)
+  const now = currentYm().slice(0, 4)
+  const dim = (color: string, i: number) => (labels[i] < now ? color + '8c' : color)
+  return (dark, c) => ({
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Principal',
+          data: labels.map((y) => years[y].p),
+          backgroundColor: labels.map((_, i) => dim(series(ROLE.cash, dark), i)),
+          borderColor: c.surface,
+          borderWidth: { top: 1 },
+          borderSkipped: false as const
+        },
+        {
+          label: 'Interest',
+          data: labels.map((y) => years[y].i),
+          backgroundColor: labels.map((_, i) => dim(series(ROLE.debt, dark), i)),
+          borderColor: c.surface,
+          borderWidth: { top: 1 },
+          borderSkipped: false as const
+        }
+      ]
+    },
+    options: {
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 10, autoSkip: true } }, y: { stacked: true } },
+      interaction: { mode: 'index', intersect: false }
+    }
+  })
+})
+const ymLabel = (ym: string | null) => (ym ? new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—')
 
 /* ---- snapshot dialog ---- */
 const dlg = reactive({ open: false, date: null as Date | null, values: {} as Record<string, number>, editing: false })
@@ -124,7 +218,9 @@ function openSnapshot(point: NetWorthPoint | null = null): void {
     Object.assign(dlg, { open: true, date: endOfMonth(base), values: { ...(last.value?.values || {}) }, editing: false })
   }
 }
-const dlgTotal = computed(() => state.netWorth.accounts.reduce((a, acc) => a + (dlg.values[acc.id] || 0), 0))
+const dlgTotal = computed(() =>
+  state.netWorth.accounts.reduce((a, acc) => (acc.group === 'Debt' ? a - Math.abs(dlg.values[acc.id] || 0) : a + (dlg.values[acc.id] || 0)), 0)
+)
 function addAcct() {
   const a = addAccount(newAcct.name, newAcct.group)
   if (!a) return
@@ -162,22 +258,23 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
       <div>
         <p class="ink2">Net worth on {{ shortDate(last.date) }}</p>
         <p class="hero-num num">{{ money(last.total) }}</p>
+        <p v-if="last.debt" class="muted small num">{{ money(last.assets) }} assets · −{{ money(last.debt) }} debt</p>
       </div>
       <dl class="changes">
         <div v-if="prev">
           <dt>vs prior month</dt>
           <dd class="num" :class="last.total >= prev.total ? 'pos' : 'neg'">{{ signedMoney(last.total - prev.total) }}</dd>
-          <dd class="sub muted">{{ pct((last.total - prev.total) / prev.total) }}</dd>
+          <dd class="sub muted">{{ rel(last.total, prev.total) }}</dd>
         </div>
         <div v-if="yearAgo">
           <dt>vs a year ago</dt>
           <dd class="num" :class="last.total >= yearAgo.total ? 'pos' : 'neg'">{{ signedMoney(last.total - yearAgo.total) }}</dd>
-          <dd class="sub muted">{{ pct((last.total - yearAgo.total) / yearAgo.total) }}</dd>
+          <dd class="sub muted">{{ rel(last.total, yearAgo.total) }}</dd>
         </div>
         <div v-if="first && first !== last">
           <dt>since {{ shortDate(first.date) }}</dt>
           <dd class="num" :class="last.total >= first.total ? 'pos' : 'neg'">{{ signedMoney(last.total - first.total) }}</dd>
-          <dd class="sub muted">{{ pct((last.total - first.total) / first.total) }}</dd>
+          <dd class="sub muted">{{ rel(last.total, first.total) }}</dd>
         </div>
       </dl>
     </section>
@@ -186,7 +283,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
       <div class="panel-head">
         <div>
           <h2>Over time</h2>
-          <p class="muted">Account groups stacked; the line is net worth</p>
+          <p class="muted">Assets stacked above zero, debt below; the line is net worth</p>
         </div>
         <SelectButton v-model="range" :options="RANGES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Range" />
       </div>
@@ -196,6 +293,34 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
         <span v-for="g in groupsInUse.filter((g) => g !== 'Debt')" :key="g">
           <i class="swatch" :style="{ background: `var(--nw-${g.replace(' ', '-').toLowerCase()})` }"></i>{{ g }}
         </span>
+        <span v-if="last && last.debt > 0"><i class="swatch" style="background: var(--nw-debt)"></i>Debt (below zero)</span>
+      </div>
+    </section>
+
+    <section v-if="loan" class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>{{ loan.loan.name || 'Loan' }}: principal vs interest</h2>
+          <p class="muted num">
+            Owe {{ money(loan.balance) }} · paid {{ money(loan.principalPaid) }} principal and {{ money(loan.interestPaid) }} interest so far · paid off {{ ymLabel(loan.payoff) }}
+          </p>
+        </div>
+        <Select
+          v-if="loans.length > 1"
+          v-model="loanPick"
+          :options="loans.map((x) => ({ label: x.loan.name || 'Loan', value: x.loan.id }))"
+          option-label="label"
+          option-value="value"
+          :placeholder="loan.loan.name || 'Loan'"
+          size="small"
+          aria-label="Loan"
+        />
+      </div>
+      <BaseChart :build="loanChart" height="240px" :label="`Principal and interest paid each year on ${loan.loan.name || 'the loan'}`" />
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--nw-cash)"></i>Principal</span>
+        <span><i class="swatch" style="background: var(--nw-debt)"></i>Interest</span>
+        <span class="muted">Faded bars are past years · {{ money(loan.interestTotal) }} interest over the whole loan · edit it on My numbers</span>
       </div>
     </section>
 
@@ -217,10 +342,13 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
             <tr v-for="a in accountRows" :key="a.id">
               <td>
                 <span class="acct">{{ a.name }}</span>
-                <small class="muted">{{ a.group }} · {{ pct(a.share) }} of assets</small>
+                <small class="muted">{{ a.group }} · {{ a.note }}</small>
               </td>
-              <td class="r num">{{ money(a.value) }}</td>
-              <td class="r num" :class="a.change === null || a.change === 0 ? 'muted' : a.change > 0 ? 'pos' : 'neg'">{{ a.change === null ? '—' : signedMoney(a.change) }}</td>
+              <td class="r num" :class="{ neg: a.debt && a.value }">{{ a.debt && a.value ? `−${money(a.value)}` : money(a.value) }}</td>
+              <td class="r num" :class="a.change === null || a.change === 0 ? 'muted' : a.change > 0 ? 'pos' : 'neg'">
+                {{ a.change === null ? '—' : signedMoney(a.change) }}
+                <small v-if="a.debt && a.change" class="muted paid">{{ a.change > 0 ? 'paid down' : 'added' }}</small>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -261,12 +389,12 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
           <span>Month-end date</span>
           <DatePicker v-model="dlg.date" input-id="snap-date" date-format="M d, yy" fluid :disabled="dlg.editing" />
         </label>
-        <p class="muted small">Balances start from your last snapshot. Enter debts as negative amounts.</p>
+        <p class="muted small">Balances start from your last snapshot. For debts, enter what you still owe; it's subtracted. Loans set up on My numbers are added for you.</p>
         <div v-for="g in NW_GROUPS" :key="g" class="grp">
           <template v-if="state.netWorth.accounts.some((a) => a.group === g)">
             <h3>{{ g }}</h3>
             <label v-for="a in state.netWorth.accounts.filter((x) => x.group === g)" :key="a.id" class="acct-row">
-              <span>{{ a.name }}</span>
+              <span>{{ a.name }}<small v-if="g === 'Debt'" class="muted"> owed</small></span>
               <InputNumber v-model="dlg.values[a.id]" :input-id="`snap-${a.id}`" mode="currency" currency="USD" locale="en-US" fluid />
             </label>
           </template>
@@ -299,6 +427,10 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 </template>
 
 <style scoped>
+.paid {
+  display: block;
+  font-size: 0.6875rem;
+}
 .page-head {
   display: flex;
   justify-content: space-between;

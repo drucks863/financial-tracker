@@ -24,6 +24,7 @@
   --nw-cash: #199e70;
   --nw-investments: #3987e5;
   --nw-other-assets: #9085e9;
+  --nw-debt: #e66767;
   color-scheme: dark;
 }
 :root[data-theme='light'] {
@@ -41,6 +42,7 @@
   --nw-cash: #1baf7a;
   --nw-investments: #2a78d6;
   --nw-other-assets: #6250d6;
+  --nw-debt: #e34948;
   color-scheme: light;
 }
 

@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue'
 import seed from '@seed'
+import { loanBalanceAt } from '../lib/loan'
 import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
 // Single in-memory store for the prototype, persisted to localStorage.
@@ -15,7 +16,8 @@ export const emptyPlan = (): Plan => ({
   k401: 0,
   match: 0,
   deductions: [],
-  housing: []
+  housing: [],
+  loans: []
 })
 
 // Older saved data (and seeds without one) have no plan, or an earlier shape; fill in defaults.
@@ -23,10 +25,10 @@ const validPlan = (p: unknown): p is Plan => {
   const q = p as Partial<Plan> | undefined
   return !!q && !!q.payFrequency && Array.isArray(q.deductions) && Array.isArray(q.housing)
 }
-const withPlan = (d: FinanceData): FinanceData => ({
-  ...d,
-  plan: validPlan(d.plan) ? d.plan : validPlan(seed.plan) ? clone(seed.plan) : emptyPlan()
-})
+const withPlan = (d: FinanceData): FinanceData => {
+  const plan = validPlan(d.plan) ? d.plan : validPlan(seed.plan) ? clone(seed.plan) : emptyPlan()
+  return { ...d, plan: { ...plan, loans: plan.loans ?? [] } }
+}
 
 function load(): FinanceData {
   try {
@@ -245,9 +247,19 @@ export function netWorthSeries(): NetWorthPoint[] {
   const sorted = [...snapshots].sort((a, b) => a.date.localeCompare(b.date))
   return sorted.map((s) => {
     const byGroup = Object.fromEntries(NW_GROUPS.map((g) => [g, 0])) as Record<AccountGroup, number>
-    for (const a of accounts) byGroup[a.group] += s.values[a.id] || 0
+    // Debt balances count as amounts owed whichever sign they were entered with.
+    for (const a of accounts) byGroup[a.group] += a.group === 'Debt' ? Math.abs(s.values[a.id] || 0) : s.values[a.id] || 0
+    // Loans from My numbers add their balance for that month.
+    const loans: Record<string, number> = {}
+    for (const l of state.plan?.loans ?? []) {
+      const b = loanBalanceAt(l, s.date.slice(0, 7))
+      if (b > 0) {
+        loans[l.id] = b
+        byGroup.Debt += b
+      }
+    }
     const assets = byGroup.Cash + byGroup.Investments + byGroup['Other assets']
-    return { date: s.date, byGroup, assets, debt: byGroup.Debt, total: assets + byGroup.Debt, values: s.values }
+    return { date: s.date, byGroup, assets, debt: byGroup.Debt, loans, total: assets - byGroup.Debt, values: s.values }
   })
 }
 

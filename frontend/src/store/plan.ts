@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { state, uid } from './finance'
-import type { PayDeduction, PayFrequency, SharedCost } from '../types'
+import { loanSummary } from '../lib/loan'
+import type { Loan, PayDeduction, PayFrequency, SharedCost } from '../types'
 
 // The My numbers page: steady-state pay, contributions, taxes and housing. Mirrors the
 // "Misc. Calculations" tab of the Net Worth / Retirement workbook. Other screens read
@@ -14,6 +15,7 @@ export const PAY_FREQUENCIES: { label: string; value: PayFrequency; perYear: num
 ]
 
 export const newDeduction = (): PayDeduction => ({ id: uid('p'), name: '', perPaycheck: 0 })
+export const newLoan = (): Loan => ({ id: uid('p'), name: '', amount: 0, rate: 0.065, termYears: 30, start: new Date().toISOString().slice(0, 7), extraMonthly: 0 })
 export const newSharedCost = (): SharedCost => ({ id: uid('p'), name: '', monthly: 0, share: 1 })
 
 export const planned = computed(() => {
@@ -38,6 +40,10 @@ export const planned = computed(() => {
   const housingTotal = housing.reduce((a, h) => a + (Number(h.monthly) || 0), 0)
   const housingMine = housing.reduce((a, h) => a + h.mine, 0)
 
+  // Loans: this month's payment for each one still being paid
+  const loans = (p.loans ?? []).map((l) => ({ loan: l, ...loanSummary(l) }))
+  const loanPayments = loans.reduce((a, l) => a + (l.balance > 0 ? l.payment : 0), 0)
+
   const takeHomeMonthly = toMonthly(takeHome)
   const savedMonthly = toMonthly(k401 + match + deductions)
   return {
@@ -52,11 +58,13 @@ export const planned = computed(() => {
       takeHome: takeHomeMonthly,
       housingTotal,
       housingMine,
-      /** take-home after my share of rent and bills */
-      afterHousing: takeHomeMonthly - housingMine,
+      loanPayments,
+      /** take-home after my share of rent and bills, and loan payments */
+      afterHousing: takeHomeMonthly - housingMine - loanPayments,
       saved: savedMonthly
     },
     housing,
+    loans,
     savedYearly: savedMonthly * 12,
     /** share of gross pay going to 401k (yours + company) and other deductions */
     savedRate: p.salary ? (savedMonthly * 12) / p.salary : null

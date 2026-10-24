@@ -6,9 +6,9 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { state } from '../store/finance'
-import { planned, newDeduction, newSharedCost, PAY_FREQUENCIES } from '../store/plan'
+import { planned, newDeduction, newSharedCost, newLoan, PAY_FREQUENCIES } from '../store/plan'
 import { money, money2, pct } from '../lib/format'
-import type { Plan, SharedCost } from '../types'
+import type { Loan, Plan, SharedCost } from '../types'
 
 const p = computed<Plan>(() => state.plan!)
 const n = planned
@@ -26,6 +26,9 @@ const taxPct = percent('taxRate')
 const k401Pct = percent('k401')
 const matchPct = percent('match')
 const setShare = (h: SharedCost, v: number | null) => (h.share = clampPct(v))
+const setRate = (l: Loan, v: number | null) => (l.rate = clampPct(v))
+const loanInfo = (id: string) => n.value.loans.find((x) => x.loan.id === id)
+const ymLabel = (ym: string | null) => (ym ? new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—')
 
 const takeHomeActual = computed<boolean>({
   get: () => p.value.takeHome !== null,
@@ -88,8 +91,13 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
               <td class="r muted">—</td>
               <td class="num r">{{ signed(-n.monthly.housingMine) }}</td>
             </tr>
+            <tr v-if="n.monthly.loanPayments">
+              <th scope="row">Loan payments</th>
+              <td class="r muted">—</td>
+              <td class="num r">{{ signed(-n.monthly.loanPayments) }}</td>
+            </tr>
             <tr class="total">
-              <th scope="row">Left after rent and bills</th>
+              <th scope="row">{{ n.monthly.loanPayments ? 'Left after housing and loans' : 'Left after rent and bills' }}</th>
               <td class="r muted">—</td>
               <td class="num r" :class="n.monthly.afterHousing >= 0 ? 'pos' : 'neg'">{{ signed(n.monthly.afterHousing) }}</td>
             </tr>
@@ -206,6 +214,45 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
             <Button label="Add item" icon="pi pi-plus" text size="small" @click="p.housing.push(newSharedCost())" />
             <span class="muted small num">Total {{ money2(n.monthly.housingTotal) }} · you pay {{ money2(n.monthly.housingMine) }}</span>
           </div>
+        </section>
+
+        <!-- Loans -->
+        <section class="panel">
+          <h2>Loans</h2>
+          <p class="muted">Mortgage, car loan and so on. Net worth uses these to work out what you owe each month.</p>
+          <div v-for="l in p.loans" :key="l.id" class="loan">
+            <div class="loan-top">
+              <InputText v-model="l.name" placeholder="Name, e.g. Mortgage" aria-label="Loan name" fluid />
+              <Button icon="pi pi-trash" text rounded severity="secondary" :aria-label="`Remove ${l.name || 'loan'}`" @click="remove(p.loans, l.id)" />
+            </div>
+            <div class="grid loan-grid">
+              <label class="field">
+                <span>Amount borrowed</span>
+                <InputNumber v-model="l.amount" mode="currency" currency="USD" locale="en-US" :max-fraction-digits="0" fluid />
+              </label>
+              <label class="field">
+                <span>Interest rate</span>
+                <InputNumber :model-value="asPct(l.rate)" suffix="%" :min="0" :max="100" :max-fraction-digits="3" fluid @update:model-value="setRate(l, $event)" />
+              </label>
+              <label class="field">
+                <span>Term</span>
+                <InputNumber v-model="l.termYears" suffix=" years" :min="1" :max="50" fluid />
+              </label>
+              <label class="field">
+                <span>First payment</span>
+                <InputText v-model="l.start" type="month" fluid />
+              </label>
+              <label class="field">
+                <span>Extra each month</span>
+                <InputNumber v-model="l.extraMonthly" mode="currency" currency="USD" locale="en-US" fluid />
+              </label>
+            </div>
+            <p v-if="loanInfo(l.id)" class="muted small loan-sum num">
+              {{ money2(loanInfo(l.id)!.payment) }} a month · owe {{ money(loanInfo(l.id)!.balance) }} now · paid off {{ ymLabel(loanInfo(l.id)!.payoff) }} ·
+              {{ money(loanInfo(l.id)!.interestTotal) }} interest over the loan
+            </p>
+          </div>
+          <Button label="Add loan" icon="pi pi-plus" text size="small" @click="p.loans.push(newLoan())" />
         </section>
       </div>
     </div>
@@ -348,6 +395,24 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
+}
+
+.loan {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.loan-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 6px;
+}
+.loan-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-top: 10px;
+}
+.loan-sum {
+  margin: 10px 0 0;
 }
 
 /* summary */
