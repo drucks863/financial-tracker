@@ -1,67 +1,64 @@
 import { computed } from 'vue'
-import { state, monthTotals, avgNonZero, uid } from './finance'
-import type { PlanLine } from '../types'
+import { state, uid } from './finance'
+import type { PayDeduction, PayFrequency, SharedCost } from '../types'
 
 // The My numbers page: steady-state pay, contributions, taxes and housing. Mirrors the
 // "Misc. Calculations" tab of the Net Worth / Retirement workbook. Other screens read
 // `planned` instead of recomputing these figures.
 
-export const newLine = (name = ''): PlanLine => ({ id: uid('p'), name, monthly: 0 })
+export const PAY_FREQUENCIES: { label: string; value: PayFrequency; perYear: number }[] = [
+  { label: 'Weekly', value: 'weekly', perYear: 52 },
+  { label: 'Every two weeks', value: 'biweekly', perYear: 26 },
+  { label: 'Twice a month', value: 'semimonthly', perYear: 24 },
+  { label: 'Monthly', value: 'monthly', perYear: 12 }
+]
 
-const sumLines = (lines: PlanLine[]) => lines.reduce((a, l) => a + (Number(l.monthly) || 0), 0)
-
-/** Average monthly non-essential spending from entries over the latest year that has any. */
-const averageLiving = computed(() => {
-  const years = [...new Set(state.entries.map((e) => +e.date.slice(0, 4)))].sort((a, b) => b - a)
-  for (const y of years) {
-    const v = avgNonZero(monthTotals(y).map((r) => r.discretionary))
-    if (v) return { monthly: v, year: y }
-  }
-  return { monthly: 0, year: null as number | null }
-})
+export const newDeduction = (): PayDeduction => ({ id: uid('p'), name: '', perPaycheck: 0 })
+export const newSharedCost = (): SharedCost => ({ id: uid('p'), name: '', monthly: 0, share: 1 })
 
 export const planned = computed(() => {
   const p = state.plan!
-  const grossMonthly = p.salary / 12
-  const k401 = grossMonthly * p.k401
-  const match = grossMonthly * p.match
-  const otherContrib = sumLines(p.contributions)
-  const paycheckContrib = sumLines(p.contributions.filter((c) => c.fromPaycheck))
-  const takeHomeContrib = otherContrib - paycheckContrib
-  // Estimate: gross minus what comes out of the paycheck (401k and paycheck contributions),
-  // taxed at the effective rate. A close-enough approximation; enter the real figure when known.
-  const estTakeHome = Math.max(0, (grossMonthly - k401 - paycheckContrib) * (1 - p.taxRate))
+  const perYear = PAY_FREQUENCIES.find((f) => f.value === p.payFrequency)?.perYear ?? 26
+  const toMonthly = (perPaycheck: number) => (perPaycheck * perYear) / 12
+
+  // Per paycheck
+  const gross = p.salary / perYear
+  const k401 = gross * p.k401
+  const match = gross * p.match
+  const deductions = p.deductions.reduce((a, d) => a + (Number(d.perPaycheck) || 0), 0)
+  // Estimate: what's left after 401k and other deductions, taxed at the effective rate.
+  // Close enough for planning; the real figure can be entered instead.
+  const taxable = Math.max(0, gross - k401 - deductions)
+  const taxes = taxable * p.taxRate
+  const estTakeHome = taxable - taxes
   const takeHome = p.takeHome ?? estTakeHome
-  const h = p.housing
-  const bills = sumLines(h.bills)
-  const rentMine = h.split ? h.rent * h.rentShare : h.rent
-  const billsMine = h.split ? bills * h.billsShare : bills
-  const housing = rentMine + billsMine
-  const living = p.living.useAverage ? averageLiving.value.monthly : p.living.monthly
-  const left = takeHome - takeHomeContrib - housing - living
-  const savedMonthly = k401 + match + otherContrib + Math.max(0, left)
+
+  // Monthly housing
+  const housing = p.housing.map((h) => ({ ...h, mine: (Number(h.monthly) || 0) * h.share }))
+  const housingTotal = housing.reduce((a, h) => a + (Number(h.monthly) || 0), 0)
+  const housingMine = housing.reduce((a, h) => a + h.mine, 0)
+
+  const takeHomeMonthly = toMonthly(takeHome)
+  const savedMonthly = toMonthly(k401 + match + deductions)
   return {
-    grossMonthly,
-    taxesMonthly: Math.max(0, grossMonthly - k401 - paycheckContrib - estTakeHome),
-    estTakeHome,
-    takeHome,
-    k401,
-    match,
-    otherContrib,
-    paycheckContrib,
-    takeHomeContrib,
-    rentTotal: h.rent,
-    billsTotal: bills,
-    rentMine,
-    billsMine,
+    perYear,
+    paycheck: { gross, k401, match, deductions, taxes, estTakeHome, takeHome },
+    monthly: {
+      gross: toMonthly(gross),
+      k401: toMonthly(k401),
+      match: toMonthly(match),
+      deductions: toMonthly(deductions),
+      taxes: toMonthly(taxes),
+      takeHome: takeHomeMonthly,
+      housingTotal,
+      housingMine,
+      /** take-home after my share of rent and bills */
+      afterHousing: takeHomeMonthly - housingMine,
+      saved: savedMonthly
+    },
     housing,
-    living,
-    livingAverageYear: averageLiving.value.year,
-    /** what's left each month after contributions, housing and living costs */
-    left,
-    savedMonthly,
     savedYearly: savedMonthly * 12,
-    /** share of gross pay saved, counting the company match */
+    /** share of gross pay going to 401k (yours + company) and other deductions */
     savedRate: p.salary ? (savedMonthly * 12) / p.salary : null
   }
 })

@@ -60,13 +60,20 @@ docs/       these notes, the todo list, architecture
 
 ## My numbers (plan)
 
-- Mirrors the **Misc. Calculations** tab of "Net Worth / Retirement Calculator": rent split
-  (a share of rent plus a share of shared bills), take-home income, avg expenses,
-  monthly/yearly amount saved and percent saved.
+- The app does the math. Inputs: yearly salary, pay frequency (weekly, every two weeks, twice
+  a month, monthly), effective tax rate, your 401k % and company 401k %, other paycheck
+  deductions as amounts per paycheck (HSA...), optional actual take-home per paycheck.
+- Rent and bills: a list of items, each with its monthly cost and your share %. Solo = 100%.
+  No separate solo/split switch and no "everyday spending" section (Devin, 2026-10-24).
 - Stored as `plan` on the data (`types.ts` `Plan`); derived figures in `store/plan.ts` (`planned`).
   Other screens should read `planned`, not recompute.
-- Contributions can be marked "from paycheck" (taken before take-home, like HSA and the
-  sheet's retirement line) or paid from take-home.
+
+## The Google Sheets are reference only
+
+The workbooks (Cash Flow '26, Net Worth / Retirement Calculator) were shared to get the
+structure right. If this app works out, Devin stops using them. So: the app is the source of
+truth; the sheet importers are a one-time migration path, not an ongoing sync. Don't design
+features around keeping the sheets updated.
 
 ## Privacy
 

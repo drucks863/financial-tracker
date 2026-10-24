@@ -9,17 +9,24 @@ const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o))
 
 export const emptyPlan = (): Plan => ({
   salary: 0,
+  payFrequency: 'biweekly',
   taxRate: 0.22,
   takeHome: null,
   k401: 0,
   match: 0,
-  contributions: [],
-  housing: { rent: 0, split: false, rentShare: 0.5, bills: [], billsShare: 0.5 },
-  living: { useAverage: true, monthly: 0 }
+  deductions: [],
+  housing: []
 })
 
-// Older saved data (and seeds without one) have no plan; fill in defaults.
-const withPlan = (d: FinanceData): FinanceData => ({ ...d, plan: d.plan ?? emptyPlan() })
+// Older saved data (and seeds without one) have no plan, or an earlier shape; fill in defaults.
+const validPlan = (p: unknown): p is Plan => {
+  const q = p as Partial<Plan> | undefined
+  return !!q && !!q.payFrequency && Array.isArray(q.deductions) && Array.isArray(q.housing)
+}
+const withPlan = (d: FinanceData): FinanceData => ({
+  ...d,
+  plan: validPlan(d.plan) ? d.plan : validPlan(seed.plan) ? clone(seed.plan) : emptyPlan()
+})
 
 function load(): FinanceData {
   try {

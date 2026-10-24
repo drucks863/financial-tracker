@@ -3,63 +3,58 @@ import { computed, type WritableComputedRef } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import SelectButton from 'primevue/selectbutton'
+import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
-import Checkbox from 'primevue/checkbox'
 import { state } from '../store/finance'
-import { planned, newLine } from '../store/plan'
+import { planned, newDeduction, newSharedCost, PAY_FREQUENCIES } from '../store/plan'
 import { money, money2, pct } from '../lib/format'
-import type { Plan, PlanLine } from '../types'
+import type { Plan, SharedCost } from '../types'
 
 const p = computed<Plan>(() => state.plan!)
 const n = planned
 
 // Percent fields are stored as 0–1 but edited as 0–100.
-function percent<T extends object>(target: () => T, key: keyof T): WritableComputedRef<number | null> {
+const clampPct = (v: number | null) => Math.min(100, Math.max(0, v ?? 0)) / 100
+const asPct = (v: number) => Math.round(v * 10000) / 100
+function percent(key: 'taxRate' | 'k401' | 'match'): WritableComputedRef<number | null> {
   return computed({
-    get: () => Math.round(Number(target()[key]) * 10000) / 100,
-    set: (v) => ((target() as Record<keyof T, unknown>)[key] = (v ?? 0) / 100)
+    get: () => asPct(p.value[key]),
+    set: (v) => (p.value[key] = clampPct(v))
   })
 }
-const taxPct = percent(() => p.value, 'taxRate')
-const k401Pct = percent(() => p.value, 'k401')
-const matchPct = percent(() => p.value, 'match')
-const rentSharePct = percent(() => p.value.housing, 'rentShare')
-const billsSharePct = percent(() => p.value.housing, 'billsShare')
-
-// Rent can be entered either as a share or as my dollar amount; both stay in sync.
-const rentMine = computed<number | null>({
-  get: () => Math.round(p.value.housing.rent * p.value.housing.rentShare * 100) / 100,
-  set: (v) => {
-    const rent = p.value.housing.rent
-    if (rent > 0) p.value.housing.rentShare = Math.min(1, Math.max(0, (v ?? 0) / rent))
-  }
-})
-
-const HOUSING_MODES = [
-  { label: 'Solo', value: false },
-  { label: 'Split', value: true }
-]
+const taxPct = percent('taxRate')
+const k401Pct = percent('k401')
+const matchPct = percent('match')
+const setShare = (h: SharedCost, v: number | null) => (h.share = clampPct(v))
 
 const takeHomeActual = computed<boolean>({
   get: () => p.value.takeHome !== null,
-  set: (on) => (p.value.takeHome = on ? Math.round(n.value.estTakeHome) : null)
+  set: (on) => (p.value.takeHome = on ? Math.round(n.value.paycheck.estTakeHome * 100) / 100 : null)
 })
 
-function addLine(list: PlanLine[], name = ''): void {
-  list.push(newLine(name))
-}
-function removeLine(list: PlanLine[], id: string): void {
+const freqLabel = computed(() => PAY_FREQUENCIES.find((f) => f.value === p.value.payFrequency)?.label.toLowerCase())
+
+function remove<T extends { id: string }>(list: T[], id: string): void {
   const i = list.findIndex((l) => l.id === id)
   if (i >= 0) list.splice(i, 1)
 }
 
-const summary = computed(() => [
-  { label: 'Take-home pay', value: n.value.takeHome, sign: 1 },
-  { label: 'Contributions from take-home', value: n.value.takeHomeContrib, sign: -1 },
-  { label: p.value.housing.split ? 'Housing (your share)' : 'Housing', value: n.value.housing, sign: -1 },
-  { label: 'Living costs', value: n.value.living, sign: -1 }
-])
+const payRows = computed(() => {
+  const c = n.value.paycheck
+  const m = n.value.monthly
+  return [
+    { label: 'Gross pay', check: c.gross, month: m.gross },
+    { label: 'Your 401k', check: -c.k401, month: -m.k401 },
+    { label: 'Other deductions', check: -c.deductions, month: -m.deductions },
+    {
+      label: takeHomeActual.value ? 'Taxes and other' : 'Taxes (estimated)',
+      check: -(c.gross - c.k401 - c.deductions - c.takeHome),
+      month: -(m.gross - m.k401 - m.deductions - m.takeHome)
+    },
+    { label: 'Take-home', check: c.takeHome, month: m.takeHome, total: true }
+  ]
+})
+const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
 </script>
 
 <template>
@@ -73,23 +68,38 @@ const summary = computed(() => [
 
     <div class="layout">
       <!-- Summary: first on phones, sticky on the right on desktop -->
-      <aside class="panel summary" aria-label="Monthly summary">
-        <h2>Each month</h2>
-        <dl class="lines">
-          <div v-for="s in summary" :key="s.label">
-            <dt>{{ s.label }}</dt>
-            <dd class="num">{{ s.sign < 0 && s.value ? '−' : '' }}{{ money(s.value) }}</dd>
-          </div>
-          <div class="total">
-            <dt>Left over</dt>
-            <dd class="num" :class="n.left >= 0 ? 'pos' : 'neg'">{{ money(n.left) }}</dd>
-          </div>
-        </dl>
+      <aside class="panel summary" aria-label="Summary">
+        <table class="sum-t">
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Item</span></th>
+              <th scope="col" class="r">Per paycheck</th>
+              <th scope="col" class="r">Monthly</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in payRows" :key="r.label" :class="{ total: r.total }">
+              <th scope="row">{{ r.label }}</th>
+              <td class="num r">{{ signed(r.check) }}</td>
+              <td class="num r">{{ signed(r.month) }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Your rent and bills</th>
+              <td class="r muted">—</td>
+              <td class="num r">{{ signed(-n.monthly.housingMine) }}</td>
+            </tr>
+            <tr class="total">
+              <th scope="row">Left after rent and bills</th>
+              <td class="r muted">—</td>
+              <td class="num r" :class="n.monthly.afterHousing >= 0 ? 'pos' : 'neg'">{{ signed(n.monthly.afterHousing) }}</td>
+            </tr>
+          </tbody>
+        </table>
         <div class="saved">
           <div>
             <span class="muted small">Saved a month</span>
-            <span class="big num">{{ money(n.savedMonthly) }}</span>
-            <span class="muted small">401k {{ money(n.k401) }} · match {{ money(n.match) }} · other {{ money(n.otherContrib) }} · left over {{ money(Math.max(0, n.left)) }}</span>
+            <span class="big num">{{ money(n.monthly.saved) }}</span>
+            <span class="muted small">your 401k {{ money(n.monthly.k401) }} · company {{ money(n.monthly.match) }} · deductions {{ money(n.monthly.deductions) }}</span>
           </div>
           <div class="saved-row">
             <div>
@@ -107,122 +117,94 @@ const summary = computed(() => [
       <div class="inputs">
         <!-- Pay -->
         <section class="panel">
-          <h2>Pay and taxes</h2>
+          <h2>Pay</h2>
           <div class="grid">
             <label class="field">
               <span>Gross salary, yearly</span>
               <InputNumber v-model="p.salary" mode="currency" currency="USD" locale="en-US" :max-fraction-digits="0" fluid />
-              <small class="muted">{{ money(n.grossMonthly) }} a month</small>
+            </label>
+            <label class="field">
+              <span>Paid</span>
+              <Select v-model="p.payFrequency" :options="PAY_FREQUENCIES" option-label="label" option-value="value" fluid />
+              <small class="muted">{{ n.perYear }} paychecks a year · {{ money2(n.paycheck.gross) }} gross each</small>
             </label>
             <label class="field">
               <span>Effective tax rate</span>
               <InputNumber v-model="taxPct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
-              <small class="muted">about {{ money(n.taxesMonthly) }} a month</small>
             </label>
-            <label class="field">
-              <span>Your 401k contribution</span>
-              <InputNumber v-model="k401Pct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
-              <small class="muted">{{ money(n.k401) }} a month</small>
-            </label>
-            <label class="field">
-              <span>Company 401k contribution</span>
-              <InputNumber v-model="matchPct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
-              <small class="muted">{{ money(n.match) }} a month</small>
-            </label>
-          </div>
-          <div class="take-home">
-            <label class="switch">
-              <ToggleSwitch v-model="takeHomeActual" />
-              <span>Use my actual take-home pay</span>
-            </label>
-            <InputNumber v-if="takeHomeActual" v-model="p.takeHome" mode="currency" currency="USD" locale="en-US" aria-label="Monthly take-home pay" class="th-input" />
-            <span class="muted small">
-              {{ takeHomeActual ? `Estimate would be ${money(n.estTakeHome)}` : `Estimated ${money(n.estTakeHome)} a month after paycheck contributions and taxes` }}
-            </span>
           </div>
         </section>
 
-        <!-- Contributions -->
+        <!-- 401k + deductions -->
         <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Other contributions</h2>
-              <p class="muted">Monthly amounts like HSA or Roth IRA. Mark the ones taken out of your paycheck.</p>
-            </div>
+          <h2>Contributions</h2>
+          <div class="grid">
+            <label class="field">
+              <span>Your 401k</span>
+              <InputNumber v-model="k401Pct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
+              <small class="muted">{{ money2(n.paycheck.k401) }} a paycheck</small>
+            </label>
+            <label class="field">
+              <span>Company 401k</span>
+              <InputNumber v-model="matchPct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
+              <small class="muted">{{ money2(n.paycheck.match) }} a paycheck, on top of your pay</small>
+            </label>
           </div>
-          <ul class="line-list contrib">
-            <li v-for="l in p.contributions" :key="l.id">
-              <InputText v-model="l.name" placeholder="Name" aria-label="Contribution name" fluid />
-              <InputNumber v-model="l.monthly" mode="currency" currency="USD" locale="en-US" aria-label="Monthly amount" fluid />
-              <label class="paycheck" :title="l.fromPaycheck ? 'Taken out before take-home' : 'Paid from take-home'">
-                <Checkbox v-model="l.fromPaycheck" binary />
-                <span>Paycheck</span>
-              </label>
-              <Button icon="pi pi-trash" text rounded severity="secondary" :aria-label="`Remove ${l.name || 'contribution'}`" @click="removeLine(p.contributions, l.id)" />
+
+          <h3>Other paycheck deductions</h3>
+          <ul class="line-list">
+            <li v-for="d in p.deductions" :key="d.id">
+              <InputText v-model="d.name" placeholder="Name, e.g. HSA" aria-label="Deduction name" fluid />
+              <InputNumber v-model="d.perPaycheck" mode="currency" currency="USD" locale="en-US" aria-label="Amount per paycheck" fluid />
+              <Button icon="pi pi-trash" text rounded severity="secondary" :aria-label="`Remove ${d.name || 'deduction'}`" @click="remove(p.deductions, d.id)" />
             </li>
           </ul>
-          <p v-if="!p.contributions.length" class="empty">None yet.</p>
-          <Button label="Add contribution" icon="pi pi-plus" text size="small" @click="addLine(p.contributions)" />
+          <div class="list-foot">
+            <Button label="Add deduction" icon="pi pi-plus" text size="small" @click="p.deductions.push(newDeduction())" />
+            <span class="muted small">Amounts are per paycheck</span>
+          </div>
+
+          <div class="take-home">
+            <label class="switch">
+              <ToggleSwitch v-model="takeHomeActual" />
+              <span>Use my actual take-home</span>
+            </label>
+            <InputNumber v-if="takeHomeActual" v-model="p.takeHome" mode="currency" currency="USD" locale="en-US" aria-label="Take-home per paycheck" class="th-input" />
+            <span class="muted small">
+              {{ takeHomeActual ? `per paycheck · estimate would be ${money2(n.paycheck.estTakeHome)}` : `Estimated ${money2(n.paycheck.estTakeHome)} a paycheck, ${freqLabel}` }}
+            </span>
+          </div>
         </section>
 
         <!-- Housing -->
         <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Rent and bills</h2>
-              <p class="muted">{{ p.housing.split ? `You pay ${money2(n.housing)} of ${money2(n.rentTotal + n.billsTotal)}` : `You pay ${money2(n.housing)}` }} a month</p>
-            </div>
-            <SelectButton v-model="p.housing.split" :options="HOUSING_MODES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Housing" />
+          <h2>Rent and bills</h2>
+          <p class="muted">Monthly cost and your share. Living alone? Use 100%.</p>
+          <div class="house-head" aria-hidden="true">
+            <span>Item</span><span>Monthly cost</span><span>Your share</span><span class="r">You pay</span><span></span>
           </div>
-          <div class="grid">
-            <label class="field">
-              <span>{{ p.housing.split ? 'Total rent' : 'Rent' }}</span>
-              <InputNumber v-model="p.housing.rent" mode="currency" currency="USD" locale="en-US" fluid />
-            </label>
-            <template v-if="p.housing.split">
-              <label class="field">
-                <span>Your share</span>
-                <InputNumber v-model="rentSharePct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
-              </label>
-              <label class="field">
-                <span>Your rent</span>
-                <InputNumber v-model="rentMine" mode="currency" currency="USD" locale="en-US" fluid />
-                <small class="muted">set either one; the other follows</small>
-              </label>
-            </template>
-          </div>
-
-          <h3>{{ p.housing.split ? 'Shared bills' : 'Bills' }}</h3>
-          <ul class="line-list">
-            <li v-for="l in p.housing.bills" :key="l.id">
-              <InputText v-model="l.name" placeholder="Name" aria-label="Bill name" fluid />
-              <InputNumber v-model="l.monthly" mode="currency" currency="USD" locale="en-US" aria-label="Monthly amount" fluid />
-              <Button icon="pi pi-trash" text rounded severity="secondary" :aria-label="`Remove ${l.name || 'bill'}`" @click="removeLine(p.housing.bills, l.id)" />
+          <ul class="line-list house">
+            <li v-for="h in p.housing" :key="h.id">
+              <InputText v-model="h.name" class="h-name" placeholder="Name, e.g. Rent" aria-label="Item" fluid />
+              <InputNumber v-model="h.monthly" class="h-cost" mode="currency" currency="USD" locale="en-US" aria-label="Monthly cost" fluid />
+              <InputNumber
+                :model-value="asPct(h.share)"
+                class="h-share"
+                suffix="%"
+                :min="0"
+                :max="100"
+                :max-fraction-digits="2"
+                aria-label="Your share"
+                fluid
+                @update:model-value="setShare(h, $event)"
+              />
+              <span class="num r mine">{{ money2((h.monthly || 0) * h.share) }}</span>
+              <Button class="h-del" icon="pi pi-trash" text rounded severity="secondary" :aria-label="`Remove ${h.name || 'item'}`" @click="remove(p.housing, h.id)" />
             </li>
           </ul>
-          <div class="bills-foot">
-            <Button label="Add bill" icon="pi pi-plus" text size="small" @click="addLine(p.housing.bills)" />
-            <label v-if="p.housing.split" class="field inline">
-              <span>Your share of bills</span>
-              <InputNumber v-model="billsSharePct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" class="pct-input" />
-            </label>
-            <span class="muted small">Total {{ money2(n.billsTotal) }}<template v-if="p.housing.split"> · yours {{ money2(n.billsMine) }}</template></span>
-          </div>
-        </section>
-
-        <!-- Living -->
-        <section class="panel">
-          <h2>Everyday spending</h2>
-          <p class="muted">Everything that isn't rent or bills</p>
-          <div class="take-home">
-            <label class="switch">
-              <ToggleSwitch v-model="p.living.useAverage" />
-              <span>Use my average from entries</span>
-            </label>
-            <InputNumber v-if="!p.living.useAverage" v-model="p.living.monthly" mode="currency" currency="USD" locale="en-US" aria-label="Monthly everyday spending" class="th-input" />
-            <span v-else class="muted small">
-              {{ n.livingAverageYear ? `${money(n.living)} a month, your ${n.livingAverageYear} discretionary average` : 'No entries yet' }}
-            </span>
+          <div class="list-foot">
+            <Button label="Add item" icon="pi pi-plus" text size="small" @click="p.housing.push(newSharedCost())" />
+            <span class="muted small num">Total {{ money2(n.monthly.housingTotal) }} · you pay {{ money2(n.monthly.housingMine) }}</span>
           </div>
         </section>
       </div>
@@ -237,7 +219,7 @@ const summary = computed(() => [
 }
 @media (min-width: 1100px) {
   .layout {
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr) 360px;
     align-items: start;
   }
   .summary {
@@ -254,7 +236,7 @@ const summary = computed(() => [
   margin-bottom: 4px;
 }
 h3 {
-  margin: 18px 0 8px;
+  margin: 20px 0 8px;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ink-2);
@@ -274,14 +256,6 @@ h3 {
 }
 .field small {
   font-size: 0.75rem;
-}
-.field.inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pct-input :deep(input) {
-  width: 90px;
 }
 .take-home {
   display: flex;
@@ -305,9 +279,12 @@ h3 {
 .small {
   font-size: 0.8125rem;
 }
+.r {
+  text-align: right;
+}
 .line-list {
   list-style: none;
-  margin: 12px 0 4px;
+  margin: 8px 0 4px;
   padding: 0;
   display: grid;
   gap: 8px;
@@ -318,61 +295,90 @@ h3 {
   gap: 8px;
   align-items: center;
 }
-.contrib li {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+.house li,
+.house-head {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) 84px 40px;
 }
-.paycheck {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.house-head {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
   font-size: 0.75rem;
-  color: var(--ink-2);
-  cursor: pointer;
+  color: var(--muted);
 }
-@media (max-width: 559px) {
-  .contrib li {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+.mine {
+  font-weight: 600;
+}
+@media (max-width: 639px) {
+  .house-head {
+    display: none;
   }
-  .contrib li > :first-child {
-    grid-column: 1 / -1;
+  .house li {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) auto;
+    grid-template-areas: 'name name del' 'cost share share' 'mine mine mine';
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .house .h-name {
+    grid-area: name;
+  }
+  .house .h-cost {
+    grid-area: cost;
+  }
+  .house .h-share {
+    grid-area: share;
+  }
+  .house .h-del {
+    grid-area: del;
+  }
+  .house li > .mine {
+    grid-area: mine;
+    text-align: left;
+    font-size: 0.8125rem;
+  }
+  .house li > .mine::before {
+    content: 'You pay ';
+    font-weight: 400;
+    color: var(--muted);
   }
 }
-.bills-foot {
+.list-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 8px 16px;
 }
 
 /* summary */
-.summary h2 {
-  margin-bottom: 10px;
-}
-.lines {
-  margin: 0;
-  display: grid;
-}
-.lines > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
+.sum-t {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.875rem;
-  border-bottom: 1px solid var(--line);
 }
-.lines dt {
+.sum-t thead th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 0 0 8px;
+}
+.sum-t tbody th {
+  text-align: left;
+  font-weight: 400;
   color: var(--ink-2);
 }
-.lines dd {
-  margin: 0;
-  font-weight: 500;
+.sum-t tbody th,
+.sum-t td {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
 }
-.lines .total {
-  border-bottom: 0;
+.sum-t td {
+  padding-left: 12px;
+  white-space: nowrap;
+}
+.sum-t tr.total th,
+.sum-t tr.total td {
   font-weight: 600;
-  font-size: 1rem;
-}
-.lines .total dt {
   color: var(--ink);
 }
 .saved {
@@ -400,5 +406,13 @@ h3 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 </style>

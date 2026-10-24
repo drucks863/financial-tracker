@@ -48,13 +48,23 @@ export interface Subscription {
   from: string
 }
 
-/** A recurring monthly amount on the My numbers page (a bill or a contribution). */
-export interface PlanLine {
+export type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly'
+
+/** Something taken out of each paycheck (HSA, Roth 401k...), as an amount per paycheck. */
+export interface PayDeduction {
   id: string
   name: string
+  perPaycheck: number
+}
+
+/** A housing cost (rent, water, electric...) and the share of it I pay. */
+export interface SharedCost {
+  id: string
+  name: string
+  /** full monthly cost */
   monthly: number
-  /** contributions only: taken out of the paycheck before take-home (HSA, Roth 401k...) */
-  fromPaycheck?: boolean
+  /** my share, 0–1 (1 when living solo) */
+  share: number
 }
 
 /**
@@ -64,29 +74,19 @@ export interface PlanLine {
 export interface Plan {
   /** gross yearly salary */
   salary: number
+  payFrequency: PayFrequency
   /** effective tax rate, 0–1, used to estimate take-home */
   taxRate: number
-  /** actual monthly take-home pay; when null the estimate is used */
+  /** actual take-home per paycheck; when null the estimate is used */
   takeHome: number | null
-  /** 401k contribution as a share of salary, 0–1 */
+  /** my 401k contribution, share of salary 0–1 */
   k401: number
-  /** company 401k contribution as a share of salary, 0–1 */
+  /** company 401k contribution, share of salary 0–1 */
   match: number
-  /** other monthly contributions (HSA, Roth IRA, brokerage...) */
-  contributions: PlanLine[]
-  housing: {
-    rent: number
-    /** false = living solo, pay all of it */
-    split: boolean
-    /** my share of rent when split, 0–1 */
-    rentShare: number
-    /** shared monthly bills (water, electric...) */
-    bills: PlanLine[]
-    /** my share of the bills when split, 0–1 */
-    billsShare: number
-  }
-  /** other monthly spending; when useAverage, the average from entries (excluding essentials) is used */
-  living: { useAverage: boolean; monthly: number }
+  /** other paycheck deductions (HSA...) */
+  deductions: PayDeduction[]
+  /** rent and bills with my share of each */
+  housing: SharedCost[]
 }
 
 export interface FinanceData {

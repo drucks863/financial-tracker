@@ -102,25 +102,17 @@ const subscriptions: Subscription[] = [
 
 const plan: Plan = {
   salary: 85000,
+  payFrequency: 'biweekly',
   taxRate: 0.2,
   takeHome: null,
   k401: 0.08,
   match: 0.04,
-  contributions: [
-    { id: 'p1', name: 'HSA', monthly: 150, fromPaycheck: true },
-    { id: 'p2', name: 'Roth IRA', monthly: 300 }
-  ],
-  housing: {
-    rent: 2200,
-    split: true,
-    rentShare: 0.5,
-    bills: [
-      { id: 'p3', name: 'Water', monthly: 90 },
-      { id: 'p4', name: 'Electric', monthly: 160 }
-    ],
-    billsShare: 0.5
-  },
-  living: { useAverage: true, monthly: 0 }
+  deductions: [{ id: 'p1', name: 'HSA', perPaycheck: 75 }],
+  housing: [
+    { id: 'p2', name: 'Rent', monthly: 2200, share: 0.5 },
+    { id: 'p3', name: 'Water', monthly: 90, share: 0.5 },
+    { id: 'p4', name: 'Electric', monthly: 160, share: 0.5 }
+  ]
 }
 
 writeFileSync(
