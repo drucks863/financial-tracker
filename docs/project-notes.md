@@ -77,7 +77,7 @@ saved in the browser only.
   silver accent (`frontend/src/theme.ts`, tokens in `style.css`). **No yellow/brass accent** (dropped 2026-10-24). **No navy / blue-black backgrounds**
   ("that screams AI"), and not stark white-on-black either.
 - Important numbers up front (KPI cards); secondary things go behind menus, dropdowns and
-  "show all" buttons. Desktop nav is a slim icon rail.
+  "show all" buttons. Desktop nav is a narrow rail with icon + text labels (icons alone were unclear).
 - Overview: Monthly/Yearly toggle, period picker, Download menu, KPI row, then draggable widgets
   (chart with a chart-type dropdown, recent activity, spending mix). Widget order is per browser.
 - Dark by default; light only when `data-theme="light"` is set on `<html>`.

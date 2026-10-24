@@ -45,9 +45,9 @@ onMounted(() => {
 <template>
   <div class="shell">
     <nav class="rail" aria-label="Main">
-      <div class="brand" title="Financial Tracker">
+      <div class="brand">
         <span class="brand-mark" aria-hidden="true">$</span>
-        <span class="sr-only">Financial Tracker</span>
+        <span class="brand-name">Financial Tracker</span>
       </div>
       <button
         v-for="v in VIEWS"
@@ -55,14 +55,13 @@ onMounted(() => {
         type="button"
         class="nav-item"
         :class="{ end: v.id === 'data' }"
-        :title="v.label"
         :aria-current="current === v.id ? 'page' : undefined"
         @click="go(v.id)"
       >
         <i :class="v.icon" aria-hidden="true"></i>
         <span>{{ v.label }}</span>
       </button>
-      <button type="button" class="rail-add" title="Add entry" aria-label="Add entry" @click="openEntry()"><i class="pi pi-plus" aria-hidden="true"></i></button>
+      <button type="button" class="rail-add" @click="openEntry()"><i class="pi pi-plus" aria-hidden="true"></i><span>Add entry</span></button>
     </nav>
 
     <main class="main">
@@ -147,11 +146,11 @@ onMounted(() => {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* Desktop: slim icon rail. Labels show as tooltips; the Data screen sits at the bottom like a settings gear. */
+/* Desktop: narrow left rail with icon + label rows. The Data screen sits at the bottom like settings. */
 @media (min-width: 960px) {
   .shell {
     display: grid;
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 208px minmax(0, 1fr);
   }
   .rail {
     position: sticky;
@@ -159,26 +158,28 @@ onMounted(() => {
     height: 100vh;
     flex-direction: column;
     justify-content: flex-start;
-    align-items: center;
-    gap: 6px;
+    gap: 2px;
     border-top: 0;
     border-right: 1px solid var(--line);
-    padding: 16px 0;
+    padding: 16px 12px;
   }
   .brand {
-    display: grid;
-    place-items: center;
-    padding-bottom: 14px;
-    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 6px 14px;
+    margin-bottom: 8px;
     border-bottom: 1px solid var(--line);
+    font-weight: 600;
+    font-size: 0.9375rem;
     order: -2;
   }
   .brand-mark {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
     background: var(--accent);
     color: var(--p-primary-contrast-color, #fff);
     font-weight: 700;
@@ -186,27 +187,24 @@ onMounted(() => {
   .nav-item,
   .rail-add {
     flex: none;
-    display: grid;
-    place-items: center;
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
     border: 0;
     background: none;
-    color: var(--muted);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 0.9rem;
     cursor: pointer;
-  }
-  .nav-item span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
   }
   .nav-item .pi,
   .rail-add .pi {
-    font-size: 1.15rem;
+    font-size: 1rem;
+    width: 18px;
+    text-align: center;
   }
   .nav-item:hover {
     background: var(--panel-2);
@@ -214,6 +212,10 @@ onMounted(() => {
   }
   .nav-item[aria-current='page'] {
     background: var(--panel-2);
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .nav-item[aria-current='page'] .pi {
     color: var(--accent);
   }
   .nav-item.end {
@@ -221,12 +223,14 @@ onMounted(() => {
   }
   .rail-add {
     order: -1;
-    margin-bottom: 8px;
-    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-    color: var(--accent);
+    margin-bottom: 10px;
+    justify-content: center;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-weight: 500;
   }
   .rail-add:hover {
-    background: var(--accent-soft);
+    background: var(--panel-2);
   }
   .fab {
     display: none;
