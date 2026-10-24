@@ -9,8 +9,19 @@ import { money, signedMoney, pct, MONTHS, monthLabel, shortDate } from '../lib/f
 import { series, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
 import type { ChartBuilder } from '../lib/chart-types'
+import { useWidgetOrder } from '../lib/widget-order'
 
 const emit = defineEmits<{ navigate: [view: string] }>()
+
+const WIDGETS = ['summary', 'flow', 'spend', 'networth']
+const WIDGET_NAMES: Record<string, string> = { summary: 'Month summary', flow: 'Income vs expenses', spend: 'Where it went', networth: 'Net worth' }
+const layout = useWidgetOrder('financial-tracker.overview-order', WIDGETS)
+const customOrder = computed(() => layout.order.value.join() !== WIDGETS.join())
+const widget = (id: string) => ({
+  'data-widget': id,
+  class: { dragging: layout.dragging.value === id },
+  style: { order: layout.pos(id) }
+})
 
 const year = computed(() => monthTotals(ui.year))
 const m = computed(() => year.value[ui.month])
@@ -161,11 +172,14 @@ const nwSpark = computed<ChartBuilder>(() => {
         <h1>{{ monthLabel(selectedYm) }}</h1>
         <p class="muted">Cash flow for the month, against your {{ ui.year }} averages</p>
       </div>
+      <Button v-if="customOrder" label="Reset layout" icon="pi pi-undo" text size="small" @click="layout.reset()" />
     </header>
 
     <MonthStrip />
 
-    <section class="panel hero" aria-label="Month summary">
+    <div class="grid-2 widgets" :class="{ 'is-dragging': layout.dragging.value }">
+    <section class="panel hero span-2" aria-label="Month summary" v-bind="widget('summary')">
+      <button type="button" class="grip" :aria-label="`Move ${WIDGET_NAMES['summary']}. Drag, or use the arrow keys`" title="Drag to move" @pointerdown="layout.onHandleDown('summary', $event)" @keydown="layout.onHandleKey('summary', $event)"><span aria-hidden="true"></span></button>
       <div class="hero-main">
         <p class="ink2">Net cash flow</p>
         <p class="hero-num num" :class="m.net >= 0 ? 'pos' : 'neg'">{{ m.count ? signedMoney(m.net) : '—' }}</p>
@@ -198,8 +212,8 @@ const nwSpark = computed<ChartBuilder>(() => {
       </dl>
     </section>
 
-    <div class="grid-2">
-      <section class="panel span-2">
+      <section class="panel span-2" v-bind="widget('flow')">
+        <button type="button" class="grip" :aria-label="`Move ${WIDGET_NAMES['flow']}. Drag, or use the arrow keys`" title="Drag to move" @pointerdown="layout.onHandleDown('flow', $event)" @keydown="layout.onHandleKey('flow', $event)"><span aria-hidden="true"></span></button>
         <div class="panel-head">
           <div>
             <h2>Income vs expenses, {{ ui.year }}</h2>
@@ -214,7 +228,8 @@ const nwSpark = computed<ChartBuilder>(() => {
         <BaseChart :build="flowChart" height="260px" :label="`Monthly income and expenses for ${ui.year}`" />
       </section>
 
-      <section class="panel">
+      <section class="panel" v-bind="widget('spend')">
+        <button type="button" class="grip" :aria-label="`Move ${WIDGET_NAMES['spend']}. Drag, or use the arrow keys`" title="Drag to move" @pointerdown="layout.onHandleDown('spend', $event)" @keydown="layout.onHandleKey('spend', $event)"><span aria-hidden="true"></span></button>
         <div class="panel-head">
           <div>
             <h2>Where it went</h2>
@@ -246,7 +261,8 @@ const nwSpark = computed<ChartBuilder>(() => {
         <p v-else class="empty">Nothing spent yet this month.</p>
       </section>
 
-        <section class="panel nw-card">
+        <section class="panel nw-card" v-bind="widget('networth')">
+          <button type="button" class="grip" :aria-label="`Move ${WIDGET_NAMES['networth']}. Drag, or use the arrow keys`" title="Drag to move" @pointerdown="layout.onHandleDown('networth', $event)" @keydown="layout.onHandleKey('networth', $event)"><span aria-hidden="true"></span></button>
           <div class="panel-head">
             <div>
               <h2>Net worth</h2>
@@ -270,6 +286,53 @@ const nwSpark = computed<ChartBuilder>(() => {
 </template>
 
 <style scoped>
+.widgets > .panel {
+  position: relative;
+  transition: box-shadow 0.15s, opacity 0.15s;
+}
+/* Drag pill centred on each widget's top edge. Big hit area for thumbs; touch-action none so
+   dragging doesn't scroll the page. */
+.grip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+  background: none;
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+}
+.grip span {
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  transition: background 0.15s;
+}
+.grip:hover span,
+.grip:focus-visible span,
+.dragging .grip span {
+  background: var(--accent);
+}
+.grip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.is-dragging,
+.is-dragging .grip {
+  cursor: grabbing;
+  user-select: none;
+}
+.widgets > .panel.dragging {
+  box-shadow: 0 0 0 2px var(--accent);
+  opacity: 0.92;
+}
 .page-head {
   display: flex;
   justify-content: space-between;

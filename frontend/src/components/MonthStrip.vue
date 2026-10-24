@@ -67,6 +67,16 @@ watch(() => [ui.month, ui.year], scrollToActive)
   align-self: center;
   width: 108px;
 }
+/* Phones: the year sits on its own line above the month scroller so the months get the full width. */
+@media (max-width: 959px) {
+  .month-strip {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .year {
+    align-self: flex-start;
+  }
+}
 .months {
   display: flex;
   gap: 4px;

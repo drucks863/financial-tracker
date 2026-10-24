@@ -222,23 +222,33 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
   color: var(--muted);
 }
 .subs {
-  padding: 0 16px 12px 36px;
+  padding: 0 16px 12px 28px;
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 .sub-row {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--ink-2);
-  padding-bottom: 4px;
-  border-bottom: 1px dashed var(--line);
+  align-items: baseline;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
 }
+.sub-row .num {
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+}
+/* Entries sit indented under their subcategory with a guide line, so the two never read as peers. */
 .entries {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  margin: 4px 0 0 10px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--line);
 }
 .entry {
   width: 100%;
