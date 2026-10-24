@@ -1,7 +1,8 @@
 import { definePreset } from '@primeuix/themes'
 import Aura from '@primeuix/themes/aura'
 
-// Aura re-skinned as a command center: near-black neutral surfaces (no blue cast) and a brass primary.
+// Aura re-skinned as a command center: near-black neutral surfaces (no blue cast) and a
+// monochrome silver primary.
 // The app is dark by default; light only applies when the viewer explicitly picks it
 // (`.app-dark` on <html> is managed by lib/theme-mode.ts).
 
@@ -20,36 +21,37 @@ const graphite = {
   950: '#0c0c0b'
 }
 
-const brass = {
-  50: '#fbf6ea',
-  100: '#f4e7c6',
-  200: '#e9d08f',
-  300: '#ddb862',
-  400: '#d4a443',
-  500: '#bf8c2c',
-  600: '#a07222',
-  700: '#7f591d',
-  800: '#66481c',
-  900: '#553c1b',
-  950: '#30200b'
+// Accent is monochrome: soft silver on dark (not stark white), near-black on light.
+const silver = {
+  50: '#fafaf9',
+  100: '#f2f2f0',
+  200: '#e6e5e1',
+  300: '#d6d5d0',
+  400: '#bdbcb6',
+  500: '#9c9b95',
+  600: '#787873',
+  700: '#55554f',
+  800: '#3a3a37',
+  900: '#262624',
+  950: '#161615'
 }
 
 export const FinancePreset = definePreset(Aura, {
-  primitive: { graphite, brass },
+  primitive: { graphite, silver },
   semantic: {
-    primary: brass,
+    primary: silver,
     colorScheme: {
       light: {
-        primary: { color: '{brass.700}', contrastColor: '#ffffff', hoverColor: '{brass.800}', activeColor: '{brass.900}' },
+        primary: { color: '{silver.900}', contrastColor: '#ffffff', hoverColor: '{silver.800}', activeColor: '{silver.700}' },
         surface: graphite,
-        highlight: { background: '{brass.50}', focusBackground: '{brass.100}', color: '{brass.800}', focusColor: '{brass.900}' }
+        highlight: { background: '{silver.100}', focusBackground: '{silver.200}', color: '{silver.950}', focusColor: '{silver.950}' }
       },
       dark: {
-        primary: { color: '{brass.400}', contrastColor: '{graphite.950}', hoverColor: '{brass.300}', activeColor: '{brass.200}' },
+        primary: { color: '{silver.300}', contrastColor: '{graphite.950}', hoverColor: '{silver.200}', activeColor: '{silver.100}' },
         surface: graphite,
         highlight: {
-          background: 'color-mix(in srgb, {brass.400}, transparent 84%)',
-          focusBackground: 'color-mix(in srgb, {brass.400}, transparent 76%)',
+          background: 'color-mix(in srgb, {silver.300}, transparent 84%)',
+          focusBackground: 'color-mix(in srgb, {silver.300}, transparent 76%)',
           color: 'rgba(255,255,255,.87)',
           focusColor: 'rgba(255,255,255,.87)'
         }

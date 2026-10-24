@@ -1,5 +1,5 @@
 /* Layout: mobile-first single column with a bottom tab bar; a left rail and two-column grids from 960px.
-   Palette: warm graphite with a brass accent, dark by default. Light applies only when the
+   Palette: near-black neutral with a monochrome silver accent, dark by default. Light applies only when the
    viewer explicitly chooses it (data-theme="light"). Component colors come from PrimeVue's
    --p-* tokens (see theme.ts) so app chrome and components always agree. */
 :root {
@@ -11,7 +11,7 @@
   --ink-2: #b4b3ad;
   --muted: #85847e;
   --line: #262624;
-  --accent: var(--p-primary-color, #d4a443);
+  --accent: var(--p-primary-color, #d6d5d0);
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --good: #5fbf8f;
   --bad: #ec8a76;
