@@ -11,6 +11,7 @@ import { useToast } from 'primevue/usetoast'
 import { ui, selectedYm } from '../store/ui'
 import { categoriesOf, findCategory, saveEntry, deleteEntry, addSubcategory, addCategory } from '../store/finance'
 import { money2 } from '../lib/format'
+import { planned } from '../store/plan'
 import type { EntryType } from '../types'
 
 const toast = useToast()
@@ -65,6 +66,43 @@ watch(
 
 const categoryOptions = computed(() => categoriesOf(form.type).map((c) => c.name))
 const subOptions = computed(() => findCategory(form.type, form.category)?.subcategories || [])
+
+// Suggested amount from My numbers for the picked category: paycheck take-home for wage income,
+// your share for a rent or bill item, or a loan payment. Matched by name.
+const norm = (v: string | null | undefined) => (v || '').toLowerCase().replace(/[^a-z]/g, '')
+const sameName = (a: string, b: string) => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
+const suggestion = computed<{ amount: number; label: string } | null>(() => {
+  const n = planned.value
+  const sub = norm(form.subcategory)
+  const cat = norm(form.category)
+  if (form.type === 'income') {
+    if ((sub.includes('paycheck') || cat.includes('wage')) && n.paycheck.takeHome > 0) return { amount: n.paycheck.takeHome, label: 'take-home per paycheck' }
+    return null
+  }
+  for (const l of n.loans) {
+    const name = norm(l.loan.name)
+    if (l.balance > 0 && (sameName(sub, name) || (name.includes('mortgage') && cat.includes('mortgage') && sub.includes('mortgage')))) return { amount: l.payment, label: `${l.loan.name} payment` }
+  }
+  for (const h of n.housing) {
+    if (sameName(sub, norm(h.name)) && h.mine > 0) return { amount: Math.round(h.mine * 100) / 100, label: `your share of ${h.name.toLowerCase()}` }
+  }
+  return null
+})
+const prefilled = ref(false)
+watch(suggestion, (sg) => {
+  if (form.id) return
+  if (sg && (form.amount === null || prefilled.value)) {
+    form.amount = sg.amount
+    prefilled.value = true
+  } else if (!sg && prefilled.value) {
+    form.amount = null
+    prefilled.value = false
+  }
+})
+watch(
+  () => ui.entryDialog.open,
+  () => (prefilled.value = false)
+)
 
 watch(
   () => form.type,
@@ -168,6 +206,10 @@ function remove(): void {
             autofocus
           />
           <small v-if="errors.amount" class="err">{{ errors.amount }}</small>
+          <small v-else-if="prefilled && suggestion && form.amount === suggestion.amount" class="hint">From My numbers: {{ suggestion.label }}</small>
+          <button v-else-if="!form.id && suggestion && form.amount !== suggestion.amount" type="button" class="link hint-btn" @click="form.amount = suggestion.amount">
+            Use {{ money2(suggestion.amount) }} ({{ suggestion.label }})
+          </button>
           <small v-else-if="form.amount !== null && form.amount < 0" class="hint">
             {{ form.type === 'expense' ? 'A negative expense counts as a refund and adds back to the month.' : 'A negative income entry lowers the month’s income.' }}
           </small>
@@ -291,6 +333,10 @@ function remove(): void {
 }
 .hint {
   color: var(--muted);
+  font-size: 0.75rem;
+}
+.hint-btn {
+  justify-self: start;
   font-size: 0.75rem;
 }
 .actions {

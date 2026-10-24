@@ -14,6 +14,7 @@ import { money, signedMoney, pct, shortDate } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
 import type { ChartBuilder } from '../lib/chart-types'
 import { loanSummary, currentYm } from '../lib/loan'
+import { planned } from '../store/plan'
 import type { AccountGroup, NetWorthPoint } from '../types'
 
 const toast = useToast()
@@ -27,6 +28,14 @@ const yearAgo = computed(() => {
 })
 const first = computed(() => all.value[0])
 // Percent change only makes sense against a positive starting value.
+// Expected monthly growth from My numbers: contributions (yours, company, paycheck deductions)
+// plus loan principal paid down. Market moves come on top of this.
+const expected = computed(() => {
+  const m = planned.value.monthly
+  const ym = last.value?.date.slice(0, 7) ?? currentYm()
+  const principal = (state.plan?.loans ?? []).reduce((a, l) => a + (loanSummary(l).rows.find((r) => r.ym === ym)?.principal ?? 0), 0)
+  return { contributions: m.saved, principal, total: m.saved + principal }
+})
 const rel = (now: number, then: number) => (then > 0 ? pct((now - then) / then) : '')
 
 const range = ref<number | 'all'>('all')
@@ -264,7 +273,17 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
         <div v-if="prev">
           <dt>vs prior month</dt>
           <dd class="num" :class="last.total >= prev.total ? 'pos' : 'neg'">{{ signedMoney(last.total - prev.total) }}</dd>
-          <dd class="sub muted">{{ rel(last.total, prev.total) }}</dd>
+          <dd class="sub muted">
+            {{ rel(last.total, prev.total) }}
+            <template v-if="expected.total > 0">
+              · <span :class="last.total - prev.total >= expected.total ? 'pos' : 'neg'">{{ last.total - prev.total >= expected.total ? 'ahead of' : 'behind' }} plan</span>
+            </template>
+          </dd>
+        </div>
+        <div v-if="expected.total > 0">
+          <dt>Expected each month</dt>
+          <dd class="num">{{ signedMoney(expected.total) }}</dd>
+          <dd class="sub muted">{{ money(expected.contributions) }} contributions<template v-if="expected.principal"> + {{ money(expected.principal) }} loan principal</template></dd>
         </div>
         <div v-if="yearAgo">
           <dt>vs a year ago</dt>
@@ -456,7 +475,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 }
 .changes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
   margin: 0;
 }

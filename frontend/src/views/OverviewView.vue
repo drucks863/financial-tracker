@@ -13,6 +13,7 @@ import { series, otherColor, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
 import { useWidgetOrder } from '../lib/widget-order'
 import { useExport } from '../lib/use-export'
+import { planned } from '../store/plan'
 import type { ChartBuilder } from '../lib/chart-types'
 import type { Entry } from '../types'
 
@@ -273,6 +274,28 @@ const mix = computed(() => {
   return rest > 0 ? [...top, { name: `Other (${spend.value.length - MIX_TOP})`, total: rest, color: otherColor(isDark.value) }] : top
 })
 const essentials = computed(() => spend.value.filter((c) => c.essential).reduce((a, c) => a + c.total, 0))
+
+/* ---------- plan check: this period against My numbers ---------- */
+// Year mode scales the monthly plan by the months that have entries, so a partial year compares fairly.
+const planMonths = computed(() => (mode.value === 'month' ? 1 : year.value.filter((r) => r.count).length))
+const planRows = computed(() => {
+  const n = planned.value.monthly
+  const k = planMonths.value
+  const c = current.value
+  const budget = Math.max(0, n.afterHousing) * k
+  return [
+    { id: 'income', label: 'Income', note: 'vs planned take-home', actual: c.income, plan: n.takeHome * k, upIsGood: true },
+    { id: 'housing', label: 'Rent and utilities', note: 'vs your share', actual: essentials.value, plan: (n.housingMine + n.loanPayments) * k, upIsGood: false },
+    { id: 'other', label: 'Everything else', note: 'vs what’s left after housing', actual: spendTotal.value - essentials.value, plan: budget, upIsGood: false }
+  ]
+    .filter((r) => r.plan > 0)
+    .map((r) => {
+      const ratio = r.plan ? r.actual / r.plan : 0
+      const good = r.upIsGood ? r.actual >= r.plan : r.actual <= r.plan
+      return { ...r, ratio, good, diff: r.actual - r.plan }
+    })
+})
+const hasPlan = computed(() => planned.value.monthly.takeHome > 0 || planned.value.monthly.housingMine > 0)
 const showAllCats = ref(false)
 const mixMenu = ref<InstanceType<typeof Menu> | null>(null)
 const mixItems = [
@@ -289,8 +312,8 @@ const exportItems = [
   { label: 'Net worth (CSV)', icon: 'pi pi-file', command: () => doExport('nw') }
 ]
 
-const WIDGETS = ['chart', 'activity', 'mix']
-const WIDGET_NAMES: Record<string, string> = { chart: 'chart', activity: 'Recent activity', mix: 'Spending mix' }
+const WIDGETS = ['chart', 'activity', 'mix', 'plan']
+const WIDGET_NAMES: Record<string, string> = { chart: 'chart', activity: 'Recent activity', mix: 'Spending mix', plan: 'Plan check' }
 const layout = useWidgetOrder('financial-tracker.overview-order.v2', WIDGETS)
 const customOrder = computed(() => layout.order.value.join() !== WIDGETS.join())
 const widget = (id: string) => ({
@@ -534,6 +557,43 @@ const pageItems = computed(() => [
           </ul>
         </template>
         <p v-else class="empty">Nothing spent in {{ periodLabel }}.</p>
+      </section>
+
+      <!-- Plan check -->
+      <section class="panel plan" aria-labelledby="plan-title" v-bind="widget('plan')">
+        <button
+          type="button"
+          class="grip"
+          :aria-label="`Move ${WIDGET_NAMES.plan}. Drag, or use the arrow keys`"
+          title="Drag to move"
+          @pointerdown="layout.onHandleDown('plan', $event)"
+          @keydown="layout.onHandleKey('plan', $event)"
+        >
+          <span aria-hidden="true"></span>
+        </button>
+        <div class="panel-head">
+          <div>
+            <h2 id="plan-title">Plan check</h2>
+            <p class="muted small">{{ periodLabel }} against My numbers{{ mode === 'year' ? ` (${planMonths} months)` : '' }}</p>
+          </div>
+          <Button label="Edit" text size="small" @click="emit('navigate', 'plan')" />
+        </div>
+        <ul v-if="hasPlan && current.count" class="plan-list">
+          <li v-for="r in planRows" :key="r.id">
+            <div class="plan-top">
+              <span>{{ r.label }} <small class="muted">{{ r.note }}</small></span>
+              <span class="num"><strong>{{ money(r.actual) }}</strong> <span class="muted">/ {{ money(r.plan) }}</span></span>
+            </div>
+            <div class="meter" role="img" :aria-label="`${pct(r.ratio)} of plan`">
+              <span :class="r.good ? 'good' : 'bad'" :style="{ width: `${Math.min(100, r.ratio * 100)}%` }"></span>
+            </div>
+            <small class="num" :class="r.good ? 'pos' : 'neg'">
+              {{ r.diff >= 0 ? `${money(r.diff)} over` : `${money(-r.diff)} under` }}
+            </small>
+          </li>
+        </ul>
+        <p v-else-if="!hasPlan" class="empty">Fill in My numbers to compare each month to your plan.</p>
+        <p v-else class="empty">Nothing recorded for {{ periodLabel }}.</p>
       </section>
     </div>
   </div>
@@ -915,6 +975,47 @@ const pageItems = computed(() => [
   .sub-cat {
     display: none !important;
   }
+}
+
+/* ---------- plan check ---------- */
+.plan-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.plan-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.875rem;
+  margin-bottom: 6px;
+}
+.plan-top small {
+  font-size: 0.75rem;
+}
+.meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--panel-2);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.meter .good {
+  background: var(--good);
+}
+.meter .bad {
+  background: var(--bad);
+}
+.plan-list small.num {
+  font-size: 0.75rem;
 }
 
 /* ---------- spending mix ---------- */

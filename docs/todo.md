@@ -17,7 +17,8 @@
 - [x] Convert the frontend to TypeScript (strict, vue-tsc type-check in the build)
 - [x] Remove the Savings entry type (contribution boxes were only a reminder)
 - [x] Editable subscriptions (add, edit, delete)
-- [ ] Use My numbers figures on other screens (e.g. compare a month to the plan)
+- [x] Use My numbers on other screens: Overview plan check, Net worth expected growth, entry prefill, Trends planned lines
+- [x] Loans on My numbers (amortized); Net worth subtracts balances and shows principal vs interest
 - [ ] Devin reviews the preview and sends tweaks
 
 ## Next

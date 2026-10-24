@@ -4,7 +4,8 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import BaseChart from '../components/BaseChart.vue'
 import { ui, categoryRank, categoryColor } from '../store/ui'
-import { monthTotals, avgNonZero, yearGrid, yearsAvailable, categoriesOf } from '../store/finance'
+import { monthTotals, avgNonZero, yearGrid, yearsAvailable, categoriesOf, findCategory } from '../store/finance'
+import { planned } from '../store/plan'
 import { money, signedMoney, pct, MONTHS } from '../lib/format'
 import { series, otherColor, ROLE } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
@@ -32,6 +33,20 @@ const stats = computed(() => {
   }
 })
 
+/* ---- planned amounts from My numbers ---- */
+const planTakeHome = computed(() => planned.value.monthly.takeHome)
+const norm = (v: string) => v.toLowerCase().replace(/[^a-z]/g, '')
+const sameName = (a: string, b: string) => !!a && !!b && (a.includes(b) || b.includes(a) || a.slice(0, 5) === b.slice(0, 5))
+/** Planned monthly amount for one category, when My numbers has one (wages, rent, bills, loans). */
+function planFor(type: EntryType, name: string): number {
+  const n = planned.value
+  if (type === 'income') return norm(name).includes('wage') ? n.monthly.takeHome : 0
+  const subs = [name, ...(findCategory('expense', name)?.subcategories ?? [])].map(norm)
+  const housing = n.housing.filter((h) => subs.some((s) => sameName(s, norm(h.name)))).reduce((a, h) => a + h.mine, 0)
+  const loans = n.loans.filter((l) => l.balance > 0 && subs.some((s) => sameName(s, norm(l.loan.name)))).reduce((a, l) => a + l.payment, 0)
+  return housing + loans
+}
+
 /* ---- stacked spending by category ---- */
 const stacked = computed<ChartBuilder>(() => {
   const grid = yearGrid('expense', ui.year)
@@ -50,6 +65,20 @@ const stacked = computed<ChartBuilder>(() => {
           borderWidth: { top: 2 },
           borderSkipped: 'start' as const
         })),
+        ...(planTakeHome.value > 0
+          ? [
+              {
+                type: 'line' as const,
+                label: 'Planned take-home',
+                data: MONTHS.map(() => planTakeHome.value),
+                borderColor: c.ink,
+                borderDash: [5, 4],
+                borderWidth: 1.5,
+                pointRadius: 0,
+                stack: 'plan'
+              }
+            ]
+          : []),
         {
           label: 'Other',
           data: MONTHS.map((_, m) => rest.reduce((a, n) => a + grid[n].months[m], 0)),
@@ -82,8 +111,10 @@ const trend = computed(() => {
   const data = grid[name]?.months || Array(12).fill(0)
   const average = avgNonZero(data)
   const color = trendType.value === 'expense' ? null : ROLE.income
+  const plan = planFor(trendType.value, name)
   return {
     average,
+    plan,
     total: data.reduce((a, b) => a + b, 0),
     build: ((dark, c) => ({
       type: 'bar',
@@ -100,6 +131,19 @@ const trend = computed(() => {
             pointRadius: 0,
             order: 0
           },
+          ...(plan > 0
+            ? [
+                {
+                  type: 'line' as const,
+                  label: 'Planned',
+                  data: MONTHS.map(() => plan),
+                  borderColor: c.ink,
+                  borderWidth: 1.5,
+                  pointRadius: 0,
+                  order: 0
+                }
+              ]
+            : []),
           {
             label: name,
             data,
@@ -214,6 +258,7 @@ const yoy = computed(() => {
           <span v-for="l in stackedLegend" :key="l.name" :title="l.i < 0 ? otherNames : ''">
             <i class="swatch" :style="{ background: l.i < 0 ? otherColor(isDark) : series(l.i, isDark) }"></i>{{ l.name }}
           </span>
+          <span v-if="planTakeHome > 0"><i class="swatch line" style="background: var(--ink)"></i>Planned take-home</span>
         </div>
         <BaseChart :build="stacked" height="280px" :label="`Monthly spending by category for ${ui.year}`" />
       </section>
@@ -244,6 +289,7 @@ const yoy = computed(() => {
         <div class="legend">
           <span><i class="swatch" :style="{ background: trendType === 'expense' ? categoryColor(trendName, isDark) : 'var(--series-income)' }"></i>{{ trendName }}</span>
           <span><i class="swatch line" style="background: var(--ink-2)"></i>Monthly average</span>
+          <span v-if="trend.plan > 0"><i class="swatch line" style="background: var(--ink)"></i>Planned {{ money(trend.plan) }} (My numbers)</span>
         </div>
       </section>
 

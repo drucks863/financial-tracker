@@ -66,7 +66,13 @@ docs/       these notes, the todo list, architecture
 - Rent and bills: a list of items, each with its monthly cost and your share %. Solo = 100%.
   No separate solo/split switch and no "everyday spending" section (Devin, 2026-10-24).
 - Stored as `plan` on the data (`types.ts` `Plan`); derived figures in `store/plan.ts` (`planned`).
-  Other screens should read `planned`, not recompute.
+  Other screens should read `planned`, not recompute. Used by: Overview "Plan check" widget,
+  Net worth "Expected each month", Add entry amount prefill (matched by subcategory name),
+  Trends planned lines.
+- Loans (amount, rate, term, first payment month, extra/month) live on My numbers;
+  `lib/loan.ts` amortizes them. Net worth adds each loan's balance as debt for every snapshot
+  month (owed from the month before the first payment), so loans are never typed into snapshots.
+- Debt accounts typed into snapshots count as owed whichever sign is entered.
 
 ## The Google Sheets are reference only
 
