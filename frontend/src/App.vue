@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import Toast from 'primevue/toast'
+import Button from 'primevue/button'
 import EntryDialog from './components/EntryDialog.vue'
 import OverviewView from './views/OverviewView.vue'
 import CashFlowView from './views/CashFlowView.vue'
@@ -19,6 +20,9 @@ const VIEWS = [
   // opened from the avatar, not listed in the nav
   { id: 'plan', label: 'Financial profile', icon: 'pi pi-calculator', component: PlanView, hidden: true }
 ]
+
+// after a failed save, reloading shows what the server actually has
+const reload = () => location.reload()
 
 const NAV = VIEWS.filter((v) => !('hidden' in v))
 const me = computed(() => {
@@ -98,7 +102,14 @@ onMounted(() => {
     </nav>
 
     <main class="main">
-      <p v-if="sync.error" class="sync-error" role="alert"><i class="pi pi-exclamation-triangle"></i> Couldn't save to the server: {{ sync.error }}. Reload to see what was saved.</p>
+      <div v-if="sync.error" class="sync-error" role="alert">
+        <i class="pi pi-cloud" aria-hidden="true"></i>
+        <p>
+          <strong>Your last change wasn't saved.</strong>
+          <span class="why">{{ sync.error }}</span>
+        </p>
+        <Button label="Reload" size="small" severity="secondary" @click="reload" />
+      </div>
       <p v-if="isSampleData" class="sample-note">Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export), or add <code>src/data/seed.local.json</code>.</p>
       <component :is="view.component" @navigate="go" />
     </main>
@@ -121,12 +132,34 @@ onMounted(() => {
 }
 
 .sync-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin: 0 0 16px;
-  padding: 10px 14px;
+  padding: 10px 10px 10px 14px;
   border-radius: 10px;
-  border: 1px solid var(--series-expense);
+  background: var(--bad-soft);
+  border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
   color: var(--ink);
   font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.sync-error > .pi {
+  color: var(--bad);
+  font-size: 1rem;
+}
+.sync-error p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.sync-error strong {
+  display: block;
+  font-weight: 600;
+}
+.sync-error .why {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 .sample-note {
   margin: 0 0 16px;
