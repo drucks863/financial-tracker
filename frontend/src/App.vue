@@ -45,15 +45,24 @@ onMounted(() => {
 <template>
   <div class="shell">
     <nav class="rail" aria-label="Main">
-      <div class="brand">
+      <div class="brand" title="Financial Tracker">
         <span class="brand-mark" aria-hidden="true">$</span>
-        <span class="brand-name">Financial Tracker</span>
+        <span class="sr-only">Financial Tracker</span>
       </div>
-      <button v-for="v in VIEWS" :key="v.id" type="button" class="nav-item" :aria-current="current === v.id ? 'page' : undefined" @click="go(v.id)">
+      <button
+        v-for="v in VIEWS"
+        :key="v.id"
+        type="button"
+        class="nav-item"
+        :class="{ end: v.id === 'data' }"
+        :title="v.label"
+        :aria-current="current === v.id ? 'page' : undefined"
+        @click="go(v.id)"
+      >
         <i :class="v.icon" aria-hidden="true"></i>
         <span>{{ v.label }}</span>
       </button>
-      <Button class="rail-add" label="Add entry" icon="pi pi-plus" @click="openEntry()" />
+      <button type="button" class="rail-add" title="Add entry" aria-label="Add entry" @click="openEntry()"><i class="pi pi-plus" aria-hidden="true"></i></button>
     </nav>
 
     <main class="main">
@@ -138,11 +147,11 @@ onMounted(() => {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-/* Desktop: left rail */
+/* Desktop: slim icon rail. Labels show as tooltips; the Data screen sits at the bottom like a settings gear. */
 @media (min-width: 960px) {
   .shell {
     display: grid;
-    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr);
   }
   .rail {
     position: sticky;
@@ -150,59 +159,92 @@ onMounted(() => {
     height: 100vh;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 2px;
+    align-items: center;
+    gap: 6px;
     border-top: 0;
     border-right: 1px solid var(--line);
-    padding: 20px 12px;
+    padding: 16px 0;
   }
   .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 10px 20px;
-    font-weight: 600;
+    display: grid;
+    place-items: center;
+    padding-bottom: 14px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    order: -2;
   }
   .brand-mark {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
     background: var(--accent);
     color: var(--p-primary-contrast-color, #fff);
     font-weight: 700;
   }
-  .nav-item {
+  .nav-item,
+  .rail-add {
     flex: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    height: 42px;
-    padding: 0 12px;
-    border-radius: 10px;
-    font-size: 0.9375rem;
-    color: var(--ink-2);
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 12px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .nav-item span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .nav-item .pi,
+  .rail-add .pi {
+    font-size: 1.15rem;
   }
   .nav-item:hover {
-    background: var(--accent-soft);
+    background: var(--panel-2);
+    color: var(--ink);
   }
   .nav-item[aria-current='page'] {
-    background: var(--accent-soft);
+    background: var(--panel-2);
     color: var(--accent);
-    font-weight: 600;
+  }
+  .nav-item.end {
+    margin-top: auto;
   }
   .rail-add {
-    display: inline-flex;
-    margin-top: 16px;
+    order: -1;
+    margin-bottom: 8px;
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    color: var(--accent);
+  }
+  .rail-add:hover {
+    background: var(--accent-soft);
   }
   .fab {
     display: none;
   }
   .main {
-    padding-block: 28px 48px;
-    padding-left: 32px;
-    padding-right: 32px;
+    max-width: 1320px;
+    padding-block: 24px 48px;
+    padding-left: 28px;
+    padding-right: 28px;
     width: 100%;
   }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 </style>

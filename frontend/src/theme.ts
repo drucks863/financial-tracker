@@ -1,23 +1,23 @@
 import { definePreset } from '@primeuix/themes'
 import Aura from '@primeuix/themes/aura'
 
-// Aura re-skinned as a ledger: warm graphite surfaces (no blue cast) and a brass primary.
+// Aura re-skinned as a command center: near-black neutral surfaces (no blue cast) and a brass primary.
 // The app is dark by default; light only applies when the viewer explicitly picks it
 // (`.app-dark` on <html> is managed by lib/theme-mode.ts).
 
 const graphite = {
   0: '#ffffff',
-  50: '#f6f5f2',
-  100: '#eceae5',
-  200: '#dcd9d1',
-  300: '#c3bfb4',
-  400: '#9d988c',
-  500: '#7b766b',
-  600: '#5f5b52',
-  700: '#46433d',
-  800: '#2f2d29',
-  900: '#211f1c',
-  950: '#171614'
+  50: '#f7f7f6',
+  100: '#efefed',
+  200: '#e0e0dd',
+  300: '#c8c8c4',
+  400: '#a0a09b',
+  500: '#787873',
+  600: '#5a5a56',
+  700: '#3a3a37',
+  800: '#262624',
+  900: '#161615',
+  950: '#0c0c0b'
 }
 
 const brass = {

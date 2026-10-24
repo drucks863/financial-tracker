@@ -4,16 +4,19 @@
    --p-* tokens (see theme.ts) so app chrome and components always agree. */
 :root {
   --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --bg: #171614;
-  --panel: #211f1c;
-  --ink: #ece8df;
-  --ink-2: #c3bfb4;
-  --muted: #9d988c;
-  --line: #2f2d29;
+  --bg: #0c0c0b;
+  --panel: #131312;
+  --panel-2: #1c1c1a;
+  --ink: #e9e8e4;
+  --ink-2: #b4b3ad;
+  --muted: #85847e;
+  --line: #262624;
   --accent: var(--p-primary-color, #d4a443);
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --good: #5fbf8f;
   --bad: #ec8a76;
+  --good-soft: color-mix(in srgb, var(--good) 14%, transparent);
+  --bad-soft: color-mix(in srgb, var(--bad) 14%, transparent);
   --radius-panel: 14px;
   --nav-h: 64px;
   --series-income: #3987e5;
@@ -24,12 +27,13 @@
   color-scheme: dark;
 }
 :root[data-theme='light'] {
-  --bg: #f6f5f2;
+  --bg: #f7f7f6;
   --panel: #ffffff;
+  --panel-2: #f1f1ef;
   --ink: #211f1c;
   --ink-2: #5f5b52;
   --muted: #7b766b;
-  --line: #e4e1da;
+  --line: #e4e4e1;
   --good: #1d7a4a;
   --bad: #b8432c;
   --series-income: #2a78d6;
@@ -169,12 +173,12 @@ p {
   font-weight: 500;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #eceae5;
+  background: var(--panel-2);
   color: var(--ink-2);
   white-space: nowrap;
 }
 .app-dark .delta {
-  background: #2f2d29;
+  background: var(--panel-2);
 }
 .delta .pi {
   font-size: 0.625rem;

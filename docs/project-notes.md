@@ -73,7 +73,12 @@ saved in the browser only.
 
 ## Look and feel
 
-- Dark by default: warm graphite surfaces with a brass accent (`frontend/src/theme.ts`).
-  **No navy / blue-black backgrounds** (Devin, 2026-10-24: "that screams AI").
-  Light mode only applies when `data-theme="light"` is set on `<html>`.
+- "Command center, but not messy" (Devin, 2026-10-24). Near-black neutral surfaces with a brass
+  accent (`frontend/src/theme.ts`, tokens in `style.css`). **No navy / blue-black backgrounds**
+  ("that screams AI"), and not stark white-on-black either.
+- Important numbers up front (KPI cards); secondary things go behind menus, dropdowns and
+  "show all" buttons. Desktop nav is a slim icon rail.
+- Overview: Monthly/Yearly toggle, period picker, Download menu, KPI row, then draggable widgets
+  (chart with a chart-type dropdown, recent activity, spending mix). Widget order is per browser.
+- Dark by default; light only when `data-theme="light"` is set on `<html>`.
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.

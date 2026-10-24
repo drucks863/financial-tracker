@@ -22,31 +22,16 @@ import {
   uid,
   resetToSheetData
 } from '../store/finance'
-import { saveFile, entriesCsv, workbookBytes, netWorthCsv, parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook } from '../lib/io'
+import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook } from '../lib/io'
 import { money, money2, shortDate } from '../lib/format'
-import type { ParsedEntries, ParsedNetWorth, SaveError } from '../lib/io'
+import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
+import { useExport } from '../lib/use-export'
 import type { Category, EntryType } from '../types'
 
 const toast = useToast()
 
 /* ---------- export ---------- */
-type ExportKind = 'csv' | 'xlsx' | 'nw'
-const exporting = ref<ExportKind | null>(null)
-const stamp = () => new Date().toISOString().slice(0, 10)
-async function doExport(kind: ExportKind): Promise<void> {
-  exporting.value = kind
-  try {
-    if (kind === 'csv') await saveFile(`entries-${stamp()}.csv`, entriesCsv())
-    if (kind === 'xlsx') await saveFile(`financial-tracker-${stamp()}.xlsx`, new Blob([workbookBytes()]))
-    if (kind === 'nw') await saveFile(`net-worth-${stamp()}.csv`, netWorthCsv())
-    toast.add({ severity: 'success', summary: 'Export ready', detail: 'Check your downloads.', life: 2500 })
-  } catch (err) {
-    const e = err as Partial<SaveError>
-    if (e?.code !== 'declined') toast.add({ severity: 'warn', summary: 'Export not saved', detail: e?.message || 'Saving files is not available here.', life: 4000 })
-  } finally {
-    exporting.value = null
-  }
-}
+const { exporting, doExport } = useExport()
 
 /* ---------- import ---------- */
 type ImportKind = 'entries' | 'cashflow' | 'networth'
