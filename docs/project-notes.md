@@ -126,3 +126,4 @@ saved in the browser only.
 - Prefer long, descriptive variable names over short abbreviations, including for services
   (`financeService: FinanceService`, not `fs`). Devin, 2026-10-24. Apply to new and touched code.
 - Branch names are plain and descriptive (`ui-review-fixes`), never `claude/...`.
+- No pull requests: push finished work straight to main (Devin, 2026-10-27).
