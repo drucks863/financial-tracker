@@ -13,7 +13,7 @@ Monorepo:
 
 ## Run it
 
-Needs JDK 21 and Node 22.
+Needs JDK 17 and Node 22. Gradle runs on JDK 17 even if `JAVA_HOME` is older, and downloads one if none is installed.
 
 **One jar (UI + API).** Builds the Vue app, bundles it into the Spring Boot jar, and serves
 both on http://localhost:8080:

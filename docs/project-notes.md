@@ -47,7 +47,7 @@ docs/       these notes, the todo list, architecture
 
 ## Backend (started 2026-10-24)
 
-- Spring Boot 4.1, Kotlin 2.3, Java 21, Jackson 3, JUnit 5. Gradle wrapper at the repo root,
+- Spring Boot 4.1, Kotlin 2.3, Java 17 (toolchain, and Gradle itself via `gradle/gradle-daemon-jvm.properties`), Jackson 3, JUnit 5. Gradle wrapper at the repo root,
   backend is the `:backend` module. Package `app.financetracker`.
 - Packages follow **model / controller / service / repository** (Devin, 2026-10-24):
   - `model/`: data classes grouped by topic, one file each (`Category`, `Entry`, `NetWorth`, `Plan`,

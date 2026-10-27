@@ -10,7 +10,9 @@ plugins {
 group = "app.financetracker"
 version = "0.1.0"
 
-java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+// Java 17 (Spring Boot 4's minimum). Gradle finds an installed JDK 17, or downloads one
+// (see the foojay plugin in settings.gradle.kts), whatever JAVA_HOME points at.
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
 
 repositories { mavenCentral() }
 
@@ -26,7 +28,7 @@ dependencies {
 
 kotlin {
     compilerOptions {
-        jvmTarget = JvmTarget.JVM_21
+        jvmTarget = JvmTarget.JVM_17
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
     }
 }
