@@ -96,3 +96,16 @@ tasks.register<JavaExec>("dynamoDbLocal") {
     mainClass = "com.amazonaws.services.dynamodbv2.local.main.ServerRunner"
     args("-inMemory", "-port", "8000")
 }
+
+/* ---------- Elastic Beanstalk ---------- */
+
+// `./gradlew :backend:beanstalkBundle` builds build/distributions/financial-tracker-beanstalk.zip:
+// the jar (UI included), the Procfile and .ebextensions from deploy/beanstalk. Upload it as an
+// application version; nothing here deploys or talks to AWS by itself.
+tasks.register<Zip>("beanstalkBundle") {
+    group = "distribution"
+    description = "Zips the jar with the Beanstalk Procfile and .ebextensions"
+    from(tasks.bootJar) { rename { "financial-tracker.jar" } }
+    from(rootProject.layout.projectDirectory.dir("deploy/beanstalk"))
+    archiveFileName = "financial-tracker-beanstalk.zip"
+}

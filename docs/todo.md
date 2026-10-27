@@ -30,10 +30,14 @@
 - [x] Server-side loan amortization, budget setup figures, month totals, net worth series (tested)
 - [x] Frontend loads from and saves to the API when it's running; falls back to local data otherwise
 - [ ] Devin reviews the backend branch
-- [ ] DynamoDB tables and repository layer (local DynamoDB for dev/tests)
-- [ ] Login: Google SSO via Spring Security OAuth2, replacing the `CurrentUser` bean
+- [x] DynamoDB repository layer (one table), tested on DynamoDB Local; `local-dynamodb` profile for dev
+- [x] Login: Google sign-in via Spring Security OAuth2 with an allowed-email list; avatar shows the Google photo, Sign out
+- [x] Beanstalk bundle task, `.ebextensions`, IAM policy, `docs/deploy.md` (nothing deployed)
 - [ ] Frontend reads server-side summaries instead of recomputing (optional; keep the math in one place)
 - [ ] CI: GitHub Actions running backend tests and frontend typecheck
 - [ ] Move import/export parsing server-side (Apache POI) and keep the UI as the front end for it
 - [ ] Recurring subscriptions feeding the Subscriptions category automatically
-- [ ] Deploy: Elastic Beanstalk + S3 for exports/backups
+- [ ] Devin: go-ahead for AWS and which account; domain name for HTTPS; Google OAuth client (see `docs/deploy.md`)
+- [ ] Deploy: create the table, Beanstalk environment, env vars; first sign-in and import the real sheets
+- [ ] S3 for exports/backups
+- [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)

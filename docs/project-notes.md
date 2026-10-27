@@ -33,6 +33,12 @@ monthly and yearly averages, and net worth.
 - JSON field names stay as they are in `frontend/src/types.ts` (`ym`, `k401`...) so the API and the
   store keep matching; renaming one means renaming it on both sides.
 
+## AWS
+
+- **No AWS actions of any kind until Devin says so** (Devin, 2026-10-27). Never use his own AWS
+  credentials; deploying goes to the company account, set up when he's ready. Code and config in the
+  repo are fine; running anything against AWS is not. Plan and commands: `docs/deploy.md`.
+
 ## Git
 
 - Branch names are short and descriptive (e.g. `initial-backend`), with no `claude/` prefix (Devin, 2026-10-24).
@@ -42,7 +48,8 @@ monthly and yearly averages, and net worth.
 ```
 frontend/   Vue 3 + PrimeVue app (TypeScript, Vite)
 backend/    Spring Boot 4 + Kotlin API (Gradle module `:backend`)
-docs/       these notes, the todo list, architecture
+deploy/     Beanstalk bundle files and the IAM policy for the table
+docs/       these notes, the todo list, deploy.md
 ```
 
 ## Backend (started 2026-10-24)
@@ -57,17 +64,33 @@ docs/       these notes, the todo list, architecture
   - `service/`: `FinanceService` (the rules: category renames cascade to entries, categories and
     subcategories in use can't be removed, saving an entry creates its category), the math
     (`LoanMath`, `PlanCalculator`, `Summaries`) and `CurrentUser`.
-  - `repository/`: `FinanceRepository` (plain per-user storage), the in-memory implementation, and its config.
-- **Storage is mocked**: `InMemoryFinanceRepository`, seeded per user from `finance.seed`
-  (default: the frontend's `seed.sample.json`, copied into the jar at build time). `bootRun` uses
-  `seed.local.json` when it exists. Data is lost on restart. DynamoDB replaces the repository bean in
-  `RepositoryConfig`; the interface is shaped for one table (PK user, SK kind#id).
-- **Auth seam**: `service/CurrentUser`. Every call is keyed by its id; `LocalUser` returns `"local"`.
-  Google SSO replaces that one bean (use the OIDC `sub`).
+  - `repository/`: `FinanceRepository` (plain per-user storage), the in-memory and DynamoDB implementations, and their config.
+  - `security/`: the two security setups (no login / Google sign-in) and `GoogleUser`.
+- **Storage** (`finance.storage`): `memory` (default; `InMemoryFinanceRepository`, lost on restart) or
+  `dynamodb` (`DynamoDbFinanceRepository`, added 2026-10-27). A new user starts from `finance.seed`
+  (default: the frontend's `seed.sample.json`, copied into the jar at build time); `bootRun` uses
+  `seed.local.json` when it exists.
+- **DynamoDB**: one table (`financial-tracker`), `pk` = `USER#<id>`, `sk` = `CATEGORY#id`, `ENTRY#id`,
+  `ACCOUNT#id`, `SNAPSHOT#date`, `SUBSCRIPTION#id`, `PLAN`, `META` (the sample flag; a user without it
+  gets seeded). `body` holds the model as the same JSON the API sends. Entries are keyed by id only and
+  date-filtered after the query (a few thousand per person), so deletes don't need the date.
+  Tests run against DynamoDB Local in-process (`com.amazonaws:DynamoDBLocal`, test scope, no Docker).
+  With `finance.dynamodb.endpoint` set, the app uses dummy credentials and creates the table itself;
+  on AWS the table is created once by hand (`docs/deploy.md`) and reached through the instance role.
+- **Sign-in** (`finance.auth.mode`, added 2026-10-27): `none` (default; `LocalUser`, id `"local"`) or
+  `google` (Spring Security OAuth2 login, `GoogleUser`, data keyed by the Google `sub`). Only verified
+  emails in `finance.auth.allowed-emails` get in; the app won't start in google mode without the list.
+  `/api/**` answers 401 when signed out (the UI then goes to `/oauth2/authorization/google`), pages
+  redirect to Google, `/actuator/health` stays open. Session is a server-side cookie; writes need the
+  `XSRF-TOKEN` cookie echoed as `X-XSRF-TOKEN` (`lib/api.ts` does this). `GET /api/me` gives name,
+  email, photo for the avatar; the profile shows them with a Sign out button.
+- **Profiles**: `local-dynamodb` (DynamoDB Local on :8000, `./gradlew :backend:dynamoDbLocal`) and
+  `aws` (Beanstalk: port 5000, forwarded headers, secure cookie, dynamodb, google; secrets from env vars).
 - Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),
   `PlanCalculator` (budget setup figures), `Summaries` (month totals, net worth series). The frontend
   still computes its own; keep the two in step until it reads these.
-- Health check for Beanstalk: `/actuator/health`.
+- Health check for Beanstalk: `/actuator/health`. `./gradlew :backend:beanstalkBundle` zips the jar with
+  `deploy/beanstalk` (Procfile, `.ebextensions`). See `docs/deploy.md`.
 - In this sandbox Maven Central rate-limits Gradle; a user-level init script points it at Google's
   Maven mirror. That's environment-only, not in the repo.
 
@@ -82,6 +105,7 @@ docs/       these notes, the todo list, architecture
 | `/subscriptions` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
 | `/plan` | `GET`, `PUT`, `GET /summary`, `GET /loans/{id}/schedule` |
 | `/summary/months?year=` | per-month income, expenses, essentials, net |
+| `/me` | `GET` who is signed in (`name`, `email`, `pictureUrl`, `signInRequired`) |
 
 PUT is an upsert by the client's id, so the UI can save optimistically with ids it generates.
 
@@ -124,8 +148,9 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
 
 - Opened from the user's avatar at the bottom of the sidebar (last tab on phones), like an
   account page; it is not in the main nav. Renamed from "My numbers" (Devin, 2026-10-24).
-- Google SSO is planned: the avatar will be the Google photo and the name the Google account
-  name. Until then the name is typed at the top of the page and the avatar shows initials.
+- With Google sign-in on, the avatar is the Google photo and the name the Google account name, with a
+  Sign out button on the profile. Without sign-in (local runs, preview) the name is typed at the top of
+  the page and the avatar shows initials.
 - The profile is tabbed: Budget setup (the plan; was "Pay & bills"), Categories, Subscriptions, Import & export
   (also the prototype reset). There is no separate Data page; `#data` links open Import & export.
 - Fields other screens read carry a small link marker (`components/UsedBy.vue`); hover or tap
