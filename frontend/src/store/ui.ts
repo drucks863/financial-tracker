@@ -1,7 +1,7 @@
 import { reactive, computed } from 'vue'
 import type { Entry } from '../types'
 import { state, categoryTotals } from './finance'
-import { series, otherColor } from '../lib/chart-colors'
+import { categorySeries, otherColor, CATEGORY_COLOR_COUNT } from '../lib/chart-colors'
 import { localYm } from '../lib/format'
 
 // View state shared across screens (not persisted).
@@ -37,7 +37,7 @@ export function openEntry(entry: Entry | null = null): void {
   ui.entryDialog.open = true
 }
 
-// Expense categories ranked by all-time spend. The top seven keep a fixed
+// Expense categories ranked by all-time spend. The top five keep a fixed
 // palette slot everywhere in the app; the rest share the "Other" grey.
 export const categoryRank = computed<string[]>(() => {
   const totals = categoryTotals('expense', () => true)
@@ -47,6 +47,6 @@ export const categoryRank = computed<string[]>(() => {
 })
 
 export function categoryColor(name: string, dark: boolean): string {
-  const i = categoryRank.value.indexOf(name)
-  return i >= 0 && i < 7 ? series(i, dark) : otherColor(dark)
+  const rankIndex = categoryRank.value.indexOf(name)
+  return rankIndex >= 0 && rankIndex < CATEGORY_COLOR_COUNT ? categorySeries(rankIndex, dark) : otherColor(dark)
 }

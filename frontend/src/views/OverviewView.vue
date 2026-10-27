@@ -9,7 +9,7 @@ import BaseChart from '../components/BaseChart.vue'
 import { ui, openEntry, categoryColor, categoryRank } from '../store/ui'
 import { state, monthTotals, avgNonZero, categoryTotals, netWorthSeries, yearsAvailable, findCategory } from '../store/finance'
 import { money, money2, moneyCompact, signedMoney, pct, MONTHS, MONTHS_LONG, shortDate, dayLabel as day } from '../lib/format'
-import { series, otherColor, ROLE } from '../lib/chart-colors'
+import { series, otherColor, ROLE, CATEGORY_COLOR_COUNT } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
 import { useWidgetOrder } from '../lib/widget-order'
 import { useExport } from '../lib/use-export'
@@ -195,7 +195,7 @@ const flowChart = computed<ChartBuilder>(() => {
   })
 })
 
-const topCats = computed(() => categoryRank.value.slice(0, 6))
+const topCats = computed(() => categoryRank.value.slice(0, CATEGORY_COLOR_COUNT))
 const CATCH_ALL_KEY = '\u0000rest'
 const catchAllLabel = computed(() => (topCats.value.includes('Other') ? 'Everything else' : 'Other'))
 const spendChart = computed<ChartBuilder>(() => {
@@ -265,10 +265,19 @@ const spend = computed(() =>
 )
 const spendTotal = computed(() => spend.value.reduce((a, c) => a + c.total, 0))
 const MIX_TOP = 4
+// Biggest categories this period. One outside the colored top five shares the Other grey,
+// so its dot is drawn as a ring to tell it apart from the Other row.
 const mix = computed(() => {
-  const top = spend.value.slice(0, MIX_TOP).map((c) => ({ name: c.name, total: c.total, color: categoryColor(c.name, isDark.value) }))
-  const rest = spend.value.slice(MIX_TOP).reduce((a, c) => a + c.total, 0)
-  return rest > 0 ? [...top, { name: `Other (${spend.value.length - MIX_TOP})`, total: rest, color: otherColor(isDark.value) }] : top
+  const coloredCategories = new Set(categoryRank.value.slice(0, CATEGORY_COLOR_COUNT))
+  const top = spend.value.slice(0, MIX_TOP).map((category) => ({
+    name: category.name,
+    total: category.total,
+    color: categoryColor(category.name, isDark.value),
+    sharesOtherColor: !coloredCategories.has(category.name)
+  }))
+  const remainingTotal = spend.value.slice(MIX_TOP).reduce((sum, category) => sum + category.total, 0)
+  const otherRow = { name: `Other (${spend.value.length - MIX_TOP})`, total: remainingTotal, color: otherColor(isDark.value), sharesOtherColor: false }
+  return remainingTotal > 0 ? [...top, otherRow] : top
 })
 const essentials = computed(() => spend.value.filter((c) => c.essential).reduce((a, c) => a + c.total, 0))
 
@@ -281,7 +290,7 @@ const planRows = computed(() => {
   const c = current.value
   const budget = Math.max(0, n.afterHousing) * k
   return [
-    { id: 'income', label: 'Income', note: 'vs planned take-home', actual: c.income, plan: n.takeHome * k, upIsGood: true },
+    { id: 'income', label: 'Income', note: 'vs take-home pay', actual: c.income, plan: n.takeHome * k, upIsGood: true },
     { id: 'housing', label: 'Rent and utilities', note: 'vs your share', actual: essentials.value, plan: (n.housingMine + n.loanPayments) * k, upIsGood: false },
     { id: 'other', label: 'Everything else', note: 'vs what’s left after housing', actual: spendTotal.value - essentials.value, plan: budget, upIsGood: false }
   ]
@@ -513,7 +522,7 @@ const pageItems = computed(() => [
           </div>
           <ul class="mix-list">
             <li v-for="s in mix" :key="s.name">
-              <i class="dot" :style="{ background: s.color }"></i>
+              <i class="dot" :style="s.sharesOtherColor ? { boxShadow: `inset 0 0 0 2px ${s.color}` } : { background: s.color }"></i>
               <span class="cat-name">{{ s.name }} <span class="muted">{{ pct(s.total / spendTotal) }}</span></span>
               <span class="num">{{ money(s.total) }}</span>
             </li>
@@ -555,7 +564,7 @@ const pageItems = computed(() => [
       </section>
 
       <!-- Plan check -->
-      <section class="panel plan" aria-labelledby="plan-title" v-bind="widget('plan')">
+      <section class="panel plan span-2" aria-labelledby="plan-title" v-bind="widget('plan')">
         <button
           type="button"
           class="grip"
@@ -577,7 +586,7 @@ const pageItems = computed(() => [
           <li v-for="r in planRows" :key="r.id">
             <div class="plan-top">
               <span>{{ r.label }} <small class="muted">{{ r.note }}</small></span>
-              <span class="num"><strong>{{ money(r.actual) }}</strong> <span class="muted">/ {{ money(r.plan) }}</span></span>
+              <span class="num plan-amounts"><strong>{{ money(r.actual) }}</strong> <span class="muted">/ {{ money(r.plan) }}</span></span>
             </div>
             <div class="meter" role="img" :aria-label="`${pct(r.ratio)} of plan`">
               <span :class="r.good ? 'good' : 'bad'" :style="{ width: `${Math.min(100, r.ratio * 100)}%` }"></span>
@@ -809,6 +818,8 @@ const pageItems = computed(() => [
   .widgets {
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
     align-items: start;
+    /* Backfill a half-width hole when a full-width widget is dragged between two halves. */
+    grid-auto-flow: row dense;
   }
   .widgets > .span-2 {
     grid-column: 1 / -1;
@@ -982,14 +993,35 @@ const pageItems = computed(() => [
 }
 .plan-top {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
+  gap: 2px 8px;
   font-size: 0.875rem;
   margin-bottom: 6px;
 }
 .plan-top small {
   font-size: 0.75rem;
+}
+/* Amounts never break mid-number; on a narrow screen they drop to their own line. */
+.plan-amounts {
+  margin-left: auto;
+  white-space: nowrap;
+}
+/* Full width on desktop: the three checks sit side by side, each with its label above
+   the amounts so the meters line up. */
+@media (min-width: 960px) {
+  .plan-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px;
+  }
+  .plan-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .plan-amounts {
+    margin-left: 0;
+  }
 }
 .meter {
   height: 6px;

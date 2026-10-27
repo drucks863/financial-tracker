@@ -7,7 +7,7 @@ import { ui, categoryRank, categoryColor } from '../store/ui'
 import { monthTotals, avgNonZero, yearGrid, yearsAvailable, categoriesOf, findCategory } from '../store/finance'
 import { planned, normName as norm, sameName } from '../store/plan'
 import { money, signedMoney, pct, MONTHS } from '../lib/format'
-import { series, otherColor, ROLE } from '../lib/chart-colors'
+import { series, otherColor, ROLE, categorySeries, CATEGORY_COLOR_COUNT } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
 import type { ChartBuilder } from '../lib/chart-types'
 import type { EntryType } from '../types'
@@ -48,7 +48,7 @@ function planFor(type: EntryType, name: string): number {
 /* ---- stacked spending by category ---- */
 const stacked = computed<ChartBuilder>(() => {
   const grid = yearGrid('expense', ui.year)
-  const top = categoryRank.value.slice(0, 7)
+  const top = categoryRank.value.slice(0, CATEGORY_COLOR_COUNT)
   const rest = Object.keys(grid).filter((n) => !top.includes(n))
   return (dark, c) => ({
     type: 'bar',
@@ -58,7 +58,7 @@ const stacked = computed<ChartBuilder>(() => {
         ...top.map((name, i) => ({
           label: name,
           data: grid[name]?.months || Array(12).fill(0),
-          backgroundColor: series(i, dark),
+          backgroundColor: categorySeries(i, dark),
           borderColor: c.surface,
           borderWidth: { top: 2 },
           borderSkipped: 'start' as const
@@ -95,8 +95,14 @@ const stacked = computed<ChartBuilder>(() => {
     }
   })
 })
-const stackedLegend = computed(() => [...categoryRank.value.slice(0, 7).map((n, i) => ({ name: n, i })), { name: categoryRank.value.slice(0, 7).includes('Other') ? 'Everything else' : 'Other', i: -1 }])
-const otherNames = computed(() => categoryRank.value.slice(7).join(', '))
+const stackedLegend = computed(() => {
+  const topCategories = categoryRank.value.slice(0, CATEGORY_COLOR_COUNT)
+  return [
+    ...topCategories.map((name, rankIndex) => ({ name, rankIndex })),
+    { name: topCategories.includes('Other') ? 'Everything else' : 'Other', rankIndex: -1 }
+  ]
+})
+const otherNames = computed(() => categoryRank.value.slice(CATEGORY_COLOR_COUNT).join(', '))
 
 /* ---- one category over time ---- */
 const trendType = ref<EntryType>('expense')
@@ -249,12 +255,12 @@ const yoy = computed(() => {
         <div class="panel-head">
           <div>
             <h2>Spending by category, {{ ui.year }}</h2>
-            <p class="muted">Your seven biggest categories; the rest are grouped as Other</p>
+            <p class="muted">Your five biggest categories; the rest are grouped as Other</p>
           </div>
         </div>
         <div class="legend legend-top">
-          <span v-for="l in stackedLegend" :key="l.name" :title="l.i < 0 ? otherNames : ''">
-            <i class="swatch" :style="{ background: l.i < 0 ? otherColor(isDark) : series(l.i, isDark) }"></i>{{ l.name }}
+          <span v-for="legendItem in stackedLegend" :key="legendItem.name" :title="legendItem.rankIndex < 0 ? otherNames : ''">
+            <i class="swatch" :style="{ background: legendItem.rankIndex < 0 ? otherColor(isDark) : categorySeries(legendItem.rankIndex, isDark) }"></i>{{ legendItem.name }}
           </span>
           <span v-if="planTakeHome > 0"><i class="swatch line" style="background: var(--ink)"></i>Take-home pay</span>
         </div>

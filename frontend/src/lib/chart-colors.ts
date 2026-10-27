@@ -19,6 +19,14 @@ export const ROLE: Record<'income' | 'expense' | 'cash' | 'investments' | 'other
   debt: 7 // red
 }
 
+// Expense categories skip the income (blue) and expense (orange) slots so a category never
+// looks like the income or expense series, and the red slot, which sits too close to pink
+// and reads as "bad". Five slots, validated in stacked order in both modes; the sixth
+// category and beyond share the "Other" grey.
+const CATEGORY_SLOTS = [2, 3, 4, 5, 6]
+export const CATEGORY_COLOR_COUNT = CATEGORY_SLOTS.length
+export const categorySeries = (rankIndex: number, dark: boolean): string => series(CATEGORY_SLOTS[rankIndex], dark)
+
 export interface ChartChrome {
   ink: string
   ink2: string
