@@ -14,6 +14,9 @@ finance:
   storage: memory
   dynamodb:
     table-name: financial-tracker
+  auth:
+    # none (default; everyone is the local user) or google
+    mode: none
 
 management:
   endpoints:
@@ -29,3 +32,26 @@ finance:
   storage: dynamodb
   dynamodb:
     endpoint: http://localhost:8000
+
+---
+# What runs on Elastic Beanstalk (SPRING_PROFILES_ACTIVE=aws). Everything secret or account-specific
+# comes from environment variables set on the environment; see docs/deploy.md.
+spring.config.activate.on-profile: aws
+server:
+  port: 5000
+  # Behind Beanstalk's load balancer / nginx: trust X-Forwarded-* so redirects use https and the real host
+  forward-headers-strategy: native
+  servlet.session.cookie:
+    secure: true
+    same-site: lax
+finance:
+  storage: dynamodb
+  dynamodb:
+    table-name: ${FINANCE_TABLE_NAME:financial-tracker}
+  auth:
+    mode: google
+    allowed-emails: ${ALLOWED_EMAILS}
+spring.security.oauth2.client.registration.google:
+  client-id: ${GOOGLE_CLIENT_ID}
+  client-secret: ${GOOGLE_CLIENT_SECRET}
+  scope: openid, profile, email

@@ -1,18 +1,19 @@
 package app.financetracker.service
 
-import org.springframework.stereotype.Component
+import app.financetracker.model.UserProfile
 
 /**
- * Who the request is for. Every repository call is keyed by this id, so data is already
- * per person. Google SSO will replace [LocalUser] with an implementation that reads the
- * signed-in principal (its `sub` claim); nothing else should need to change.
+ * Who the request is for. Every repository call is keyed by [id], so data is already per person.
+ * Which implementation runs depends on `finance.auth.mode` (see security/SecurityConfig):
+ * [LocalUser] without a login, GoogleUser with Google sign-in.
  */
-fun interface CurrentUser {
+interface CurrentUser {
     fun id(): String
+    fun profile(): UserProfile
 }
 
-/** No login yet: everyone is the same local user. */
-@Component
+/** No login (local runs, tests): everyone is the same local user. */
 class LocalUser : CurrentUser {
     override fun id() = "local"
+    override fun profile() = UserProfile(name = null, email = null, pictureUrl = null, signInRequired = false)
 }
