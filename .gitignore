@@ -2,3 +2,6 @@
 .idea/
 *.iml
 .vscode/
+.gradle/
+build/
+backend/build/

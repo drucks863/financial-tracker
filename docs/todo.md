@@ -23,11 +23,17 @@
 
 ## Next
 
-- [ ] Backend: Spring Boot + Kotlin skeleton in `backend/` with Gradle, JUnit 5
-- [ ] Gradle task that runs the frontend build and copies it into the jar's static resources
-- [ ] REST API for categories, entries, accounts, snapshots
+- [x] Backend: Spring Boot + Kotlin skeleton in `backend/` with Gradle, JUnit 5
+- [x] Gradle task that runs the frontend build and copies it into the jar's static resources
+- [x] REST API for categories, entries, accounts, snapshots, subscriptions, budget setup
+- [x] Repository interface with in-memory sample data (mock until DynamoDB)
+- [x] Server-side loan amortization, budget setup figures, month totals, net worth series (tested)
+- [x] Frontend loads from and saves to the API when it's running; falls back to local data otherwise
+- [ ] Devin reviews the backend branch
 - [ ] DynamoDB tables and repository layer (local DynamoDB for dev/tests)
-- [ ] Login (Cognito or Spring Security; decide)
+- [ ] Login: Google SSO via Spring Security OAuth2, replacing the `CurrentUser` bean
+- [ ] Frontend reads server-side summaries instead of recomputing (optional; keep the math in one place)
+- [ ] CI: GitHub Actions running backend tests and frontend typecheck
 - [ ] Move import/export parsing server-side (Apache POI) and keep the UI as the front end for it
 - [ ] Recurring subscriptions feeding the Subscriptions category automatically
 - [ ] Deploy: Elastic Beanstalk + S3 for exports/backups

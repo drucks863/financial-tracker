@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --build && vite build",
+    "build:server": "vue-tsc --build && vite build --mode server",
     "build:preview": "vue-tsc --build && vite build --mode preview && node scripts/to-artifact.ts",
     "sample-seed": "node scripts/make-sample-seed.ts",
     "preview": "vite preview",

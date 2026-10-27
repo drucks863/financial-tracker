@@ -40,6 +40,8 @@ export interface Snapshot {
 }
 
 export interface Subscription {
+  /** missing on older data; the store fills it in */
+  id?: string
   service: string
   price: number | null
   category: string

@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: financial-tracker
+
+server:
+  port: 8080
+  # Beanstalk's nginx forwards to 5000 by default; set SERVER_PORT there.
+
+finance:
+  # Each user's in-memory data starts from this file. `./gradlew bootRun` points it at
+  # frontend/src/data/seed.local.json when that (gitignored) file exists.
+  seed: classpath:seed/sample.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
