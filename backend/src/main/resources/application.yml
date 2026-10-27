@@ -7,12 +7,25 @@ server:
   # Beanstalk's nginx forwards to 5000 by default; set SERVER_PORT there.
 
 finance:
-  # Each user's in-memory data starts from this file. `./gradlew bootRun` points it at
+  # A new user's data starts from this file. `./gradlew bootRun` points it at
   # frontend/src/data/seed.local.json when that (gitignored) file exists.
   seed: classpath:seed/sample.json
+  # memory (default; lost on restart) or dynamodb
+  storage: memory
+  dynamodb:
+    table-name: financial-tracker
 
 management:
   endpoints:
     web:
       exposure:
         include: health
+
+---
+# `--spring.profiles.active=local-dynamodb`: DynamoDB Local on port 8000 (see docs/deploy.md).
+# Dummy credentials, so it never touches an AWS account; the table is created on startup.
+spring.config.activate.on-profile: local-dynamodb
+finance:
+  storage: dynamodb
+  dynamodb:
+    endpoint: http://localhost:8000
