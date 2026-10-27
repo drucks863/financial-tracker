@@ -18,8 +18,11 @@ const seedFor = (mode: string) => (mode !== 'server' && existsSync(localSeed) ? 
 export default defineConfig(({ mode }) => ({
   plugins: [vue(), ...(mode === 'preview' ? [viteSingleFile()] : [])],
   resolve: { alias: { '@seed': seedFor(mode) } },
-  // `npm run dev` proxies /api to the Spring Boot API (`./gradlew :backend:bootRun`, port 8080)
-  server: { proxy: { '/api': 'http://localhost:8080' } },
+  // `npm run dev` proxies /api to the Spring Boot API (`./gradlew :backend:bootRun`, port 8080),
+  // and the sign-in paths too, for running the backend with Google sign-in locally
+  server: {
+    proxy: Object.fromEntries(['/api', '/oauth2', '/login', '/logout'].map((path) => [path, 'http://localhost:8080']))
+  },
   build: {
     outDir: mode === 'preview' ? 'dist-preview' : 'dist',
     assetsInlineLimit: mode === 'preview' ? 100_000_000 : 4096,

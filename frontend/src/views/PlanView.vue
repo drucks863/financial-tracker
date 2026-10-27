@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { state } from '../store/finance'
+import { signOut, sync } from '../lib/api'
 import { planned, newDeduction, newSharedCost, newLoan, PAY_FREQUENCIES } from '../store/plan'
 import { money, money2, pct, ymLabel, localYm } from '../lib/format'
 import Tabs from 'primevue/tabs'
@@ -71,8 +72,11 @@ const takeHomeActual = computed<boolean>({
   set: (on) => (p.value.takeHome = on ? Math.round(n.value.paycheck.estTakeHome * 100) / 100 : null)
 })
 
+/** The Google account, when the server runs with sign-in. */
+const googleProfile = computed(() => (sync.profile?.signInRequired ? sync.profile : null))
+
 const initials = computed(() =>
-  (p.value.name || '')
+  (googleProfile.value?.name || p.value.name || '')
     .trim()
     .split(/\s+/)
     .map((w) => w[0] || '')
@@ -111,13 +115,19 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
       <h1 class="sr-only">Financial profile</h1>
       <div class="who">
         <span class="avatar-lg" aria-hidden="true">
-          <template v-if="initials">{{ initials }}</template>
+          <img v-if="googleProfile?.pictureUrl" :src="googleProfile.pictureUrl" alt="" referrerpolicy="no-referrer" />
+          <template v-else-if="initials">{{ initials }}</template>
           <i v-else class="pi pi-user"></i>
         </span>
-        <div class="who-text">
-          <InputText v-model="p.name" placeholder="Your name" aria-label="Your name" class="name-input" />
-          <small class="muted">Your Google name and photo will show here once sign-in is added.</small>
+        <div v-if="googleProfile" class="who-text">
+          <p class="google-name">{{ googleProfile.name || googleProfile.email }}</p>
+          <small class="muted google-email">{{ googleProfile.email }}</small>
         </div>
+        <div v-else class="who-text">
+          <InputText v-model="p.name" placeholder="Your name" aria-label="Your name" class="name-input" />
+          <small class="muted">Your Google name and photo show here when the app runs with sign-in.</small>
+        </div>
+        <Button v-if="googleProfile" class="sign-out" label="Sign out" icon="pi pi-sign-out" text severity="secondary" @click="signOut" />
       </div>
     </header>
 
@@ -413,6 +423,24 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
   font-weight: 700;
   font-size: 1.05rem;
   color: var(--ink);
+  overflow: hidden;
+}
+.avatar-lg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.who-text .google-email {
+  padding-left: 0;
+}
+.google-name {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.sign-out {
+  margin-left: auto;
+  flex: none;
 }
 /* Reads as the account name; looks like an input only on hover or focus. */
 .name-input {

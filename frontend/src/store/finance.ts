@@ -1,7 +1,7 @@
 import { computed, reactive, watch } from 'vue'
 import seed from '@seed'
 import { loanBalanceAt, propertyValueAt } from '../lib/loan'
-import { encodePathPart, loadRemote, send, sync } from '../lib/api'
+import { encodePathPart, loadProfile, loadRemote, send, sync } from '../lib/api'
 import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
 // Single in-memory store. With the API running it loads from and saves to the server (see
@@ -122,6 +122,7 @@ export async function initStore(): Promise<void> {
   if (!remoteData) return
   Object.assign(state, withPlan(remoteData))
   sync.remote = true
+  sync.profile = await loadProfile()
   let planSaveTimer: ReturnType<typeof setTimeout> | undefined
   watch(
     () => state.plan,

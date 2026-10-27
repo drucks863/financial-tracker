@@ -26,14 +26,15 @@ const reload = () => location.reload()
 
 const NAV = VIEWS.filter((v) => !('hidden' in v))
 const me = computed(() => {
-  const name = (state.plan?.name || '').trim()
+  // with Google sign-in, the Google name and photo; otherwise the name typed on the profile
+  const name = (sync.profile?.name || state.plan?.name || '').trim()
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
     .join('')
     .slice(0, 2)
     .toUpperCase()
-  return { name, initials }
+  return { name, initials, pictureUrl: sync.profile?.pictureUrl || null }
 })
 
 const current = ref('overview')
@@ -91,7 +92,8 @@ onMounted(() => {
       </button>
       <button type="button" class="me" :aria-current="current === 'plan' ? 'page' : undefined" :aria-label="`${me.name || 'You'}: financial profile`" @click="go('plan')">
         <span class="avatar" aria-hidden="true">
-          <template v-if="me.initials">{{ me.initials }}</template>
+          <img v-if="me.pictureUrl" :src="me.pictureUrl" alt="" referrerpolicy="no-referrer" />
+          <template v-else-if="me.initials">{{ me.initials }}</template>
           <i v-else class="pi pi-user"></i>
         </span>
         <span class="me-text">
@@ -238,6 +240,12 @@ onMounted(() => {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .avatar .pi {
   font-size: 0.7rem;

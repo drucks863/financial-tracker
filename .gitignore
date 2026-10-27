@@ -5,3 +5,6 @@
 .gradle/
 build/
 backend/build/
+
+# DynamoDB Local writes this next to wherever it runs
+dynamodb-local-metadata.json

@@ -161,3 +161,12 @@ export interface NetWorthPoint {
   total: number
   values: Record<string, number>
 }
+
+/** Who is signed in (GET /api/me). All null when the server runs without a login. */
+export interface UserProfile {
+  name: string | null
+  email: string | null
+  pictureUrl: string | null
+  /** true when the app is behind Google sign-in */
+  signInRequired: boolean
+}

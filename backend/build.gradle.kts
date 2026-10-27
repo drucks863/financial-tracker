@@ -86,3 +86,13 @@ tasks.bootRun {
     if (local.exists()) args("--finance.seed=file:${local.absolutePath}")
 }
 tasks.jar { enabled = false }
+
+// `./gradlew :backend:dynamoDbLocal` runs DynamoDB Local on port 8000, in memory, for
+// `bootRun --args='--spring.profiles.active=local-dynamodb'`. Nothing here talks to AWS.
+tasks.register<JavaExec>("dynamoDbLocal") {
+    group = "application"
+    description = "Runs DynamoDB Local (in memory) on port 8000"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "com.amazonaws.services.dynamodbv2.local.main.ServerRunner"
+    args("-inMemory", "-port", "8000")
+}
