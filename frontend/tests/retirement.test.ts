@@ -1,7 +1,18 @@
 // Run with `npm test`.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { neededAt, project, realRate, retirement, type RetirementInputs } from '../src/lib/retirement.ts'
+import {
+  budgetAt,
+  chanceItLasts,
+  claimFactor,
+  estimateSocialSecurity,
+  estimateWithdrawalTax,
+  neededAt,
+  project,
+  realRate,
+  retirement,
+  type RetirementInputs
+} from '../src/lib/retirement.ts'
 import { applyOverrides, cleanOverrides } from '../src/lib/scenario.ts'
 
 const base: RetirementInputs = {
@@ -12,6 +23,11 @@ const base: RetirementInputs = {
   returnRate: 0.07,
   inflation: 0.03,
   retirementSpending: 50_000,
+  salary: 85_000,
+  volatility: 0,
+  loans: [],
+  healthcareBefore65: 0,
+  withdrawalTax: 0,
   socialSecurity: 0,
   socialSecurityAge: 67,
   targetAge: 65,
@@ -95,4 +111,70 @@ test('overrides apply on top of the real numbers, and matching ones are dropped'
   // junk from storage is ignored
   assert.deepEqual(applyOverrides(real, { k401: Number.NaN, gone: 5 } as never), real)
   assert.deepEqual(cleanOverrides(real, { salary: 90_000, k401: 0.1 }), { k401: 0.1 })
+})
+
+test('Social Security estimate follows the 2026 formula and the claiming age', () => {
+  // $85k for 35 years: average $7,083/mo → 90% of $1,286 + 32% of the rest
+  near(estimateSocialSecurity(85_000, 65, 67), (0.9 * 1286 + 0.32 * (85_000 / 12 - 1286)) * 12, 1)
+  near(claimFactor(62), 0.7, 1e-9)
+  near(claimFactor(70), 1.24, 1e-9)
+  near(claimFactor(67), 1, 1e-9)
+  // fewer working years, a smaller benefit; earnings above the cap don't count
+  assert.ok(estimateSocialSecurity(85_000, 45, 67) < estimateSocialSecurity(85_000, 65, 67))
+  near(estimateSocialSecurity(500_000, 65, 67), estimateSocialSecurity(184_500, 65, 67), 0.01)
+  // null means "estimate it" in the projection
+  assert.ok(retirement({ ...base, socialSecurity: null }).earliestAge! < retirement(base).earliestAge!)
+})
+
+test('the retirement budget: loans stop at payoff, health insurance until 65, Social Security, tax', () => {
+  const inputs = {
+    ...base,
+    inflation: 0,
+    returnRate: 0,
+    retirementSpending: 60_000,
+    loans: [{ monthlyPayment: 1_000, endsAtAge: 58 }],
+    healthcareBefore65: 8_400,
+    withdrawalTax: 0.2
+  }
+  const at55 = budgetAt(inputs, 55, 24_000)
+  assert.equal(at55.loanChange, 0) // still paying, no inflation to shrink it
+  assert.equal(at55.healthcare, 8_400)
+  assert.equal(at55.socialSecurity, 0) // not until 67
+  near(at55.withdrawal, (60_000 + 8_400) / 0.8, 0.01)
+  near(at55.tax, at55.withdrawal - 68_400, 0.01)
+  const at70 = budgetAt(inputs, 70, 24_000)
+  assert.equal(at70.loanChange, -12_000)
+  assert.equal(at70.healthcare, 0)
+  assert.equal(at70.socialSecurity, 24_000)
+  near(at70.withdrawal, (60_000 - 12_000 - 24_000) / 0.8, 0.01)
+  // with inflation, a fixed payment is worth less in today's dollars while it lasts
+  const inflated = budgetAt({ ...inputs, inflation: 0.03 }, 40, 0)
+  near(inflated.loanChange, -(12_000 - 12_000 / Math.pow(1.03, 10)), 0.01)
+})
+
+test('ups and downs: the middle run matches average years, and the chance drops as spending rises', () => {
+  const shaky = { ...base, volatility: 0.15 }
+  const result = retirement(shaky, 0.9)
+  const retireIndex = result.target.years.findIndex((year) => year.age === result.target.retireAge)
+  // the median balance at retirement is close to the average-years balance
+  const median = result.range[retireIndex].median
+  assert.ok(Math.abs(median - result.target.atRetirement) / result.target.atRetirement < 0.15, `${median} vs ${result.target.atRetirement}`)
+  assert.ok(result.range.every((year) => year.low <= year.median && year.median <= year.high))
+  // wanting more certainty means retiring later
+  assert.ok(result.earliestConfident! >= result.earliestAge!)
+  assert.ok(chanceItLasts({ ...shaky, retirementSpending: 90_000 }, 55) < chanceItLasts(shaky, 55))
+  // the same inputs give the same answer
+  assert.equal(chanceItLasts(shaky, 55), chanceItLasts(shaky, 55))
+})
+
+test('tax guess from account names', () => {
+  const guess = estimateWithdrawalTax([
+    { name: 'Roth IRA', balance: 50_000 },
+    { name: 'HSA', balance: 10_000 },
+    { name: 'Taxable', balance: 20_000 },
+    { name: '401k', balance: 20_000 }
+  ])
+  near(guess.rate, (20_000 * 0.05 + 20_000 * 0.12) / 100_000, 0.001)
+  assert.deepEqual(guess.taxFree, ['Roth IRA', 'HSA'])
+  assert.deepEqual(guess.preTax, ['401k'])
 })

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, type WritableComputedRef } from 'vue'
+import { computed, ref, type WritableComputedRef } from 'vue'
 import InputNumber from 'primevue/inputnumber'
+import SelectButton from 'primevue/selectbutton'
 import SimulatorShell from '../components/SimulatorShell.vue'
 import SimField from '../components/SimField.vue'
 import BaseChart from '../components/BaseChart.vue'
 import { useScenario } from '../lib/scenario'
-import { retirement, project, type RetirementInputs } from '../lib/retirement'
+import { retirement, project, budgetAt, estimateSocialSecurity, estimateWithdrawalTax, type RetirementInputs } from '../lib/retirement'
 import { realFigures } from '../store/real-figures'
 import { money, moneyCompact, pct, shortDate, ymLabel } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
@@ -21,18 +22,35 @@ const DEFAULTS = {
   returnRate: 0.07,
   inflation: 0.03,
   salaryGrowth: 0.03,
-  socialSecurityMonthly: 0,
+  volatility: 0.15,
+  confidence: 0.9,
+  healthcareMonthly: 700,
   socialSecurityAge: 67
 }
+
+const thisYear = new Date().getFullYear()
+const taxGuess = computed(() => estimateWithdrawalTax(realFigures.value.investmentAccounts))
+const realLoanPayments = computed(() => realFigures.value.loans.reduce((total, loan) => total + loan.monthlyPayment, 0))
 
 // The starting point: your real numbers (copied as plain numbers, so nothing here can write back).
 function fromReal() {
   const real = realFigures.value
   const recent = real.recent
+  const age = real.age ?? DEFAULTS.age
   return {
-    age: real.age ?? DEFAULTS.age,
+    // In retirement
+    spendingMonthly: Math.round((recent.spending ?? real.takeHomeMonthly) / 10) * 10,
+    loanPaymentsMonthly: Math.round(realLoanPayments.value),
+    healthcareMonthly: DEFAULTS.healthcareMonthly,
+    withdrawalTax: taxGuess.value.rate,
+    socialSecurityMonthly: Math.round(estimateSocialSecurity(real.salary, DEFAULTS.targetAge, DEFAULTS.socialSecurityAge) / 12),
+    socialSecurityAge: DEFAULTS.socialSecurityAge,
+    // You
+    age,
     targetAge: DEFAULTS.targetAge,
     planToAge: DEFAULTS.planToAge,
+    // Saving
+    startBalance: Math.round(real.netWorth?.Investments ?? 0),
     salary: real.salary,
     k401: real.k401,
     match: real.match,
@@ -40,13 +58,11 @@ function fromReal() {
     // what's left over each month after spending, from Cash flow (take-home pay minus expenses)
     otherSavingMonthly: Math.max(0, Math.round((recent.leftOver ?? 0) / 10) * 10),
     salaryGrowth: DEFAULTS.salaryGrowth,
-    startBalance: Math.round(real.netWorth?.Investments ?? 0),
+    // Markets
     returnRate: DEFAULTS.returnRate,
     inflation: DEFAULTS.inflation,
-    // today's spending carries into retirement; without entries, spending all of take-home pay
-    spendingMonthly: Math.round((recent.spending ?? real.takeHomeMonthly) / 10) * 10,
-    socialSecurityMonthly: DEFAULTS.socialSecurityMonthly,
-    socialSecurityAge: DEFAULTS.socialSecurityAge
+    volatility: DEFAULTS.volatility,
+    confidence: DEFAULTS.confidence
   }
 }
 type Inputs = ReturnType<typeof fromReal>
@@ -54,39 +70,99 @@ type Key = keyof Inputs & string
 
 const scenario = useScenario<Inputs>('retirement', fromReal)
 
-const toEngine = (values: Inputs): RetirementInputs => ({
-  currentAge: values.age,
-  startBalance: values.startBalance,
-  yearlySaving: values.salary * (values.k401 + values.match) + values.deductionsYearly + values.otherSavingMonthly * 12,
-  salaryGrowth: values.salaryGrowth,
-  returnRate: values.returnRate,
-  inflation: values.inflation,
-  retirementSpending: values.spendingMonthly * 12,
-  socialSecurity: values.socialSecurityMonthly * 12,
-  socialSecurityAge: values.socialSecurityAge,
-  targetAge: values.targetAge,
-  planToAge: values.planToAge
-})
+// Social Security follows your salary and retirement age until you type your own figure.
+const socialSecurityTyped = computed(() => scenario.changed('socialSecurityMonthly'))
+const socialSecurityEstimate = computed(() =>
+  Math.round(estimateSocialSecurity(scenario.inputs.value.salary, Math.min(scenario.inputs.value.targetAge, 90), scenario.inputs.value.socialSecurityAge) / 12)
+)
 
-const engine = computed(() => toEngine(scenario.inputs.value))
-const result = computed(() => retirement(engine.value))
-const realEngine = computed(() => toEngine(scenario.real.value))
-const realResult = computed(() => retirement(realEngine.value))
+function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInputs {
+  // loans keep their real payoff dates; a changed payment total scales them all
+  const loanScale = realLoanPayments.value > 0 ? values.loanPaymentsMonthly / realLoanPayments.value : 0
+  return {
+    currentAge: values.age,
+    startBalance: values.startBalance,
+    yearlySaving: values.salary * (values.k401 + values.match) + values.deductionsYearly + values.otherSavingMonthly * 12,
+    salaryGrowth: values.salaryGrowth,
+    salary: values.salary,
+    returnRate: values.returnRate,
+    inflation: values.inflation,
+    volatility: values.volatility,
+    retirementSpending: values.spendingMonthly * 12,
+    loans: realFigures.value.loans.map((loan) => ({
+      monthlyPayment: loan.monthlyPayment * loanScale,
+      endsAtAge: values.age + (+loan.payoff.slice(0, 4) - thisYear)
+    })),
+    healthcareBefore65: values.healthcareMonthly * 12,
+    withdrawalTax: values.withdrawalTax,
+    socialSecurity: typedSocialSecurity ? values.socialSecurityMonthly * 12 : null,
+    socialSecurityAge: values.socialSecurityAge,
+    targetAge: values.targetAge,
+    planToAge: values.planToAge
+  }
+}
+
+const values = computed(() => scenario.inputs.value)
+const engine = computed(() => toEngine(values.value, socialSecurityTyped.value))
+const result = computed(() => retirement(engine.value, values.value.confidence))
+const realEngine = computed(() => toEngine(scenario.real.value, false))
+const realResult = computed(() => retirement(realEngine.value, scenario.real.value.confidence))
 const changed = computed(() => scenario.changedCount.value > 0)
+const target = computed(() => result.value.target)
+const varied = computed(() => values.value.volatility > 0)
 
-const thisYear = new Date().getFullYear()
-const yearAt = (age: number) => thisYear + Math.round(age - scenario.inputs.value.age)
+/* ---- today's or future dollars ---- */
 
+const dollars = ref<'today' | 'future'>('today')
+const DOLLARS = [
+  { label: 'Today’s $', value: 'today' },
+  { label: 'Future $', value: 'future' }
+]
+const yearAt = (age: number) => thisYear + Math.round(age - values.value.age)
+/** today's dollars at `age` → the dollars of that year */
+const inflate = (amount: number, age: number) => amount * Math.pow(1 + values.value.inflation, Math.max(0, age - values.value.age))
+const shown = (amount: number, age: number) => (dollars.value === 'future' ? inflate(amount, age) : amount)
+const dollarNote = computed(() => (dollars.value === 'future' ? 'dollars of each year' : 'today’s dollars'))
+
+/* ---- results ---- */
+
+const headline = computed(() => (varied.value ? result.value.earliestConfident : result.value.earliestAge))
+const realHeadline = computed(() => (varied.value ? realResult.value.earliestConfident : realResult.value.earliestAge))
 /** How the earliest age compares with your real numbers, once something has changed. */
 const versusReal = computed(() => {
-  const now = result.value.earliestAge
-  const before = realResult.value.earliestAge
+  const now = headline.value
+  const before = realHeadline.value
   if (!changed.value || now === null || before === null || now === before) return null
   const years = Math.abs(now - before)
   return `${years} ${years === 1 ? 'year' : 'years'} ${now < before ? 'sooner' : 'later'} than your real numbers`
 })
-const target = computed(() => result.value.target)
-const shortfall = computed(() => Math.max(0, result.value.neededAtTarget - target.value.atRetirement))
+const onTrack = computed(() => result.value.chanceAtTarget >= values.value.confidence - 1e-9)
+
+// The retirement budget, monthly: the first year, and once Social Security starts if that's later.
+const budgetColumns = computed(() => {
+  const retireAge = target.value.retireAge
+  const socialSecurity = result.value.socialSecurityAtTarget
+  const ages = [retireAge]
+  const later = Math.max(values.value.socialSecurityAge, 65)
+  if (later > retireAge && later <= values.value.planToAge) ages.push(later)
+  return ages.map((age) => ({ age, budget: budgetAt(engine.value, age, socialSecurity) }))
+})
+const budgetRows = computed(() => {
+  const monthly = (amount: number, age: number) => shown(amount, age) / 12
+  const columns = budgetColumns.value
+  const any = (pick: (budget: (typeof columns)[number]['budget']) => number) => columns.some((column) => Math.abs(pick(column.budget)) > 0.5)
+  return [
+    { label: 'Spending target', pick: (b: (typeof columns)[number]['budget']) => b.target, show: true },
+    { label: 'Loan payments gone or smaller', pick: (b: (typeof columns)[number]['budget']) => b.loanChange, show: any((b) => b.loanChange) },
+    { label: 'Health insurance until 65', pick: (b: (typeof columns)[number]['budget']) => b.healthcare, show: any((b) => b.healthcare) },
+    { label: 'Social Security', pick: (b: (typeof columns)[number]['budget']) => -b.socialSecurity, show: any((b) => b.socialSecurity) },
+    { label: 'Tax on withdrawals', pick: (b: (typeof columns)[number]['budget']) => b.tax, show: any((b) => b.tax) },
+    { label: 'Taken from investments', pick: (b: (typeof columns)[number]['budget']) => b.withdrawal, show: true, total: true }
+  ]
+    .filter((row) => row.show)
+    .map((row) => ({ label: row.label, total: !!row.total, cells: columns.map((column) => monthly(row.pick(column.budget), column.age)) }))
+})
+const signedMonthly = (amount: number) => (amount < -0.5 ? `−${money(-amount)}` : money(amount))
 
 /* ---- inputs ---- */
 
@@ -100,14 +176,29 @@ interface FieldSpec {
   hint?: () => string | undefined
   min?: number
   max?: number
+  hidden?: () => boolean
 }
 
 const net = computed(() => realFigures.value.netWorth)
 const recent = computed(() => realFigures.value.recent)
 const recentSource = () =>
   recent.value.months ? `Cash flow, ${recent.value.months}-month average${recent.value.from ? ` since ${ymLabel(recent.value.from)}` : ''}` : 'your take-home pay'
+const futureMonthly = (key: 'spendingMonthly' | 'healthcareMonthly') =>
+  `About ${money(inflate(values.value[key], target.value.retireAge))} a month in ${yearAt(target.value.retireAge)} dollars.`
+const loanList = () =>
+  realFigures.value.loans.map((loan) => `${loan.name} ends ${ymLabel(loan.payoff)} (age ${values.value.age + (+loan.payoff.slice(0, 4) - thisYear)})`).join(' · ')
+const taxSource = () => (realFigures.value.investmentAccounts.length ? 'your Net worth account names' : undefined)
+const taxHint = () => {
+  const guess = taxGuess.value
+  const parts = [
+    guess.taxFree.length ? `tax-free: ${guess.taxFree.join(', ')}` : '',
+    guess.taxable.length ? `gains only: ${guess.taxable.join(', ')}` : '',
+    guess.preTax.length ? `pre-tax: ${guess.preTax.join(', ')}` : ''
+  ].filter(Boolean)
+  return parts.length ? `Guessed from ${parts.join('; ')}. A Roth 401k counts as tax-free.` : 'Roth and HSA money comes out tax-free; pre-tax 401k and IRA money is taxed.'
+}
 
-const GROUPS: { title: string; note?: string; fields: FieldSpec[] }[] = [
+const GROUPS: { title: string; fields: FieldSpec[] }[] = [
   {
     title: 'You',
     fields: [
@@ -139,97 +230,166 @@ const GROUPS: { title: string; note?: string; fields: FieldSpec[] }[] = [
   {
     title: 'Markets',
     fields: [
-      { key: 'returnRate', label: 'Investment return, yearly', kind: 'percent', min: -10, max: 20, hint: () => 'Before inflation. 7% is a common long-run stock-heavy guess.' },
-      { key: 'inflation', label: 'Inflation, yearly', kind: 'percent', min: 0, max: 15, hint: () => 'Results are shown in today’s dollars.' }
+      { key: 'returnRate', label: 'Investment return, average year', kind: 'percent', min: -10, max: 20, hint: () => 'Before inflation. 7% is a common long-run guess for a stock-heavy mix.' },
+      { key: 'inflation', label: 'Inflation, yearly', kind: 'percent', min: 0, max: 15 },
+      { key: 'volatility', label: 'Ups and downs (volatility)', kind: 'percent', min: 0, max: 40, hint: () => 'How much a year swings. ~15% for mostly stocks, ~10% for a 60/40 mix. 0 turns it off.' },
+      { key: 'confidence', label: 'Chance the money should last', kind: 'percent', min: 50, max: 99, hint: () => 'The earliest age is the first one that clears this.' }
     ]
   },
   {
     title: 'In retirement',
     fields: [
-      { key: 'spendingMonthly', label: 'Spending a month, today’s dollars', kind: 'money', source: recentSource, hint: () => 'Rent and loan payments included; lower it if they’ll be gone.' },
-      { key: 'socialSecurityMonthly', label: 'Social Security a month', kind: 'money', hint: () => 'Left out by default. Your estimate is on ssa.gov.' },
-      { key: 'socialSecurityAge', label: 'Social Security starts at', kind: 'age', min: 62, max: 70 }
+      { key: 'spendingMonthly', label: 'Spending target a month, today’s dollars', kind: 'money', source: recentSource, hint: () => futureMonthly('spendingMonthly') },
+      {
+        key: 'loanPaymentsMonthly',
+        label: 'Loan payments in that spending, a month',
+        kind: 'money',
+        source: () => 'your profile’s loans',
+        hint: () => `They stop when paid off: ${loanList()}. Set 0 if your spending doesn’t include them.`,
+        hidden: () => !realFigures.value.loans.length
+      },
+      { key: 'healthcareMonthly', label: 'Health insurance before 65, a month', kind: 'money', hint: () => `Only if you retire before Medicare. ${futureMonthly('healthcareMonthly')}` },
+      { key: 'withdrawalTax', label: 'Tax on withdrawals', kind: 'percent', max: 50, source: taxSource, hint: taxHint },
+      {
+        key: 'socialSecurityMonthly',
+        label: 'Social Security a month, today’s dollars',
+        kind: 'money',
+        hint: () =>
+          socialSecurityTyped.value
+            ? 'Your figure. Get yours at ssa.gov (my Social Security).'
+            : `Rough estimate from your salary, working until ${target.value.retireAge}, claimed at ${values.value.socialSecurityAge}. Get yours at ssa.gov.`
+      },
+      { key: 'socialSecurityAge', label: 'Social Security starts at', kind: 'age', min: 62, max: 70, hint: () => 'Claiming at 62 pays 30% less than at 67; waiting to 70 pays 24% more.' }
     ]
   }
 ]
 
-// Percents are stored 0–1 and edited as 0–100.
+// Percents are stored 0–1 and edited as 0–100. Social Security shows the live estimate until you type your own.
 const models = Object.fromEntries(
   GROUPS.flatMap((group) => group.fields).map((spec) => {
     const raw = scenario.field(spec.key)
     const model: WritableComputedRef<number | null> =
       spec.kind === 'percent'
         ? computed({ get: () => Math.round(raw.value * 10000) / 100, set: (value) => (raw.value = value === null ? NaN : value / 100) })
-        : computed({ get: () => raw.value, set: (value) => (raw.value = value === null ? NaN : value) })
+        : spec.key === 'socialSecurityMonthly'
+          ? computed({
+              get: () => (socialSecurityTyped.value ? raw.value : socialSecurityEstimate.value),
+              set: (value) => (raw.value = value === null ? NaN : value)
+            })
+          : computed({ get: () => raw.value, set: (value) => (raw.value = value === null ? NaN : value) })
     return [spec.key, model]
   })
 ) as Record<Key, WritableComputedRef<number | null>>
 
 const realText = (spec: FieldSpec) => {
-  const value = scenario.real.value[spec.key]
+  const value = spec.key === 'socialSecurityMonthly' ? socialSecurityEstimate.value : scenario.real.value[spec.key]
   return spec.kind === 'money' ? money(value) : spec.kind === 'percent' ? pct(value) : String(value)
 }
+const realSource = (spec: FieldSpec) => (spec.key === 'socialSecurityMonthly' ? 'the estimate' : spec.source?.())
 const inputProps = (spec: FieldSpec) =>
   spec.kind === 'money'
     ? { mode: 'currency', currency: 'USD', locale: 'en-US', maxFractionDigits: 0, min: 0 }
     : spec.kind === 'percent'
-      ? { suffix: '%', maxFractionDigits: 2, min: spec.min ?? 0, max: spec.max, step: 0.5, showButtons: false }
+      ? { suffix: '%', maxFractionDigits: 2, min: spec.min ?? 0, max: spec.max }
       : { useGrouping: false, min: spec.min, max: spec.max }
 
 /* ---- chart ---- */
 
+/** Rounds up to 1, 2 or 5 times a power of ten, for a tidy axis top. */
+function niceCeiling(value: number): number {
+  const power = Math.pow(10, Math.floor(Math.log10(value)))
+  return ([1, 2, 5, 10].find((step) => step * power >= value) ?? 10) * power
+}
+
 const chart = computed<ChartBuilder>(() => {
   const mine = target.value.years
+  const range = result.value.range
   const real = changed.value ? project(realEngine.value, realEngine.value.targetAge).years : null
   const retireIndex = mine.findIndex((year) => year.age === target.value.retireAge)
-  return (dark, colors) => ({
-    type: 'line',
-    data: {
-      labels: mine.map((year) => String(year.age)),
-      datasets: [
-        {
-          label: changed.value ? 'With your changes' : 'Invested',
-          data: mine.map((year) => year.balance),
-          borderColor: series(ROLE.investments, dark),
-          backgroundColor: series(ROLE.investments, dark) + (dark ? '33' : '22'),
-          borderWidth: 2,
-          fill: 'origin' as const,
-          tension: 0.25,
-          pointRadius: mine.map((_, index) => (index === retireIndex ? 5 : 0)),
-          pointHoverRadius: 5
-        },
-        ...(real
-          ? [
-              {
-                label: 'Your real numbers',
-                data: mine.map((year) => real.find((point) => point.age === year.age)?.balance ?? null),
-                borderColor: colors.muted,
-                backgroundColor: colors.muted,
-                borderWidth: 1.5,
-                borderDash: [5, 4],
-                fill: false,
-                tension: 0.25,
-                pointRadius: 0,
-                pointHoverRadius: 4
+  const showRange = varied.value
+  // Good-years runs compound to huge numbers late in life; cap the axis so the average line stays readable.
+  const averageTop = Math.max(...mine.map((year) => shown(year.balance, year.age)), ...(real ?? []).map((year) => shown(year.balance, year.age)), 1)
+  const yMax = showRange ? niceCeiling(averageTop * 1.6) : undefined
+  return (dark, colors) => {
+    const blue = series(ROLE.investments, dark)
+    return {
+      type: 'line',
+      data: {
+        labels: mine.map((year) => String(year.age)),
+        datasets: [
+          ...(showRange
+            ? [
+                {
+                  label: 'Good years (1 in 10 do better)',
+                  data: range.map((year) => shown(year.high, year.age)),
+                  borderColor: 'transparent',
+                  backgroundColor: blue + (dark ? '2e' : '1f'),
+                  borderWidth: 0,
+                  fill: '+1' as const,
+                  tension: 0.25,
+                  pointRadius: 0,
+                  pointHoverRadius: 0
+                },
+                {
+                  label: 'Bad years (1 in 10 do worse)',
+                  data: range.map((year) => shown(year.low, year.age)),
+                  borderColor: blue + '66',
+                  backgroundColor: blue + '66',
+                  borderWidth: 1,
+                  fill: false,
+                  tension: 0.25,
+                  pointRadius: 0,
+                  pointHoverRadius: 0
+                }
+              ]
+            : []),
+          {
+            label: changed.value ? 'Average years, with your changes' : 'Average years',
+            data: mine.map((year) => shown(year.balance, year.age)),
+            borderColor: blue,
+            backgroundColor: blue,
+            borderWidth: 2,
+            fill: false,
+            tension: 0.25,
+            pointRadius: mine.map((_, index) => (index === retireIndex ? 5 : 0)),
+            pointHoverRadius: 5
+          },
+          ...(real
+            ? [
+                {
+                  label: 'Your real numbers',
+                  data: mine.map((year) => {
+                    const point = real.find((entry) => entry.age === year.age)
+                    return point ? shown(point.balance, point.age) : null
+                  }),
+                  borderColor: colors.muted,
+                  backgroundColor: colors.muted,
+                  borderWidth: 1.5,
+                  borderDash: [5, 4],
+                  fill: false,
+                  tension: 0.25,
+                  pointRadius: 0,
+                  pointHoverRadius: 4
+                }
+              ]
+            : [])
+        ]
+      },
+      options: {
+        scales: { y: { beginAtZero: true, max: yMax }, x: { ticks: { maxTicksLimit: 9, autoSkip: true } } },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const age = Number(items[0]?.label)
+                return `Age ${age} · ${yearAt(age)}${age === target.value.retireAge ? ' · retire' : ''}`
               }
-            ]
-          : [])
-      ]
-    },
-    options: {
-      scales: { y: { beginAtZero: true }, x: { ticks: { maxTicksLimit: 9, autoSkip: true } } },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const age = Number(items[0]?.label)
-              return `Age ${age} · ${yearAt(age)}${age === target.value.retireAge ? ' · retire' : ''}`
             }
           }
         }
       }
     }
-  })
+  }
 })
 </script>
 
@@ -237,22 +397,24 @@ const chart = computed<ChartBuilder>(() => {
   <SimulatorShell id="retirement" :changed-count="scenario.changedCount.value" @reset="scenario.reset()" @navigate="(id) => emit('navigate', id)">
     <!-- Phones: the answer stays in view while you scroll through the inputs -->
     <div class="sticky-answer" aria-hidden="true">
-      <span>Earliest <strong class="num">{{ result.earliestAge ?? '—' }}</strong></span>
-      <span>At {{ target.retireAge }}: <strong class="num">{{ moneyCompact(target.atRetirement) }}</strong></span>
-      <span :class="target.runsOutAt ? 'neg' : 'pos'">{{ target.runsOutAt ? `Out at ${target.runsOutAt}` : `Lasts to ${engine.planToAge}` }}</span>
+      <span>Earliest <strong class="num">{{ headline ?? '—' }}</strong></span>
+      <span>At {{ target.retireAge }}: <strong class="num">{{ moneyCompact(shown(target.atRetirement, target.retireAge)) }}</strong></span>
+      <span :class="onTrack ? 'pos' : 'neg'">{{ varied ? `${Math.round(result.chanceAtTarget * 100)}% lasts` : target.runsOutAt ? `Out at ${target.runsOutAt}` : `Lasts to ${engine.planToAge}` }}</span>
     </div>
 
     <div class="layout">
       <div class="results">
         <section class="panel hero" aria-live="polite">
-          <div class="kpi main-kpi">
+          <div class="main-kpi">
             <p class="ink2">Earliest you could retire</p>
-            <template v-if="result.earliestAge !== null">
-              <p class="hero-num num">{{ result.earliestAge }}</p>
+            <template v-if="headline !== null">
+              <p class="hero-num num">{{ headline }}</p>
               <p class="muted small">
-                in {{ yearAt(result.earliestAge) }}<template v-if="result.earliestAge === engine.currentAge"> (you already could)</template>
-                <template v-if="versusReal"> · <span class="ink2">{{ versusReal }}</span></template>
+                in {{ yearAt(headline) }}<template v-if="headline === engine.currentAge"> (you already could)</template>
+                <template v-if="varied"> · {{ pct(values.confidence) }} chance the money lasts to {{ engine.planToAge }}</template>
               </p>
+              <p v-if="varied && result.earliestAge !== null && result.earliestAge !== headline" class="muted small">{{ result.earliestAge }} if every year is an average year</p>
+              <p v-if="versusReal" class="ink2 small">{{ versusReal }}</p>
             </template>
             <template v-else>
               <p class="hero-num num">—</p>
@@ -261,19 +423,27 @@ const chart = computed<ChartBuilder>(() => {
           </div>
           <dl class="kpis">
             <div>
-              <dt>Invested at {{ target.retireAge }}</dt>
-              <dd class="num">{{ money(target.atRetirement) }}</dd>
-              <dd class="sub muted">needs about {{ money(result.neededAtTarget) }}</dd>
+              <dt>Retiring at {{ target.retireAge }}</dt>
+              <dd :class="onTrack ? 'pos' : 'neg'">
+                <template v-if="varied">{{ Math.round(result.chanceAtTarget * 100) }}% chance it lasts</template>
+                <template v-else>{{ target.runsOutAt ? `Runs out at ${target.runsOutAt}` : `Lasts past ${engine.planToAge}` }}</template>
+              </dd>
+              <dd class="sub muted">{{ varied && target.runsOutAt ? `average years run out at ${target.runsOutAt}` : `to age ${engine.planToAge}` }}</dd>
             </div>
             <div>
-              <dt>Retiring at {{ target.retireAge }}</dt>
-              <dd :class="target.runsOutAt ? 'neg' : 'pos'">{{ target.runsOutAt ? `Runs out at ${target.runsOutAt}` : `Lasts past ${engine.planToAge}` }}</dd>
-              <dd class="sub muted">{{ shortfall > 0 ? `${money(shortfall)} short` : 'on track' }}</dd>
+              <dt>Invested at {{ target.retireAge }}</dt>
+              <dd class="num">{{ money(shown(target.atRetirement, target.retireAge)) }}</dd>
+              <dd class="sub muted">needs about {{ money(shown(result.neededAtTarget, target.retireAge)) }}</dd>
+            </div>
+            <div>
+              <dt>Spending target</dt>
+              <dd class="num">{{ money(values.spendingMonthly) }}/mo</dd>
+              <dd class="sub muted">≈ {{ money(inflate(values.spendingMonthly, target.retireAge)) }}/mo in {{ yearAt(target.retireAge) }}</dd>
             </div>
             <div>
               <dt>Saving a year</dt>
               <dd class="num">{{ money(engine.yearlySaving) }}</dd>
-              <dd class="sub muted">{{ scenario.inputs.value.salary ? `${pct(engine.yearlySaving / scenario.inputs.value.salary)} of gross pay` : '' }}</dd>
+              <dd class="sub muted">{{ values.salary ? `${pct(engine.yearlySaving / values.salary)} of gross pay` : '' }}</dd>
             </div>
           </dl>
         </section>
@@ -281,24 +451,49 @@ const chart = computed<ChartBuilder>(() => {
         <section class="panel">
           <div class="panel-head">
             <h2>Invested over time</h2>
-            <p class="muted">Today’s dollars · {{ pct(result.realReturn) }} return after inflation</p>
+            <SelectButton v-model="dollars" :options="DOLLARS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Dollars" />
           </div>
           <BaseChart :build="chart" height="260px" :label="`Projected invested balance by age, retiring at ${target.retireAge}`" />
           <div class="legend">
-            <span><i class="swatch line" :style="{ background: 'var(--nw-investments)' }"></i>{{ changed ? 'With your changes' : 'Invested' }}</span>
+            <span><i class="swatch line" :style="{ background: 'var(--nw-investments)' }"></i>Average years</span>
+            <span v-if="varied"><i class="swatch band"></i>Bad to good years (8 in 10 runs)</span>
             <span v-if="changed"><i class="swatch line dashed"></i>Your real numbers</span>
             <span><i class="swatch dot-swatch"></i>Retire at {{ target.retireAge }}</span>
           </div>
+          <p class="muted small chart-note">{{ dollars === 'future' ? 'In the dollars of each year (inflation included).' : 'In today’s dollars.' }} {{ pct(result.realReturn) }} average return after inflation.</p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Your retirement budget</h2>
+            <p class="muted">a month, {{ dollarNote }}</p>
+          </div>
+          <table class="budget">
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">Item</span></th>
+                <th v-for="column in budgetColumns" :key="column.age" scope="col" class="r">At {{ column.age }}<span class="muted year"> · {{ yearAt(column.age) }}</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in budgetRows" :key="row.label" :class="{ total: row.total }">
+                <th scope="row">{{ row.label }}</th>
+                <td v-for="(cell, index) in row.cells" :key="index" class="num r">{{ signedMonthly(cell) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <details class="panel assumptions">
           <summary>How this is worked out</summary>
           <ul>
-            <li>Everything is in today’s dollars: growth uses the return minus inflation, and saving grows with raises above inflation.</li>
-            <li>Until you retire, each year’s saving is added and the balance earns the return. After, saving stops and spending comes out, less Social Security once it starts.</li>
-            <li>“Earliest” is the first age where retiring keeps the money from running out before {{ engine.planToAge }}.</li>
-            <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on.</li>
-            <li>Taxes in retirement aren’t modelled: spending is what you’d take out. Market ups and downs aren’t either; it’s a steady average.</li>
+            <li>Everything runs in today’s dollars: growth is the return minus inflation, and saving grows with raises above inflation. “Future $” just adds inflation back for display.</li>
+            <li>Until you retire, each year’s saving is added and the balance earns the return. After, saving stops and the budget above comes out each year.</li>
+            <li>Loan payments are fixed, so inflation shrinks them each year, and they stop at payoff. Health insurance is added until Medicare at 65.</li>
+            <li>Social Security, unless you type yours: today’s salary for each year from 22 until you retire (the best 35 count), through the 2026 benefit formula, adjusted for the age you claim. It assumes today’s rules; a shortfall in the trust fund could cut it about 20% from the 2030s.</li>
+            <li>Tax on withdrawals is one flat rate on everything taken out. Roth and HSA money is tax-free; pre-tax 401k and IRA money is taxed like income.</li>
+            <li>Ups and downs: the plan runs against {{ 500 }} sequences of yearly returns that average out to your return, with the volatility you set. Bad years early in retirement hurt most; that’s why the chance can be below 100% even when average years look fine.</li>
+            <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Contribution limits and required withdrawals aren’t modelled.</li>
           </ul>
         </details>
       </div>
@@ -307,23 +502,24 @@ const chart = computed<ChartBuilder>(() => {
         <section v-for="group in GROUPS" :key="group.title" class="panel sim-panel">
           <h2>{{ group.title }}</h2>
           <div class="grid">
-            <SimField
-              v-for="spec in group.fields"
-              :key="spec.key"
-              :label="spec.label"
-              :changed="scenario.changed(spec.key)"
-              :real-text="realText(spec)"
-              :source="spec.source?.()"
-              :hint="spec.hint?.()"
-              @reset="scenario.reset(spec.key)"
-            >
-              <InputNumber
-                :model-value="models[spec.key].value"
-                v-bind="inputProps(spec)"
-                fluid
-                @update:model-value="(value: number | null) => (models[spec.key].value = value)"
-              />
-            </SimField>
+            <template v-for="spec in group.fields" :key="spec.key">
+              <SimField
+                v-if="!spec.hidden?.()"
+                :label="spec.label"
+                :changed="scenario.changed(spec.key)"
+                :real-text="realText(spec)"
+                :source="scenario.changed(spec.key) ? realSource(spec) : spec.source?.()"
+                :hint="spec.hint?.()"
+                @reset="scenario.reset(spec.key)"
+              >
+                <InputNumber
+                  :model-value="models[spec.key].value"
+                  v-bind="inputProps(spec)"
+                  fluid
+                  @update:model-value="(value: number | null) => (models[spec.key].value = value)"
+                />
+              </SimField>
+            </template>
           </div>
         </section>
       </div>
@@ -347,10 +543,6 @@ const chart = computed<ChartBuilder>(() => {
   .layout {
     grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr);
     align-items: start;
-  }
-  .results {
-    position: sticky;
-    top: 24px;
   }
 }
 
@@ -389,6 +581,10 @@ const chart = computed<ChartBuilder>(() => {
     align-items: center;
   }
 }
+.main-kpi {
+  display: grid;
+  gap: 2px;
+}
 .hero-num {
   font-size: clamp(2.5rem, 10vw, 3.5rem);
   font-weight: 600;
@@ -400,8 +596,8 @@ const chart = computed<ChartBuilder>(() => {
 }
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
   margin: 0;
 }
 .kpis div {
@@ -426,12 +622,58 @@ const chart = computed<ChartBuilder>(() => {
 .legend {
   margin-top: 10px;
 }
+.chart-note {
+  margin-top: 6px;
+}
 .swatch.dashed {
   background: repeating-linear-gradient(90deg, var(--muted) 0 5px, transparent 5px 9px);
+}
+.swatch.band {
+  background: color-mix(in srgb, var(--nw-investments) 30%, transparent);
 }
 .dot-swatch {
   border-radius: 50%;
   background: var(--nw-investments);
+}
+
+.budget {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.budget th,
+.budget td {
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-weight: 400;
+}
+.budget thead th {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.budget .r {
+  text-align: right;
+  padding-left: 12px;
+  white-space: nowrap;
+}
+.budget tbody th {
+  color: var(--ink-2);
+}
+.budget .total th,
+.budget .total td {
+  border-bottom: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.year {
+  font-weight: 400;
+}
+@media (max-width: 420px) {
+  .year {
+    display: none;
+  }
 }
 
 /* Inputs on Plan pages get a dashed edge: scratch numbers, not your saved ones. */
@@ -464,5 +706,13 @@ const chart = computed<ChartBuilder>(() => {
   gap: 6px;
   color: var(--ink-2);
   font-size: 0.8125rem;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 </style>

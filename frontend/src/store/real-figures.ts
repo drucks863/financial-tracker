@@ -2,6 +2,7 @@ import { computed } from 'vue'
 import { state, monthTotals, netWorthSeries } from './finance'
 import { planned } from './plan'
 import { localYm } from '../lib/format'
+import { loanSummary } from '../lib/loan'
 
 // Your real numbers in the shape the Plan pages (simulators) start from: the financial profile,
 // the latest Net worth snapshot and recent Cash flow averages. Read-only figures; simulators copy
@@ -18,8 +19,19 @@ export const realFigures = computed(() => {
   const thisYear = new Date().getFullYear()
   const age = plan.birthYear && plan.birthYear > 1900 && plan.birthYear <= thisYear ? thisYear - plan.birthYear : null
 
-  // Latest Net worth snapshot, by group.
+  // Latest Net worth snapshot, by group, and the investment accounts in it.
   const latest = netWorthSeries().at(-1) ?? null
+  const investmentAccounts = latest
+    ? state.netWorth.accounts
+        .filter((account) => account.group === 'Investments' && (latest.values[account.id] || 0) > 0)
+        .map((account) => ({ name: account.name, balance: latest.values[account.id] || 0 }))
+    : []
+
+  // Loans still being paid, with their monthly payment and last payment month.
+  const loans = (plan.loans ?? [])
+    .map((loan) => ({ loan, summary: loanSummary(loan) }))
+    .filter(({ summary }) => summary.balance > 0 && summary.payoff)
+    .map(({ loan, summary }) => ({ name: loan.name || 'Loan', monthlyPayment: summary.payment, payoff: summary.payoff! }))
 
   // Recent full months with entries (this month is still in progress, so it's left out).
   const currentYm = localYm()
@@ -45,6 +57,8 @@ export const realFigures = computed(() => {
     paycheckSavingYearly: pay.savedYearly,
     takeHomeMonthly: pay.monthly.takeHome,
     netWorth: latest ? { date: latest.date, total: latest.total, ...latest.byGroup } : null,
+    investmentAccounts,
+    loans,
     recent: {
       months: months.length,
       from: months[0]?.ym ?? null,

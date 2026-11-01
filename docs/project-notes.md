@@ -294,15 +294,23 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   - `components/SimulatorShell.vue` (header, "changed here, profile not touched" note, "Reset to my numbers" there and in a bar that sticks above the tab bar while anything is changed,
     added 2026-11-01 because Devin couldn't find the way back) and
     `components/SimField.vue` (an input with where its value came from, a dot when changed, "Reset" to go back).
-- **Retirement math** (`lib/retirement.ts`, tested in `tests/retirement.test.ts`): yearly steps in today's dollars
-  (real return = (1 + return) / (1 + inflation) − 1; saving grows with raises above inflation; mid-year timing).
-  Saving stops at the retire age, then spending comes out, less Social Security from its start age. "Earliest age"
-  is the first age where the money lasts through the "last until" age. Only Net worth's Investments group counts
-  as the starting balance (cash and home equity aren't drawn on). Retirement taxes and market swings aren't modelled.
-- **Starting assumptions** (proposed to Devin 2026-11-01, each is an input): return 7%, inflation 3%, raises 3%,
-  retire at 65, money lasts to 95, Social Security $0 (left out) from 67, retirement spending = recent average
-  monthly spending (rent and loan payments included), other saving = recent average left over after spending,
-  age 30 until a birth year is on the profile.
+- **Retirement math** (`lib/retirement.ts`, tested in `tests/retirement.test.ts`), made "realistic" at Devin's ask
+  (2026-11-01): yearly steps in today's dollars (real return; saving grows with raises above inflation; mid-year
+  timing). After the retire age, each year's withdrawal is the **budget** (`budgetAt`): spending target (today's $,
+  default = recent average spending) − loan payments that ended (profile loans; a fixed payment also shrinks with
+  inflation) + health insurance until 65 − Social Security from its start age, grossed up for a flat **tax on
+  withdrawals**. Social Security defaults to an estimate (`estimateSocialSecurity`: today's salary for each year from
+  22 to retirement, best 35, 2026 bend points $1,286/$7,749, earnings cap $184,500, claim-age factor) and follows
+  salary and retire age until a figure is typed. Tax defaults from Net worth account names (`estimateWithdrawalTax`:
+  Roth/HSA 0%, brokerage/taxable 5%, anything else 12%; Devin's "401k" is a Roth 401k, so he may lower it).
+  **Ups and downs**: 500 seeded runs of lognormal yearly returns (median = the average return, spread = volatility);
+  the headline is the earliest age that lasts in at least the chosen share of runs (default 90%), with the
+  average-years age underneath; the chart shows the 10th–90th percentile band (axis capped so the average line reads).
+  "Today's $ / Future $" only changes display. Only Net worth's Investments count; cash and home equity aren't drawn
+  on; contribution limits and required withdrawals aren't modelled.
+- **Starting assumptions** (each is an input): return 7%, inflation 3%, raises 3%, volatility 15%, 90% chance,
+  retire at 65, money lasts to 95, health insurance $700/mo before 65, Social Security estimated and claimed at 67,
+  other saving = recent average left over after spending, age 30 until a birth year is on the profile.
 - The profile has a **Birth year** field (Pay section; `Plan.birthYear`, optional, on both sides) for the age.
 
 ## The Google Sheets are reference only
