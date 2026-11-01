@@ -19,6 +19,7 @@
 - [x] Editable subscriptions (add, edit, delete)
 - [x] Use My numbers on other screens: Overview plan check, Net worth expected growth, entry prefill, Trends planned lines
 - [x] Loans on My numbers (amortized); Net worth subtracts balances and shows principal vs interest
+- [x] Plan check: Rent and bills row counts spending on those items (by name), so editing them changes the check
 - [ ] Devin reviews the preview and sends tweaks
 
 ## Next
