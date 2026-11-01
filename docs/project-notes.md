@@ -108,7 +108,9 @@ docs/       these notes, the todo list, deploy.md
 - **Lambda**: `LambdaHandler` (aws-serverless-java-container-springboot4) starts Spring at class load, which
   SnapStart snapshots. `./gradlew :backend:lambdaZip` packages it. The container answers in the 1.0 response
   shape; `LambdaHandler` rewrites it to 2.0 (all Set-Cookie values into `cookies`), because function URLs drop
-  `multiValueHeaders` and the session cookie was being lost (sign-in loop, 2026-11-01).
+  `multiValueHeaders` and the session cookie was being lost (sign-in loop, 2026-11-01). It also sets the
+  container's default charset to UTF-8: without it, .js/.css (no charset in Content-Type) were garbled as
+  ISO-8859-1 and the UI was a black page. `LambdaHandlerTest` checks both.
 - A failed Google sign-in answers with a small "Sign-in didn't work" page and logs the reason, instead of
   redirecting (which looped back to Google).
 - Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),

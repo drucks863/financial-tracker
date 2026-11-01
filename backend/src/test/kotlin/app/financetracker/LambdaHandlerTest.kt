@@ -78,4 +78,14 @@ class LambdaHandlerTest {
         assertEquals("Origin,Accept", functionUrlResponse["headers"]["Vary"].asString())
         assertTrue(functionUrlResponse["headers"]["Set-Cookie"] == null)
     }
+
+    @Test
+    fun `serves static files byte for byte, non-ASCII characters included`() {
+        val expected = javaClass.getResource("/static/charset-check.js")!!.readBytes()
+        val response = invoke("GET", "/charset-check.js")
+        assertEquals(200, response["statusCode"].asInt())
+        val body = response["body"].asString()
+        val served = if (response["isBase64Encoded"].asBoolean()) java.util.Base64.getDecoder().decode(body) else body.toByteArray(Charsets.UTF_8)
+        assertTrue(expected.contentEquals(served), "served: " + String(served, Charsets.UTF_8))
+    }
 }

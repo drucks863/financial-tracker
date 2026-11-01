@@ -1,5 +1,6 @@
 package app.financetracker
 
+import com.amazonaws.serverless.proxy.internal.LambdaContainerHandler
 import com.amazonaws.serverless.proxy.model.AwsProxyResponse
 import com.amazonaws.serverless.proxy.model.HttpApiV2ProxyRequest
 import com.amazonaws.serverless.proxy.spring.SpringBootLambdaContainerHandler
@@ -27,8 +28,12 @@ class LambdaHandler : RequestStreamHandler {
     companion object {
         private val jsonMapper = JsonMapper.builder().build()
 
-        private val springHandler: SpringBootLambdaContainerHandler<HttpApiV2ProxyRequest, AwsProxyResponse> =
+        private val springHandler: SpringBootLambdaContainerHandler<HttpApiV2ProxyRequest, AwsProxyResponse> = run {
+            // Responses without a charset (the UI's .js and .css files) were turned into text as ISO-8859-1,
+            // garbling every non-ASCII character in them; the broken JavaScript left a black page.
+            LambdaContainerHandler.getContainerConfig().defaultContentCharset = Charsets.UTF_8.name()
             SpringBootLambdaContainerHandler.getHttpApiV2ProxyHandler(FinanceTrackerApplication::class.java)
+        }
 
         /**
          * The container answers in the 1.0 shape (multiValueHeaders). Function URLs read the 2.0 shape,
