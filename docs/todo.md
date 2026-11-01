@@ -47,6 +47,7 @@
 - [x] Make the Cash Flow '22 to '26 sheets importable: older layouts mapped to the 2026 categories, checked against the real files
 - [ ] First sign-in and import the real sheets ('22 to '26 with "Cash Flow workbook", one file at a time)
 - [ ] S3 for exports/backups
+- [ ] Serve `site.webmanifest` as `application/manifest+json` (it goes out as octet-stream; browsers cope)
 - [x] App icon and favicon (trend line): tab icon, iOS home screen, Android/PWA manifest; open before sign-in
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
