@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, type Component } from 'vue'
 import Toast from 'primevue/toast'
 import Button from 'primevue/button'
 import EntryDialog from './components/EntryDialog.vue'
@@ -8,23 +8,33 @@ import CashFlowView from './views/CashFlowView.vue'
 import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
 import PlanView from './views/PlanView.vue'
+import RetirementView from './views/RetirementView.vue'
 import { state } from './store/finance'
 import { sync } from './lib/api'
 import { ui, isProfileTab } from './store/ui'
+import { SIMULATORS, isSimulator } from './lib/simulators'
 
-const VIEWS = [
-  { id: 'overview', label: 'Overview', icon: 'pi pi-home', component: OverviewView },
-  { id: 'cashflow', label: 'Cash flow', icon: 'pi pi-list', component: CashFlowView },
-  { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView },
-  { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView },
+// Pages showing your real data come first in the nav; the Plan pages (what-if simulators, listed
+// in lib/simulators.ts) sit in their own section below, so it's clear which numbers are real.
+type Section = 'real' | 'plan' | 'hidden'
+const SIMULATOR_VIEWS: Record<string, Component> = { retirement: RetirementView }
+const VIEWS: { id: string; label: string; icon: string; component: Component; section: Section }[] = [
+  { id: 'overview', label: 'Overview', icon: 'pi pi-home', component: OverviewView, section: 'real' },
+  { id: 'cashflow', label: 'Cash flow', icon: 'pi pi-list', component: CashFlowView, section: 'real' },
+  { id: 'networth', label: 'Net worth', icon: 'pi pi-chart-line', component: NetWorthView, section: 'real' },
+  { id: 'trends', label: 'Trends', icon: 'pi pi-chart-bar', component: TrendsView, section: 'real' },
+  ...SIMULATORS.map((simulator) => ({ ...simulator, component: SIMULATOR_VIEWS[simulator.id], section: 'plan' as const })),
   // opened from the avatar, not listed in the nav
-  { id: 'plan', label: 'Financial profile', icon: 'pi pi-calculator', component: PlanView, hidden: true }
+  { id: 'plan', label: 'Financial profile', icon: 'pi pi-calculator', component: PlanView, section: 'hidden' }
 ]
 
 // after a failed save, reloading shows what the server actually has
 const reload = () => location.reload()
 
-const NAV = VIEWS.filter((v) => !('hidden' in v))
+const NAV = VIEWS.filter((v) => v.section === 'real')
+const PLAN_NAV = VIEWS.filter((v) => v.section === 'plan')
+// Phones have room for one Plan tab: it opens the first simulator (each simulator links to the others).
+const onPlanPage = computed(() => isSimulator(current.value))
 const me = computed(() => {
   // with Google sign-in, the Google name and photo; otherwise the name typed on the profile
   const name = (sync.profile?.name || state.plan?.name || '').trim()
@@ -94,6 +104,32 @@ onMounted(() => {
       >
         <i :class="v.icon" aria-hidden="true"></i>
         <span class="full">{{ v.label }}</span>
+      </button>
+      <div class="nav-section" aria-hidden="true">
+        <span class="nav-section-label">Plan</span>
+        <span class="nav-section-sub">what-if</span>
+      </div>
+      <button
+        v-for="v in PLAN_NAV"
+        :key="v.id"
+        type="button"
+        class="nav-item sim-item"
+        :aria-label="`${v.label} (what-if)`"
+        :aria-current="current === v.id ? 'page' : undefined"
+        @click="go(v.id)"
+      >
+        <i :class="v.icon" aria-hidden="true"></i>
+        <span class="full">{{ v.label }}</span>
+      </button>
+      <button
+        type="button"
+        class="nav-item plan-tab"
+        aria-label="Plan: what-if simulators"
+        :aria-current="onPlanPage ? 'page' : undefined"
+        @click="go(PLAN_NAV[0].id)"
+      >
+        <i class="pi pi-sliders-h" aria-hidden="true"></i>
+        <span class="full">Plan</span>
       </button>
       <button type="button" class="me" :aria-current="current === 'plan' ? 'page' : undefined" :aria-label="`${me.name || 'You'}: financial profile`" @click="go('plan')">
         <span class="avatar" aria-hidden="true">
@@ -205,6 +241,21 @@ onMounted(() => {
 }
 .nav-item[aria-current='page'] {
   color: var(--accent);
+}
+/* Plan section: on phones a thin divider and one Plan tab; the simulators are listed on desktop. */
+.nav-section {
+  flex: none;
+  align-self: center;
+  width: 1px;
+  height: 28px;
+  border-left: 1px dashed var(--line);
+}
+.nav-section-label,
+.nav-section-sub {
+  display: none;
+}
+.sim-item {
+  display: none;
 }
 
 /* Avatar: opens the financial profile. A tab on phones, the bottom-left corner of the rail on desktop. */
@@ -324,6 +375,45 @@ onMounted(() => {
   }
   .nav-item[aria-current='page'] .pi {
     color: var(--accent);
+  }
+  .nav-section {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    align-self: stretch;
+    width: auto;
+    height: auto;
+    border-left: 0;
+    border-top: 1px dashed var(--line);
+    margin: 12px 0 4px;
+    padding: 12px 12px 2px;
+  }
+  .nav-section-label {
+    display: inline;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .nav-section-sub {
+    display: inline;
+    font-size: 0.6875rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .sim-item {
+    display: flex;
+  }
+  /* what-if pages: a dashed outline on the open one instead of a solid fill */
+  .sim-item[aria-current='page'] {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--line);
+    outline: 1px dashed var(--muted);
+    outline-offset: -1px;
+  }
+  .plan-tab {
+    display: none;
   }
   .me {
     flex: none;

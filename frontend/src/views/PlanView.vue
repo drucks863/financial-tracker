@@ -33,7 +33,8 @@ const USES = {
     'Overview: plan check, loan payments',
     'Trends and Add entry: the monthly payment'
   ],
-  property: ['Net worth: counted under Other assets, with equity on the loan chart']
+  property: ['Net worth: counted under Other assets, with equity on the loan chart'],
+  birthYear: ['Retirement: your age today']
 }
 const tab = computed(() => PROFILE_TABS.find((t) => t.id === ui.profileTab) ?? PROFILE_TABS[0])
 // On phones the tab row scrolls; keep the open tab in view.
@@ -84,6 +85,7 @@ const initials = computed(() =>
     .slice(0, 2)
     .toUpperCase()
 )
+const thisYear = new Date().getFullYear()
 const freqLabel = computed(() => PAY_FREQUENCIES.find((f) => f.value === p.value.payFrequency)?.label.toLowerCase())
 
 function remove<T extends { id: string }>(list: T[], id: string): void {
@@ -212,6 +214,10 @@ const signed = (v: number) => (v < -0.004 ? `−${money(-v)}` : money(v))
             <label class="field">
               <span>Effective tax rate<UsedBy :where="USES.takeHome" note="Sets your take-home pay." /></span>
               <InputNumber v-model="taxPct" suffix="%" :min="0" :max="100" :max-fraction-digits="2" fluid />
+            </label>
+            <label class="field">
+              <span>Birth year<UsedBy :where="USES.birthYear" note="Only your age is used." /></span>
+              <InputNumber v-model="p.birthYear" :use-grouping="false" :min="1900" :max="thisYear" placeholder="e.g. 1994" fluid />
             </label>
           </div>
         </section>

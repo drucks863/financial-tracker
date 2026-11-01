@@ -25,6 +25,8 @@ data class SharedCost(
 data class Plan(
     /** display name for the avatar (until there's a login) */
     val name: String? = null,
+    /** year you were born; the Retirement page works out your age from it */
+    val birthYear: Int? = null,
     /** gross yearly salary */
     val salary: Double = 0.0,
     val payFrequency: PayFrequency = PayFrequency.BIWEEKLY,

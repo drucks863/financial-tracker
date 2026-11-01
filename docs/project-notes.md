@@ -273,6 +273,37 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   this value kept conservative; there's no live price lookup, he updates it himself.
 - Debt accounts typed into snapshots count as owed whichever sign is entered.
 
+## Plan pages: what-if simulators (started 2026-11-01)
+
+- Devin wants "playground" pages that start from his real numbers and let him tweak them without changing
+  anything saved. First one: **Retirement** (`#retirement`). Home budgeting is next on the todo list.
+- **Nav**: real-data pages (Overview, Cash flow, Net worth, Trends) first; the simulators sit under a dashed
+  divider labelled "Plan · what-if" on desktop. Phones get one **Plan** tab (sliders icon) after a dashed divider,
+  opening the first simulator; once there are several, `SimulatorShell` shows links between them. Simulator pages
+  carry a dashed "Plan · what-if" pill and dashed input panels, so scratch numbers never look like saved ones.
+- **Plumbing** (reuse it for the next simulator):
+  - `lib/simulators.ts`: the list (id, label, icon, blurb). Map the view in `App.vue` (`SIMULATOR_VIEWS`).
+  - `store/real-figures.ts`: `realFigures`, read-only real numbers in one place: age (from the profile's birth
+    year), salary, 401k %, deductions, latest Net worth by group, and 12 full-month Cash flow averages (spending,
+    income, left over; the current month is left out).
+  - `lib/scenario.ts`: `useScenario(key, fromReal)`. The real inputs are rebuilt from the store each time; tweaks
+    are kept as **overrides** on top, so untouched fields keep following the profile and tweaked ones stay put.
+    Plain numbers only, so nothing can write back into the store. Overrides are saved in this browser only
+    (localStorage `financial-tracker.scenario.<key>`), never sent to the server. Setting a field back to the real
+    value (or "Use it") drops the override; "Reset all" clears them.
+  - `components/SimulatorShell.vue` (header, "changed here, profile not touched" note, Reset all) and
+    `components/SimField.vue` (an input with where its value came from, a dot when changed, "Use it" to go back).
+- **Retirement math** (`lib/retirement.ts`, tested in `tests/retirement.test.ts`): yearly steps in today's dollars
+  (real return = (1 + return) / (1 + inflation) − 1; saving grows with raises above inflation; mid-year timing).
+  Saving stops at the retire age, then spending comes out, less Social Security from its start age. "Earliest age"
+  is the first age where the money lasts through the "last until" age. Only Net worth's Investments group counts
+  as the starting balance (cash and home equity aren't drawn on). Retirement taxes and market swings aren't modelled.
+- **Starting assumptions** (proposed to Devin 2026-11-01, each is an input): return 7%, inflation 3%, raises 3%,
+  retire at 65, money lasts to 95, Social Security $0 (left out) from 67, retirement spending = recent average
+  monthly spending (rent and loan payments included), other saving = recent average left over after spending,
+  age 30 until a birth year is on the profile.
+- The profile has a **Birth year** field (Pay section; `Plan.birthYear`, optional, on both sides) for the age.
+
 ## The Google Sheets are reference only
 
 The workbooks (Cash Flow '26, Net Worth / Retirement Calculator) were shared to get the
