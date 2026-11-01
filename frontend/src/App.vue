@@ -242,6 +242,9 @@ onMounted(() => {
 .nav-item[aria-current='page'] {
   color: var(--accent);
 }
+.nav-item[aria-current='page'] .pi {
+  color: var(--brand);
+}
 /* Plan section: on phones a thin divider and one Plan tab; the simulators are listed on desktop. */
 .nav-section {
   flex: none;
@@ -374,7 +377,7 @@ onMounted(() => {
     font-weight: 600;
   }
   .nav-item[aria-current='page'] .pi {
-    color: var(--accent);
+    color: var(--brand);
   }
   .nav-section {
     display: flex;

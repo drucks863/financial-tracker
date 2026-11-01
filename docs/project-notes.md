@@ -344,6 +344,15 @@ saved in the browser only.
 - Net worth Snapshots list: on desktop it fills its panel to the height of Accounts (360px minimum) and
   scrolls inside; on phones it runs down the page with no inner scroll box (it used to stop at 360px).
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
+- More color, kept restrained (Devin, 2026-11-01: "too much white", "don't go overboard"). Chrome stays
+  graphite/silver; color only goes where it carries meaning, always from existing colors:
+  - `--brand` (`#5fbf8f` dark, `#1d8f5e` light; `brand()` in `lib/chart-colors.ts`) is the app icon's green.
+    Used for the Net worth **Trend** line (with a green wash fading to the axis), the Net worth KPI tile, and the
+    active nav icon. Breakdown keeps its ink line since it sits on top of colored layers.
+  - Overview KPI icon tiles are tinted like the category icons: income blue, expenses orange, net cash flow
+    green/red by sign, net worth brand green.
+  - Trends: the income and expense tiles get a swatch in their chart colors. Net worth Accounts: a dot in the
+    account group's chart color before "Cash · …".
 - Expense category colors: five palette slots go to the five biggest categories **of the year being viewed**
   (`categoryRank` in `store/ui.ts`, ties by all-time spend); everything else is grey "Other" ("Everything else"
   when a real category is called Other). Ranked all-time until 2026-11-01, which pushed a year's big categories

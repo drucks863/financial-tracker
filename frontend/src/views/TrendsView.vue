@@ -244,11 +244,11 @@ const yoy = computed(() => {
     <section class="panel">
       <dl class="tiles">
         <div>
-          <dt>Avg monthly income</dt>
+          <dt><i class="swatch tile-swatch" style="background: var(--series-income)" aria-hidden="true"></i>Avg monthly income</dt>
           <dd class="num">{{ money(stats.avgIncome) }}</dd>
         </div>
         <div>
-          <dt>Avg monthly expenses</dt>
+          <dt><i class="swatch tile-swatch" style="background: var(--series-expense)" aria-hidden="true"></i>Avg monthly expenses</dt>
           <dd class="num">{{ money(stats.avgExpense) }}</dd>
         </div>
         <div>
@@ -402,6 +402,12 @@ const yoy = computed(() => {
 </template>
 
 <style scoped>
+/* income and expense tiles carry their chart colors, like the Year over year legend */
+.tile-swatch {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: 0;
+}
 .page-head {
   display: flex;
   justify-content: space-between;
