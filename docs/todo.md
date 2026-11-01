@@ -39,8 +39,10 @@
 - [ ] Recurring subscriptions feeding the Subscriptions category automatically
 - [x] Devin: AWS go-ahead, personal account via an admin IAM user; HTTPS via CloudFront's free address
 - [x] DynamoDB table created (us-east-1, on-demand, point-in-time recovery)
-- [ ] Deploy: TTL on the table, Lambda + role, CloudFront (see `docs/deploy.md`)
+- [x] Deploy: TTL on the table, Lambda + role, deploy bucket, CloudFront (health and sign-in redirect checked)
 - [ ] Devin: which Google account(s) may sign in; Google OAuth client
+- [ ] Put the Google client id/secret and allowed emails on the function, publish, move `live`
+- [ ] Later: CI deploy (GitHub Actions + OIDC role) so deploys don't need Devin's Mac
 - [ ] First sign-in and import the real sheets
 - [ ] S3 for exports/backups
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)

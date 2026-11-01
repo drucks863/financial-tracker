@@ -47,7 +47,10 @@ monthly and yearly averages, and net worth.
 - Hosting: **AWS Lambda** behind CloudFront's free `*.cloudfront.net` address, no domain for now. Devin wants it
   under $5/month (2026-11-01); Beanstalk dropped because any always-on server is ~$7+ with the IPv4 charge.
   `PUBLIC_URL` sets the Google redirect URI. Steps and settings: `docs/deploy.md`.
-- Created in AWS so far (2026-11-01): DynamoDB table `financial-tracker`, us-east-1, on-demand, PITR on.
+- Live in AWS (2026-11-01, us-east-1): DynamoDB table `financial-tracker` (on-demand, PITR, TTL on `expiresAt`),
+  IAM role `financial-tracker-lambda`, private bucket `financial-tracker-deploy-<account id>`, Lambda
+  `financial-tracker` (alias `live`, public function URL), CloudFront distribution in front (comment
+  "financial-tracker"). Google settings on the function are still placeholders until the OAuth client exists.
 
 ## Git
 
