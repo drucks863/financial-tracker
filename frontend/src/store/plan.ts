@@ -17,11 +17,10 @@ export const PAY_FREQUENCIES: { label: string; value: PayFrequency; perYear: num
 
 export const newDeduction = (): PayDeduction => ({ id: uid('p'), name: '', perPaycheck: 0 })
 export const newLoan = (): Loan => ({ id: uid('p'), name: '', amount: 0, rate: 0.065, termYears: 30, start: localYm(), extraMonthly: 0 })
-// Profile items are matched to entries by name ("Rent" ~ "Rent/Mortgage"). Shared by the
-// Add entry suggestion and the Trends planned line so both screens agree.
-export const normName = (name: string | null | undefined): string => (name || '').toLowerCase().replace(/[^a-z]/g, '')
-export const sameName = (first: string, second: string): boolean =>
-  !!first && !!second && (first.includes(second) || second.includes(first) || first.slice(0, 5) === second.slice(0, 5))
+// Profile items are matched to entries by name ("Rent" ~ "Rent/Mortgage") with the plan check's
+// rule (lib/plan-match.ts), so the Add entry suggestion, the Trends planned line and the plan check
+// agree. The looser rule these used before matched insurance "Car" to "Car loan".
+export { normName, namesMatch as sameName } from '../lib/plan-match'
 
 export const newSharedCost = (): SharedCost => ({ id: uid('p'), name: '', monthly: 0, share: 1 })
 

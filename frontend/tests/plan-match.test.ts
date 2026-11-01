@@ -1,7 +1,7 @@
 // Run with `npm test`.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { matchPlanItem, planItemSpend } from '../src/lib/plan-match.ts'
+import { matchPlanItem, namesMatch, normName, planItemSpend, planItemsForCategory } from '../src/lib/plan-match.ts'
 
 const items = [
   { id: 'rent', name: 'Rent' },
@@ -48,4 +48,27 @@ test('an item removed from the list stops counting', () => {
   const entries = [expense('Rent/Mortgage', 'Rent/Mortgage', 1100), expense('Utilities', 'Water', 45)]
   assert.equal(planItemSpend(entries, items).total, 1145)
   assert.equal(planItemSpend(entries, items.filter((item) => item.id !== 'water')).total, 1100)
+})
+
+test('a category gets the plan items its name or subcategories match, with the same rule', () => {
+  const housing = [
+    { id: 'rent', name: 'Rent' },
+    { id: 'water', name: 'Water' },
+    { id: 'electric', name: 'Electric' }
+  ]
+  const loans = [{ id: 'car', name: 'Car loan' }]
+  const ids = (found: { id: string }[]) => found.map((item) => item.id)
+  assert.deepEqual(ids(planItemsForCategory('Utilities', ['Phone', 'Internet', 'Electricity', 'Water'], housing)), ['water', 'electric'])
+  assert.deepEqual(ids(planItemsForCategory('Rent/Mortgage', ['Rent/Mortgage'], housing)), ['rent'])
+  // Insurance/Taxes › Car is car insurance; its Trends line must not be the car loan payment
+  assert.deepEqual(ids(planItemsForCategory('Insurance/Taxes', ['Car', 'Health', 'Home', 'Life', 'Taxes'], loans)), [])
+  assert.deepEqual(ids(planItemsForCategory('Car loan', ['Other'], loans)), ['car'])
+})
+
+test('Add entry and Trends use the plan check rule for names', () => {
+  assert.equal(namesMatch(normName('Car'), normName('Car loan')), false)
+  assert.equal(namesMatch(normName('Electricity'), normName('Electric')), true)
+  assert.equal(namesMatch(normName('Rent/Mortgage'), normName('Rent')), true)
+  // the old rule also matched any two names sharing their first five letters
+  assert.equal(namesMatch(normName('Internet'), normName('Interest')), false)
 })

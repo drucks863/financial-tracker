@@ -263,3 +263,33 @@ test('net worth tracker tab: accounts by section, month-end dates, subtotals ski
   assert.deepEqual(result.accounts.find((a) => a.name === '401k')!.values, { '2024-10-31': 10000, '2024-11-30': 10400 })
   assert.deepEqual(result.problems, [])
 })
+
+test('net worth tracker: blank cells are not $0 balances, and empty months are skipped', async () => {
+  const tracker: Grid = [
+    [null, 'Institution', 'Name / Type', 'Sep-30-2026', 'Oct-31-2026', 'Nov-30-2026', 'Dec-31-2026'],
+    [null, 'Cash / Cash Equivalents'],
+    [1, null, 'Checking', 1000, 1200, null, null],
+    [2, null, 'HYSA', null, 5000, null, null],
+    [null, 'Liabilities'],
+    [1, null, 'Credit card', 300, 0, null, null]
+  ]
+  const result = await parseNetWorthWorkbook(workbook({ 'Net Worth Tracker': tracker }))
+  assert.deepEqual(result.dates, ['2026-09-30', '2026-10-31'])
+  assert.deepEqual(result.accounts.find((a) => a.name === 'Checking')!.values, { '2026-09-30': 1000, '2026-10-31': 1200 })
+  // opened in October: September stays unknown instead of $0
+  assert.deepEqual(result.accounts.find((a) => a.name === 'HYSA')!.values, { '2026-10-31': 5000 })
+  // a typed 0 is a real balance (paid off)
+  assert.deepEqual(result.accounts.find((a) => a.name === 'Credit card')!.values, { '2026-09-30': 300, '2026-10-31': 0 })
+  assert.deepEqual(result.problems, ['Skipped 2 months with no balances filled in.'])
+})
+
+test('Cash Flow workbook: a negative Expenses tab total (a refund) is kept', async () => {
+  const file = workbook({
+    Expenses: totalsTab('Expenses', { Food: { Groceries: { 0: 200, 1: -15 } } }),
+    Income: totalsTab('Income', { Wages: { Paycheck: { 0: 3000, 1: 3000 } } })
+  })
+  const { entries, problems } = await parseCashFlowWorkbook(file, 2026)
+  assert.deepEqual(problems, [])
+  assert.equal(sum(entries, (e) => e.type === 'expense' && e.date === '2026-02-01'), -15)
+  assert.equal(sum(entries, (e) => e.type === 'expense' && e.date === '2026-01-01'), 200)
+})

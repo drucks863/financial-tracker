@@ -23,7 +23,11 @@
 - [ ] Devin reviews the preview and sends tweaks
 - [x] Net worth import over the sample data removes the sample accounts (the stray −$25k Brokerage)
 - [ ] Devin: re-import the Net Worth tracker after the deploy to clear the sample Brokerage
-- [ ] Clear leftover sample cash flow entries (months no import covered) and the sample plan's Car loan
+- [ ] Clear leftover sample cash flow entries (months no import covered) and the sample plan's Car loan (waiting on Devin's pick: the `sample` flag is never turned off today, so it stays true after real imports)
+- [x] Bug hunt on the math and imports: CSV dates shifting a day back (moved entries a month), blank net worth cells
+  read as $0, car insurance matched to the Car loan in Add entry and Trends, negative sheet totals dropped
+- [ ] Devin: if an entries CSV was ever re-imported, check entries dated the last day of a month (they were on the 1st)
+- [ ] Devin: re-import the Net Worth tracker after the deploy if it has empty month columns (they became $0 snapshots)
 
 ## Next
 

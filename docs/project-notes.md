@@ -211,6 +211,16 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   to the sheet's "Taxable": $0 in the newest month with a −$25k change, and ~$20–25k of fake balance in every
   older month. The Cash Flow import still only replaces the months a file covers, and the sample's plan
   (salary, rent split, "Car loan") stays until edited on the profile.
+- Import bug hunt (2026-11-01), fixed and covered by `npm test`:
+  - Files are read with SheetJS `raw: true`, so CSV cells stay text. Without it "2026-10-01" became midnight UTC,
+    which is still Sep 30 in the US: re-importing the app's own CSV moved every entry on the 1st (all sheet-imported
+    entries) into the month before. `tests/entries-file.test.ts` runs in a US time zone to keep this fixed.
+  - Net worth tracker: only cells with a number are balances. A blank cell (a month not filled in yet, an account not
+    opened yet) used to be $0, so empty future columns became snapshots with net worth near zero (or negative after
+    loans) and overwrote balances already in the app. Months with no balances at all are skipped and the preview says
+    how many. A typed 0 still counts (paid-off card).
+  - Cash Flow workbook: a negative Expenses tab total with no itemized lines (a refund) is imported as a negative
+    expense, like the sheet sums it. It used to be dropped with a misleading "lines come to more" warning.
 - The year comes from the file name (`Cash Flow '23.xlsx` → 2023), or the tab name for '22/'23.
 - Known differences from the sheets, where the import is right and the sheet isn't: November '22's own
   "Total Expenses" leaves out the recurring bills; October '23 has a line typed with a decimal comma ("12,34" as text, so the
@@ -249,6 +259,8 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   category, so editing Rent and bills only moved the target and Devin thought it ignored them.
   "Everything else" is all other spending. Short names (under 4 letters) only match exactly, so
   insurance "Car" doesn't count as "Car loan".
+  The Add entry suggestion and the Trends planned line use the same rule (`namesMatch`, `planItemsForCategory`).
+  Until 2026-11-01 they had a looser one, so Insurance/Taxes › Car prefilled and planned the Car loan payment.
 - Loans (amount, rate, term, first payment month, extra/month) live on the financial profile;
   `lib/loan.ts` amortizes them. Net worth adds each loan's balance as debt for every snapshot
   month (owed from the month before the first payment), so loans are never typed into snapshots.

@@ -5,7 +5,8 @@ import SelectButton from 'primevue/selectbutton'
 import BaseChart from '../components/BaseChart.vue'
 import { ui, categoryRank, categoryColor } from '../store/ui'
 import { monthTotals, avgNonZero, yearGrid, yearsAvailable, categoriesOf, findCategory } from '../store/finance'
-import { planned, normName as norm, sameName } from '../store/plan'
+import { planned, normName as norm } from '../store/plan'
+import { planItemsForCategory } from '../lib/plan-match'
 import { money, signedMoney, pct, MONTHS } from '../lib/format'
 import { series, otherColor, ROLE, categorySeries, CATEGORY_COLOR_COUNT } from '../lib/chart-colors'
 import { isDark } from '../lib/theme-mode'
@@ -39,9 +40,10 @@ const planTakeHome = computed(() => planned.value.monthly.takeHome)
 function planFor(type: EntryType, name: string): number {
   const n = planned.value
   if (type === 'income') return norm(name).includes('wage') ? n.monthly.takeHome : 0
-  const subs = [name, ...(findCategory('expense', name)?.subcategories ?? [])].map(norm)
-  const housing = n.housing.filter((h) => subs.some((s) => sameName(s, norm(h.name)))).reduce((a, h) => a + h.mine, 0)
-  const loans = n.loans.filter((l) => l.balance > 0 && subs.some((s) => sameName(s, norm(l.loan.name)))).reduce((a, l) => a + l.payment, 0)
+  const subcategories = findCategory('expense', name)?.subcategories ?? []
+  const housing = planItemsForCategory(name, subcategories, n.housing).reduce((a, h) => a + h.mine, 0)
+  const activeLoans = n.loans.filter((l) => l.balance > 0).map((l) => ({ id: l.loan.id, name: l.loan.name, payment: l.payment }))
+  const loans = planItemsForCategory(name, subcategories, activeLoans).reduce((a, l) => a + l.payment, 0)
   return housing + loans
 }
 
