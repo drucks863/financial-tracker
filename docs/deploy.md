@@ -16,6 +16,30 @@ command, signed in as the IAM user `drucks`, never root. His default profile is 
 | Sign-in | Google OAuth client (Google Cloud console) | only emails in `ALLOWED_EMAILS` get in |
 | Code bundles | S3 bucket `financial-tracker-deploy-<account id>` | the Lambda zip is uploaded here |
 
+## What's in the table, and what deleting things loses
+
+The one DynamoDB table holds **both** kinds of items:
+
+- `pk` = `USER#<Google sub>`: all of a user's financial data (entries, categories, accounts, snapshots,
+  subscriptions, the plan, and `META`). Written the first time the signed-in user loads any data.
+- `pk` = `SESSION#<id>`, `sk` = `SESSION`: sign-in sessions, removed by TTL (`expiresAt`). Requests without a
+  session cookie can each create one, so there can be many.
+
+In the console, **Explore items** runs a Scan that shows only the first page, and it is often all `SESSION#`
+items. To see the data, switch to **Query** with `pk` = `USER#<sub>`, or scan with a filter
+`begins_with(pk, "USER#")`.
+
+Backups: point-in-time recovery only (restore to any second in the last 35 days, into a new table). No S3
+exports yet (see `todo.md`).
+
+| Delete | Loses |
+|---|---|
+| `SESSION#` items | nothing but sign-ins; you sign in again |
+| `USER#` items | that user's data (restorable via PITR within 35 days); the next visit reseeds the sample data |
+| The table | all data and sessions; with PITR on, AWS keeps a system backup for 35 days |
+| Deploy bucket | only uploaded Lambda zips; the running function keeps its own copy |
+| Lambda / CloudFront | the site goes down; the data is untouched |
+
 ## Run it locally (no AWS)
 
 ```bash
