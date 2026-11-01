@@ -68,3 +68,6 @@ Build the zip, upload it, `update-function-code`, wait, `publish-version`, then
 version. A new version stays Pending for a minute or two while SnapStart builds its snapshot; moving the
 alias earlier gives 504s until it goes Active (seen 2026-11-01). Environment variable changes also need a new published version (SnapStart snapshots per version).
 Sessions are in DynamoDB, so a deploy doesn't sign anyone out.
+
+The safety check on Devin's Mac blocks the AWS deploy step unless Devin's go-ahead (e.g. "deploy") is written in the
+same thread as the Remote Control session; an approval relayed from the project chat is refused.
