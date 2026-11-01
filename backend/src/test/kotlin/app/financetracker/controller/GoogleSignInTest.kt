@@ -1,5 +1,6 @@
 package app.financetracker.controller
 
+import app.financetracker.security.GoogleSignInSecurityConfig
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -51,6 +52,15 @@ class GoogleSignInTest(@Autowired val mockMvc: MockMvc) {
     @Test
     fun `the health check stays open`() {
         mockMvc.get("/actuator/health").andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `app icons and the manifest open before sign-in`() {
+        // 404 is fine when the UI wasn't built into this test run; what matters is no sign-in redirect
+        GoogleSignInSecurityConfig.PUBLIC_ICON_PATHS.forEach { path ->
+            val status = mockMvc.get(path).andReturn().response.status
+            assert(status == 200 || status == 404) { "$path answered $status" }
+        }
     }
 
     @Test

@@ -45,4 +45,6 @@
 - [ ] Later: CI deploy (GitHub Actions + OIDC role) so deploys don't need Devin's Mac
 - [ ] First sign-in and import the real sheets
 - [ ] S3 for exports/backups
+- [x] App icon and favicon (trend line): tab icon, iOS home screen, Android/PWA manifest; open before sign-in
+- [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
