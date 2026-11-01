@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.put
         "spring.security.oauth2.client.registration.google.client-id=test-client",
         "spring.security.oauth2.client.registration.google.client-secret=test-secret",
         "spring.security.oauth2.client.registration.google.scope=openid,profile,email",
+        "finance.auth.public-url=https://d111.cloudfront.net",
     ],
 )
 @AutoConfigureMockMvc
@@ -31,7 +32,8 @@ class GoogleSignInTest(@Autowired val mockMvc: MockMvc) {
     @Test
     fun `the API answers 401 before sign-in, and pages send the browser to Google`() {
         mockMvc.get("/api/data").andExpect { status { isUnauthorized() } }
-        mockMvc.get("/").andExpect {
+        // relative, so the browser stays on the public (CloudFront) address
+        mockMvc.get("/") { header("Host", "abc.lambda-url.us-east-1.on.aws") }.andExpect {
             status { is3xxRedirection() }
             redirectedUrl("/oauth2/authorization/google")
         }

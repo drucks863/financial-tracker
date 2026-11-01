@@ -52,8 +52,9 @@ handler function URL events, so the Lambda path is tested without AWS.
    The app itself requires Google sign-in for everything but `/actuator/health`.
 5. **CloudFront**: origin = the function URL's host, HTTPS only; viewer protocol redirect-to-https;
    all methods; cache policy `Managed-CachingDisabled`; origin request policy
-   `Managed-AllViewerExceptHostHeader`; a CloudFront Function from `deploy/cloudfront-forwarded-host.js`
-   on viewer request. Then set `PUBLIC_URL` on the function and publish a new version.
+   `Managed-AllViewerExceptHostHeader`. No CloudFront Function: the app takes its public address from
+   `PUBLIC_URL` (`security/PublicUrlFilter`), not from X-Forwarded-* headers, which Spring's forwarded-header
+   filter turned into 400s on Lambda. Then set `PUBLIC_URL` on the function and publish a new version.
 6. **Google OAuth client**: Google Cloud console → APIs & Services → Credentials → OAuth client ID,
    type Web application. Authorized redirect URI: `<PUBLIC_URL>/login/oauth2/code/google`.
    Consent screen: External, testing mode, the allowed accounts as test users.

@@ -36,10 +36,9 @@ finance:
 # What runs on AWS Lambda (SPRING_PROFILES_ACTIVE=aws). Everything secret or account-specific
 # comes from the function's environment variables; see docs/deploy.md.
 spring.config.activate.on-profile: aws
-server:
-  # CloudFront sends X-Forwarded-Host/-Proto (added by its viewer-request function), so redirects and
-  # links use the public https address instead of the function URL's own host
-  forward-headers-strategy: framework
+management:
+  # Lambda's /var/task is read-only and reports no free space, which would mark the app DOWN
+  health.diskspace.enabled: false
 finance:
   storage: dynamodb
   dynamodb:
@@ -49,6 +48,8 @@ finance:
     allowed-emails: ${ALLOWED_EMAILS}
     # Lambda instances share nothing in memory
     session-store: dynamodb
+    # redirects point at CloudFront, not at the function URL behind it
+    public-url: ${PUBLIC_URL}
 spring.security.oauth2.client.registration.google:
   client-id: ${GOOGLE_CLIENT_ID}
   client-secret: ${GOOGLE_CLIENT_SECRET}

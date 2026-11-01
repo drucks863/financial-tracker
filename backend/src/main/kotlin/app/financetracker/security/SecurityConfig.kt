@@ -5,6 +5,8 @@ import app.financetracker.service.LocalUser
 import app.financetracker.repository.FinanceProperties
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.boot.web.servlet.FilterRegistrationBean
+import org.springframework.core.Ordered
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpStatus
@@ -23,6 +25,7 @@ import org.springframework.session.config.annotation.web.http.EnableSpringHttpSe
 import org.springframework.session.web.http.CookieSerializer
 import org.springframework.session.web.http.DefaultCookieSerializer
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
+import java.net.URI
 import java.time.Duration
 
 @ConfigurationProperties("finance.auth")
@@ -34,6 +37,8 @@ data class AuthProperties(
     val sessionStore: SessionStore = SessionStore.CONTAINER,
     /** How long a sign-in lasts without use. */
     val sessionLength: Duration = Duration.ofDays(30),
+    /** The public address when the app sits behind CloudFront (see [PublicUrlFilter]); unset locally. */
+    val publicUrl: URI? = null,
 )
 
 enum class SessionStore { CONTAINER, DYNAMODB }
@@ -89,6 +94,12 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
 
     @Bean
     fun currentUser(): CurrentUser = GoogleUser()
+
+    /** Runs before Spring Security, so its redirects already see the public address. */
+    @Bean
+    fun publicUrlFilter(): FilterRegistrationBean<PublicUrlFilter>? = authProperties.publicUrl?.let { publicUrl ->
+        FilterRegistrationBean(PublicUrlFilter(publicUrl)).apply { order = Ordered.HIGHEST_PRECEDENCE }
+    }
 
     /** Google's user, turned away unless their verified email is on the allowed list. */
     private fun allowedGoogleUsers(): OAuth2UserService<OidcUserRequest, OidcUser> {

@@ -58,7 +58,7 @@ monthly and yearly averages, and net worth.
 ```
 frontend/   Vue 3 + PrimeVue app (TypeScript, Vite)
 backend/    Spring Boot 4 + Kotlin API (Gradle module `:backend`)
-deploy/     the table's IAM policy and the CloudFront function
+deploy/     the table's IAM policy
 docs/       these notes, the todo list, deploy.md
 ```
 
@@ -98,7 +98,10 @@ docs/       these notes, the todo list, deploy.md
   `XSRF-TOKEN` cookie echoed as `X-XSRF-TOKEN` (`lib/api.ts` does this). `GET /api/me` gives name,
   email, photo for the avatar; the profile shows them with a Sign out button.
 - **Profiles**: `local-dynamodb` (DynamoDB Local on :8000, `./gradlew :backend:dynamoDbLocal`) and
-  `aws` (Lambda: forwarded headers from CloudFront, dynamodb storage and sessions, google; secrets from env vars).
+  `aws` (Lambda: dynamodb storage and sessions, google, public address from `PUBLIC_URL`, disk-space health
+  check off since /var/task is read-only; secrets from env vars).
+- Behind CloudFront the app does **not** use X-Forwarded-* (`forward-headers-strategy: framework` made every
+  Lambda request a 400). `PublicUrlFilter` makes requests look like they reached `PUBLIC_URL` instead.
 - **Lambda**: `LambdaHandler` (aws-serverless-java-container-springboot4) starts Spring at class load, which
   SnapStart snapshots. `./gradlew :backend:lambdaZip` packages it.
 - Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),

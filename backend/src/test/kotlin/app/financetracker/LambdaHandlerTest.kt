@@ -9,8 +9,12 @@ import java.lang.reflect.Proxy
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Feeds the handler what a Lambda function URL sends (payload format 2.0), without AWS. */
+/**
+ * Feeds the handler what a Lambda function URL sends (payload format 2.0), without AWS, including the
+ * X-Forwarded-* headers function URLs and CloudFront add (these once turned every request into a 400).
+ */
 class LambdaHandlerTest {
+
     private val jsonMapper = JsonMapper.builder().build()
     private val lambdaHandler = LambdaHandler()
 
@@ -23,7 +27,7 @@ class LambdaHandlerTest {
           "routeKey": "${'$'}default",
           "rawPath": "$path",
           "rawQueryString": "$query",
-          "headers": {"host": "example.lambda-url.us-east-1.on.aws", "accept": "*/*"},
+          "headers": {"host": "example.lambda-url.us-east-1.on.aws", "accept": "*/*", "x-forwarded-for": "203.0.113.5", "x-forwarded-proto": "https", "x-forwarded-port": "443", "x-forwarded-host": "d111.cloudfront.net"},
           "requestContext": {
             "accountId": "anonymous", "apiId": "example", "domainName": "example.lambda-url.us-east-1.on.aws",
             "domainPrefix": "example", "requestId": "test", "routeKey": "${'$'}default", "stage": "${'$'}default",
