@@ -200,32 +200,6 @@ const taxHint = () => {
 
 const GROUPS: { title: string; fields: FieldSpec[] }[] = [
   {
-    title: 'In retirement',
-    fields: [
-      { key: 'spendingMonthly', label: 'Spending target a month, today’s dollars', kind: 'money', source: recentSource, hint: () => futureMonthly('spendingMonthly') },
-      {
-        key: 'loanPaymentsMonthly',
-        label: 'Loan payments in that spending, a month',
-        kind: 'money',
-        source: () => 'your profile’s loans',
-        hint: () => `They stop when paid off: ${loanList()}. Set 0 if your spending doesn’t include them.`,
-        hidden: () => !realFigures.value.loans.length
-      },
-      { key: 'healthcareMonthly', label: 'Health insurance before 65, a month', kind: 'money', hint: () => `Only if you retire before Medicare. ${futureMonthly('healthcareMonthly')}` },
-      { key: 'withdrawalTax', label: 'Tax on withdrawals', kind: 'percent', max: 50, source: taxSource, hint: taxHint },
-      {
-        key: 'socialSecurityMonthly',
-        label: 'Social Security a month, today’s dollars',
-        kind: 'money',
-        hint: () =>
-          socialSecurityTyped.value
-            ? 'Your figure. Get yours at ssa.gov (my Social Security).'
-            : `Rough estimate from your salary, working until ${target.value.retireAge}, claimed at ${values.value.socialSecurityAge}. Get yours at ssa.gov.`
-      },
-      { key: 'socialSecurityAge', label: 'Social Security starts at', kind: 'age', min: 62, max: 70, hint: () => 'Claiming at 62 pays 30% less than at 67; waiting to 70 pays 24% more.' }
-    ]
-  },
-  {
     title: 'You',
     fields: [
       {
@@ -260,6 +234,32 @@ const GROUPS: { title: string; fields: FieldSpec[] }[] = [
       { key: 'inflation', label: 'Inflation, yearly', kind: 'percent', min: 0, max: 15 },
       { key: 'volatility', label: 'Ups and downs (volatility)', kind: 'percent', min: 0, max: 40, hint: () => 'How much a year swings. ~15% for mostly stocks, ~10% for a 60/40 mix. 0 turns it off.' },
       { key: 'confidence', label: 'Chance the money should last', kind: 'percent', min: 50, max: 99, hint: () => 'The earliest age is the first one that clears this.' }
+    ]
+  },
+  {
+    title: 'In retirement',
+    fields: [
+      { key: 'spendingMonthly', label: 'Spending target a month, today’s dollars', kind: 'money', source: recentSource, hint: () => futureMonthly('spendingMonthly') },
+      {
+        key: 'loanPaymentsMonthly',
+        label: 'Loan payments in that spending, a month',
+        kind: 'money',
+        source: () => 'your profile’s loans',
+        hint: () => `They stop when paid off: ${loanList()}. Set 0 if your spending doesn’t include them.`,
+        hidden: () => !realFigures.value.loans.length
+      },
+      { key: 'healthcareMonthly', label: 'Health insurance before 65, a month', kind: 'money', hint: () => `Only if you retire before Medicare. ${futureMonthly('healthcareMonthly')}` },
+      { key: 'withdrawalTax', label: 'Tax on withdrawals', kind: 'percent', max: 50, source: taxSource, hint: taxHint },
+      {
+        key: 'socialSecurityMonthly',
+        label: 'Social Security a month, today’s dollars',
+        kind: 'money',
+        hint: () =>
+          socialSecurityTyped.value
+            ? 'Your figure. Get yours at ssa.gov (my Social Security).'
+            : `Rough estimate from your salary, working until ${target.value.retireAge}, claimed at ${values.value.socialSecurityAge}. Get yours at ssa.gov.`
+      },
+      { key: 'socialSecurityAge', label: 'Social Security starts at', kind: 'age', min: 62, max: 70, hint: () => 'Claiming at 62 pays 30% less than at 67; waiting to 70 pays 24% more.' }
     ]
   }
 ]
