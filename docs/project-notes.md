@@ -41,6 +41,9 @@ monthly and yearly averages, and net worth.
 - Devin's personal account is the AWS CLI profile `personal` (`aws login --profile personal`, temporary
   browser credentials, only on his computer, so AWS steps run through Remote Control). Always pass
   `--profile personal`; his default profile is the work account and is off limits (2026-11-01).
+  The profile must be signed in as an admin IAM user, not the account's root user (Devin, 2026-11-01);
+  check with `aws sts get-caller-identity --profile personal` before any change. Don't commit the
+  account ID here (public repo).
 - HTTPS: CloudFront's free `*.cloudfront.net` address in front of a single-instance Beanstalk
   environment; no domain for now (Devin, 2026-11-01). `PUBLIC_URL` sets the Google redirect URI.
 
