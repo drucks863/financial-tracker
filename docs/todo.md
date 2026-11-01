@@ -31,7 +31,7 @@
 - [ ] Devin: if an entries CSV was ever re-imported, check entries dated the last day of a month (they were on the 1st)
 - [ ] Devin: delete any empty $0 months at the end of Net worth history (from the blank-cell bug; re-importing doesn't remove them)
 - [x] Loading splash while the app cold starts (animated trend-line icon instead of a black page)
-- [ ] Deploy the loading splash
+- [x] Loading splash deployed as Lambda version 15 (2026-11-01)
 - [ ] Maybe: serve `index.html` and `/assets/*` from S3/CloudFront so the splash shows before the Lambda wakes
 
 ## Next
@@ -63,6 +63,7 @@
 - [ ] Serve `site.webmanifest` as `application/manifest+json` (it goes out as octet-stream; browsers cope)
 - [x] Taller month strip bars on the Cash flow tab, baseline placed to fit the data (live as version 12)
 - [x] Deployed main c9db4df (PRs #6 to #12: Paid tooltip, plan check, sample accounts on import, Trends Other, phone tooltips/popovers) as Lambda version 13, 2026-11-01
+- [x] Deployed main ba5b86b (PRs #16 loading splash, #17 Net worth chart/snapshots, #18 category icons and Add entry form) as Lambda version 15, 2026-11-01
 - [x] App icon and favicon (trend line): tab icon, iOS home screen, Android/PWA manifest; open before sign-in
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
@@ -77,6 +78,6 @@
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
 - [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
 - [x] Net worth: Snapshots list fills its box; Over time chart gets a Trend view with a fitted y-axis (Breakdown keeps the stacked view)
-- [ ] Deploy the Net worth chart and snapshots changes
+- [x] Net worth chart and snapshots changes deployed as Lambda version 15 (2026-11-01)
 - [x] Add entry: category icons and tap-to-pick chips, Description first and required with suggestions from past entries; icons on Cash flow, Overview, Settings
 - [ ] Maybe: let a category's icon be picked in Settings → Categories (today it's chosen from the name)
