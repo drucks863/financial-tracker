@@ -50,7 +50,11 @@ monthly and yearly averages, and net worth.
 - Live in AWS (2026-11-01, us-east-1): DynamoDB table `financial-tracker` (on-demand, PITR, TTL on `expiresAt`),
   IAM role `financial-tracker-lambda`, private bucket `financial-tracker-deploy-<account id>`, Lambda
   `financial-tracker` (alias `live`, public function URL), CloudFront distribution in front (comment
-  "financial-tracker"). Google settings on the function are still placeholders until the OAuth client exists.
+  "financial-tracker"). Google sign-in configured (client in Devin's Google Cloud project, allowed email = his
+  Gmail, app in Testing mode). Devin signed in successfully 2026-11-01. Site address: see the CloudFront
+  distribution (also in the project thread).
+- Deploying an update: build `lambdaZip` from main, upload, update-function-code, publish-version, move `live`
+  (`docs/deploy.md` → Updating). Done via Remote Control on Devin's Mac until CI deploys exist.
 
 ## Git
 

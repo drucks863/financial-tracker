@@ -29,7 +29,6 @@
 - [x] Repository interface with in-memory sample data (mock until DynamoDB)
 - [x] Server-side loan amortization, budget setup figures, month totals, net worth series (tested)
 - [x] Frontend loads from and saves to the API when it's running; falls back to local data otherwise
-- [ ] Devin reviews the backend branch
 - [x] DynamoDB repository layer (one table), tested on DynamoDB Local; `local-dynamodb` profile for dev
 - [x] Login: Google sign-in via Spring Security OAuth2 with an allowed-email list; avatar shows the Google photo, Sign out
 - [x] Hosting under $5/month: Lambda (SnapStart) + CloudFront instead of Beanstalk; sessions in DynamoDB; `lambdaZip`
@@ -40,8 +39,10 @@
 - [x] Devin: AWS go-ahead, personal account via an admin IAM user; HTTPS via CloudFront's free address
 - [x] DynamoDB table created (us-east-1, on-demand, point-in-time recovery)
 - [x] Deploy: TTL on the table, Lambda + role, deploy bucket, CloudFront (health and sign-in redirect checked)
-- [ ] Devin: which Google account(s) may sign in; Google OAuth client
-- [ ] Put the Google client id/secret and allowed emails on the function, publish, move `live`
+- [x] Google OAuth client; client id/secret and allowed email on the function (Devin's Gmail only)
+- [x] Fixed on Lambda: session cookie dropped (sign-in loop), UI files garbled (black page), land on `/` after sign-in
+- [x] Live and signed in at the CloudFront address (2026-11-01)
+- [ ] Optional: more sign-in providers (Microsoft, Apple...) on a picker page; data would need keying by provider + account
 - [ ] Later: CI deploy (GitHub Actions + OIDC role) so deploys don't need Devin's Mac
 - [x] Make the Cash Flow '22 to '26 sheets importable: older layouts mapped to the 2026 categories, checked against the real files
 - [ ] First sign-in and import the real sheets ('22 to '26 with "Cash Flow workbook", one file at a time)
