@@ -335,6 +335,17 @@ saved in the browser only.
 - These files are open before sign-in (`PUBLIC_ICON_PATHS` in `SecurityConfig.kt`): the manifest is fetched
   without cookies, and a phone may fetch icons before anyone signs in. Add new icon files to that list.
 
+### Loading splash (2026-11-01)
+
+- A Lambda cold start used to show a black page until the app mounted. `frontend/index.html` now has an inline
+  splash inside `#app`: the trend-line icon drawing itself on a loop, and "Waking up, this can take a few
+  seconds…" fading in after 1.5 s (so warm loads don't flash text). Inline CSS, no JS, so it paints with the HTML.
+- `main.ts` awaits `initStore()` (the first API data) before mounting, and Vue's mount replaces `#app`, so the
+  splash stays exactly until the data is in. Respects `prefers-reduced-motion` (static icon, pulsing dot).
+- Limit: the HTML itself comes from the Lambda (CloudFront caching is off), so the very first wait, before
+  the HTML arrives, still shows the browser's (or home-screen app's) background. Fixing that means serving
+  `index.html` and `/assets/*` from S3 or the CloudFront cache instead of the Lambda.
+
 ## Code conventions
 
 - Prefer long, descriptive variable names over short abbreviations, including for services
