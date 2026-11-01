@@ -75,7 +75,12 @@ onMounted(() => {
   <div class="shell">
     <nav class="rail" aria-label="Main">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">$</span>
+        <!-- same mark as the app icon (public/favicon.svg) -->
+        <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="104" fill="#131312" />
+          <polyline points="88,372 200,262 276,318 392,170" fill="none" stroke="#d6d5d0" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="398" cy="150" r="62" fill="#5fbf8f" />
+        </svg>
         <span class="brand-name">Financial Tracker</span>
       </div>
       <button
@@ -293,14 +298,12 @@ onMounted(() => {
     order: -2;
   }
   .brand-mark {
-    display: grid;
-    place-items: center;
+    flex: none;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--p-primary-contrast-color, #fff);
-    font-weight: 700;
+    border-radius: 7px;
+    /* the tile matches the dark sidebar, so a hairline keeps its edge visible */
+    box-shadow: 0 0 0 1px var(--line);
   }
   .nav-item {
     flex: none;
