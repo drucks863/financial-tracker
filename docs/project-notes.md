@@ -38,6 +38,11 @@ monthly and yearly averages, and net worth.
 - **No AWS actions of any kind until Devin says so** (Devin, 2026-10-27). Never use his own AWS
   credentials; deploying goes to the company account, set up when he's ready. Code and config in the
   repo are fine; running anything against AWS is not. Plan and commands: `docs/deploy.md`.
+- Devin's personal account is the AWS CLI profile `personal` (`aws login --profile personal`, temporary
+  browser credentials, only on his computer, so AWS steps run through Remote Control). Always pass
+  `--profile personal`; his default profile is the work account and is off limits (2026-11-01).
+- HTTPS: CloudFront's free `*.cloudfront.net` address in front of a single-instance Beanstalk
+  environment; no domain for now (Devin, 2026-11-01). `PUBLIC_URL` sets the Google redirect URI.
 
 ## Git
 

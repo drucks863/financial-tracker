@@ -10,6 +10,7 @@ Everything below is the plan for when he gives the go-ahead and says which accou
 |---|---|---|
 | App (API + UI in one jar) | Elastic Beanstalk, Java SE platform (Corretto 17) | `SPRING_PROFILES_ACTIVE=aws`, port 5000 |
 | Data | DynamoDB table `financial-tracker` | on-demand billing; one table for everyone |
+| HTTPS | CloudFront distribution in front of Beanstalk | free `https://<id>.cloudfront.net` address (Devin, 2026-11-01); a real domain can come later |
 | Sign-in | Google OAuth client (Google Cloud console) | only emails in `ALLOWED_EMAILS` get in |
 | App bundles | S3 (Beanstalk's own bucket) | backups/exports bucket comes later |
 
@@ -37,6 +38,9 @@ To try Google sign-in locally, add the Google client details (below) and run wit
 
 ## One-time setup (when Devin says go)
 
+AWS commands run on Devin's computer (Remote Control) with `--profile personal` on every command.
+His default profile is a work account: never use it.
+
 1. **DynamoDB table** (region of choice, e.g. us-east-1):
    ```bash
    aws dynamodb create-table --table-name financial-tracker \
@@ -48,15 +52,21 @@ To try Google sign-in locally, add the Google client details (below) and run wit
    ```
 2. **IAM**: add `deploy/iam-dynamodb-policy.json` to the Beanstalk instance profile
    (`aws-elasticbeanstalk-ec2-role`), so the app reaches the table without any keys.
-3. **HTTPS**: Google only redirects to `https://` (or localhost). That needs a domain name and an
-   ACM certificate on the environment's load balancer, or a single instance with its own certificate.
+3. **HTTPS** (chosen 2026-11-01: CloudFront's free address). Google only redirects to `https://` (or
+   localhost). Beanstalk runs as a single instance (no load balancer) and a CloudFront distribution sits
+   in front: origin = the environment's `*.elasticbeanstalk.com` address over HTTP, viewer protocol
+   "redirect HTTP to HTTPS", all methods allowed, cache policy `CachingDisabled`, origin request policy
+   `AllViewerExceptHostHeader` (forwards cookies, query strings and the CSRF header). Set `PUBLIC_URL` to
+   the `https://<id>.cloudfront.net` address. Later: limit the instance's security group to CloudFront's
+   managed prefix list so the plain-HTTP Beanstalk address isn't reachable directly.
 4. **Google OAuth client**: Google Cloud console → APIs & Services → Credentials → OAuth client ID,
-   type Web application. Authorized redirect URI: `https://<domain>/login/oauth2/code/google`.
+   type Web application. Authorized redirect URI: `<PUBLIC_URL>/login/oauth2/code/google`.
    Consent screen: External, in testing mode, Devin as a test user is enough.
 5. **Beanstalk**: create the application and an environment on "Corretto 17 running on 64bit Amazon Linux 2023",
    upload the bundle, and set these environment properties (secrets live only here):
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
    - `ALLOWED_EMAILS` (comma separated)
+   - `PUBLIC_URL` (the CloudFront `https://` address, no trailing slash)
    - `FINANCE_TABLE_NAME` if the table isn't called `financial-tracker`
 6. **First sign-in** starts from the sample data. Import the real sheets from the profile
    (Import & export), which replaces it.
