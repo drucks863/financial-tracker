@@ -50,6 +50,14 @@ const shown = computed(() => {
   return r === 'all' ? all.value : all.value.slice(-(r + 1))
 })
 
+// "Trend" draws only the net worth line on an axis fitted to it, so gradual change is visible;
+// "Breakdown" is the stacked view from zero. Both tooltips list every group.
+const view = ref<'trend' | 'breakdown'>('trend')
+const VIEWS = [
+  { label: 'Trend', value: 'trend' },
+  { label: 'Breakdown', value: 'breakdown' }
+]
+
 const GROUP_COLOR: Record<AccountGroup, number> = { Cash: ROLE.cash, Investments: ROLE.investments, 'Other assets': ROLE.other, Debt: ROLE.debt }
 const groupsInUse = computed(() =>
   NW_GROUPS.filter(
@@ -73,6 +81,46 @@ const chart = computed<ChartBuilder>(() => {
   })
   const hasDebt = pts.some((p) => p.debt > 0)
   const offset = hasDebt ? 2 : 1 // datasets before the group layers
+  if (view.value === 'trend') {
+    const debtGroup = groupsInUse.value.includes('Debt')
+    return (dark, c) => ({
+      type: 'line',
+      data: {
+        labels: pts.map((p) => shortDate(p.date)),
+        datasets: [
+          {
+            label: 'Net worth',
+            data: pts.map((p) => p.total),
+            borderColor: c.ink,
+            backgroundColor: c.ink + (dark ? '22' : '14'),
+            borderWidth: 2,
+            pointRadius: pts.map((_, i) => (i === pts.length - 1 ? 4 : 0)),
+            pointBackgroundColor: c.ink,
+            pointHoverRadius: 5,
+            tension: 0.25,
+            fill: 'start' as const
+          }
+        ]
+      },
+      options: {
+        // Fitted to the line (not from zero) with a little headroom either side.
+        scales: { y: { beginAtZero: false, grace: '8%' } },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              afterBody: (items) => {
+                const p = pts[items[0]?.dataIndex ?? -1]
+                if (!p) return []
+                const lines = groups.map((g) => `   ${g}: ${money(p.byGroup[g])}`)
+                if (debtGroup || p.debt > 0) lines.push(`   Debt: −${money(p.debt)}`)
+                return lines
+              }
+            }
+          }
+        }
+      }
+    })
+  }
   return (dark, c) => ({
     type: 'line',
     data: {
@@ -333,12 +381,15 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
       <div class="panel-head">
         <div>
           <h2>Over time</h2>
-          <p class="muted">Assets stacked above zero, debt below; the line is net worth</p>
+          <p class="muted">{{ view === 'trend' ? 'Axis fitted to your net worth; tap a month for the breakdown' : 'Assets stacked above zero, debt below; the line is net worth' }}</p>
         </div>
-        <SelectButton v-model="range" :options="RANGES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Range" />
+        <div class="chart-ctrls">
+          <SelectButton v-model="view" :options="VIEWS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Chart view" />
+          <SelectButton v-model="range" :options="RANGES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Range" />
+        </div>
       </div>
       <BaseChart :build="chart" height="300px" label="Net worth over time by account group" />
-      <div class="legend">
+      <div v-if="view === 'breakdown'" class="legend">
         <span><i class="swatch line" style="background: var(--ink)"></i>Net worth</span>
         <span v-for="g in groupsInUse.filter((g) => g !== 'Debt')" :key="g">
           <i class="swatch" :style="{ background: `var(--nw-${g.replace(' ', '-').toLowerCase()})` }"></i>{{ g }}
@@ -412,7 +463,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
         </p>
       </section>
 
-      <section class="panel">
+      <section class="panel snaps-panel">
         <div class="panel-head">
           <h2>Snapshots</h2>
           <p class="muted">{{ all.length }} months · tap one to edit</p>
@@ -568,12 +619,28 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 .small {
   font-size: 0.75rem;
 }
+.chart-ctrls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Phone: the list runs down the page with no inner scroll box. Side by side with Accounts, it
+   fills the panel to the bottom (as tall as Accounts, at least 360px) and scrolls inside it. */
 .snaps {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 360px;
-  overflow-y: auto;
+}
+@media (min-width: 960px) {
+  .snaps-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  .snaps {
+    flex: 1 1 0;
+    min-height: 360px;
+    overflow-y: auto;
+  }
 }
 .snaps button {
   width: 100%;

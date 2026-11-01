@@ -30,6 +30,9 @@
 - [x] Bug hunt fixes and the loan double-count block live as Lambda version 14 (2026-11-01)
 - [ ] Devin: if an entries CSV was ever re-imported, check entries dated the last day of a month (they were on the 1st)
 - [ ] Devin: delete any empty $0 months at the end of Net worth history (from the blank-cell bug; re-importing doesn't remove them)
+- [x] Loading splash while the app cold starts (animated trend-line icon instead of a black page)
+- [ ] Deploy the loading splash
+- [ ] Maybe: serve `index.html` and `/assets/*` from S3/CloudFront so the splash shows before the Lambda wakes
 
 ## Next
 
@@ -73,5 +76,7 @@
 - [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
 - [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
+- [x] Net worth: Snapshots list fills its box; Over time chart gets a Trend view with a fitted y-axis (Breakdown keeps the stacked view)
+- [ ] Deploy the Net worth chart and snapshots changes
 - [x] Add entry: category icons and tap-to-pick chips, Description first and required with suggestions from past entries; icons on Cash flow, Overview, Settings
 - [ ] Maybe: let a category's icon be picked in Settings → Categories (today it's chosen from the name)
