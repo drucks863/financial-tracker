@@ -274,6 +274,8 @@ function readLegacyMonth(rows: Rows): LegacyLine[] {
             if (isTotal(description)) break
             const amount = num(rows[rr]?.[hc + 1] ?? null)
             if (!text(description) || !amount) continue
+            // A rental security deposit comes back, so it isn't spending (Devin, 2026-11-01).
+            if (category === 'Everyday' && /deposit/.test(norm(description))) continue
             const [cat, sub] = refineItem(category, subcategory, text(description))
             lines.push({ type: 'expense', category: cat, subcategory: sub, description: text(description), amount, headingTarget: [category, subcategory] })
           }

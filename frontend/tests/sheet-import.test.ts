@@ -53,8 +53,8 @@ const legacyStacked: Grid = [
   ['Groceries / Food', null, 'Household', null, 'Truck', null, 'Other', null],
   ['Aldi', 60, 'Lamp', 40, 'Sunpass', 30, 'Birthday Gift', 100],
   ['Wendys', 15, 'Rug', '12,50', 'Gas', 35, 'Website Domain', 25],
-  [null, null, null, null, null, null, null, null],
-  ['Total', 75, 'Total', 40, 'Total', 65, 'Total', 125],
+  [null, null, null, null, null, null, 'New Deposit', 900],
+  ['Total', 75, 'Total', 40, 'Total', 65, 'Total', 1025],
   ['Total', 305],
   [],
   ['Income (Recurring)', null, null, 'Savings (Recurring)', null],
@@ -99,6 +99,7 @@ test("'22-style workbook: reads every month tab and maps to the 2026 categories"
   assert.deepEqual([find('Birthday Gift').category, find('Website Domain').category], ['Gifts', 'Everyday'])
   assert.deepEqual([find('Job (30 days)').category, find('Job (30 days)').subcategory], ['Wages', 'Paycheck'])
   assert.equal(entries.find((e) => dec(e) && e.description === 'Gym'), undefined, 'a "-" amount is skipped')
+  assert.equal(entries.find((e) => e.description === 'New Deposit'), undefined, 'a rental deposit is not spending')
   assert.equal(entries.find((e) => e.description === '401k' || e.description === 'HSA'), undefined, 'savings boxes are not tracked')
 
   const nov = (e: EntryDraft) => e.date === '2022-11-01'
