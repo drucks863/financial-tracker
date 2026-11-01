@@ -27,8 +27,9 @@
   The `sample` flag still never turns off after an import; harmless for him now, matters for new users
 - [x] Bug hunt on the math and imports: CSV dates shifting a day back (moved entries a month), blank net worth cells
   read as $0, car insurance matched to the Car loan in Add entry and Trends, negative sheet totals dropped
+- [x] Bug hunt fixes and the loan double-count block live as Lambda version 14 (2026-11-01)
 - [ ] Devin: if an entries CSV was ever re-imported, check entries dated the last day of a month (they were on the 1st)
-- [ ] Devin: re-import the Net Worth tracker after the deploy if it has empty month columns (they became $0 snapshots)
+- [ ] Devin: delete any empty $0 months at the end of Net worth history (from the blank-cell bug; re-importing doesn't remove them)
 
 ## Next
 
