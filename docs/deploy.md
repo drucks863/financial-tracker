@@ -8,7 +8,8 @@ Everything below is the plan for when he gives the go-ahead and says which accou
 
 | Piece | AWS | Notes |
 |---|---|---|
-| App (API + UI in one jar) | Elastic Beanstalk, Java SE platform (Corretto 17) | `SPRING_PROFILES_ACTIVE=aws`, port 5000 |
+| App (API + UI in one jar) | Elastic Beanstalk, Java SE platform (Corretto 17), single t4g.nano | `SPRING_PROFILES_ACTIVE=aws`, port 5000; small JVM settings in the Procfile and a 1 GB swap file (Devin wanted the smallest instance, 2026-11-01) |
+| Table | `financial-tracker`, us-east-1, on-demand, point-in-time recovery on | created 2026-11-01 |
 | Data | DynamoDB table `financial-tracker` | on-demand billing; one table for everyone |
 | HTTPS | CloudFront distribution in front of Beanstalk | free `https://<id>.cloudfront.net` address (Devin, 2026-11-01); a real domain can come later |
 | Sign-in | Google OAuth client (Google Cloud console) | only emails in `ALLOWED_EMAILS` get in |
