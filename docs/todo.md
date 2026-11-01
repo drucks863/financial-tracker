@@ -76,3 +76,5 @@
 - [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
 - [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
+- [x] Net worth: Snapshots list fills its box; Over time chart gets a Trend view with a fitted y-axis (Breakdown keeps the stacked view)
+- [ ] Deploy the Net worth chart and snapshots changes
