@@ -57,6 +57,7 @@
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
 - [x] Tapping "Paid" (and other Select fields) in the profile opened the link-marker popover; fixed
+- [ ] Back burner (Devin, 2026-11-01): import Chase CSV activity (chase.com → Download account activity, ~24 months) to get real transaction dates. Proposed: "Chase CSV" import option, skip transfers/card payments, remembered Chase-category and description rules mapped to our categories, and match sheet lines by amount within the month to set their real date (unmatched rows reviewed in a preview). Overlap approach not decided yet.
 - [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
 - [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
