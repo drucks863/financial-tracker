@@ -8,7 +8,7 @@ import CashFlowView from './views/CashFlowView.vue'
 import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
 import PlanView from './views/PlanView.vue'
-import { isSampleData, state } from './store/finance'
+import { state } from './store/finance'
 import { sync } from './lib/api'
 import { ui, isProfileTab } from './store/ui'
 
@@ -75,7 +75,12 @@ onMounted(() => {
   <div class="shell">
     <nav class="rail" aria-label="Main">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">$</span>
+        <!-- same mark as the app icon (public/favicon.svg) -->
+        <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="104" fill="#131312" />
+          <polyline points="88,372 200,262 276,318 392,170" fill="none" stroke="#d6d5d0" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="398" cy="150" r="62" fill="#5fbf8f" />
+        </svg>
         <span class="brand-name">Financial Tracker</span>
       </div>
       <button
@@ -112,9 +117,6 @@ onMounted(() => {
         </p>
         <Button label="Reload" size="small" severity="secondary" @click="reload" />
       </div>
-      <p v-if="isSampleData" class="sample-note">
-        Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export)<template v-if="!sync.remote">, or add <code>src/data/seed.local.json</code></template>.
-      </p>
       <component :is="view.component" @navigate="go" />
     </main>
 
@@ -165,15 +167,6 @@ onMounted(() => {
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
-.sample-note {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--ink-2);
-  font-size: 0.8125rem;
-}
-
 /* Mobile: bottom tab bar */
 .rail {
   position: fixed;
@@ -293,14 +286,12 @@ onMounted(() => {
     order: -2;
   }
   .brand-mark {
-    display: grid;
-    place-items: center;
+    flex: none;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--p-primary-contrast-color, #fff);
-    font-weight: 700;
+    border-radius: 7px;
+    /* the tile matches the dark sidebar, so a hairline keeps its edge visible */
+    box-shadow: 0 0 0 1px var(--line);
   }
   .nav-item {
     flex: none;

@@ -146,7 +146,7 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   app runs exactly like the prototype from the bundled seed and localStorage (preview, dev without API).
 - The budget setup form edits `state.plan` in place; a debounced watcher PUTs `/plan`.
 - Imports run inside `bulkChange()` and save the whole document with one `PUT /data`.
-- A failed save shows a banner in the app shell.
+- A failed save shows a banner in the app shell. There is no sample-data banner (removed at Devin's ask, 2026-11-01).
 - Subscriptions now have ids (older data gets `s1`, `s2`...).
 - The jar's UI build (`npm run build:server`) always bundles the sample seed, never `seed.local.json`.
 
