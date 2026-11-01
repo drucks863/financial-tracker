@@ -8,7 +8,7 @@ import CashFlowView from './views/CashFlowView.vue'
 import TrendsView from './views/TrendsView.vue'
 import NetWorthView from './views/NetWorthView.vue'
 import PlanView from './views/PlanView.vue'
-import { isSampleData, state } from './store/finance'
+import { state } from './store/finance'
 import { sync } from './lib/api'
 import { ui, isProfileTab } from './store/ui'
 
@@ -117,9 +117,6 @@ onMounted(() => {
         </p>
         <Button label="Reload" size="small" severity="secondary" @click="reload" />
       </div>
-      <p v-if="isSampleData" class="sample-note">
-        Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export)<template v-if="!sync.remote">, or add <code>src/data/seed.local.json</code></template>.
-      </p>
       <component :is="view.component" @navigate="go" />
     </main>
 
@@ -170,15 +167,6 @@ onMounted(() => {
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
-.sample-note {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: var(--ink-2);
-  font-size: 0.8125rem;
-}
-
 /* Mobile: bottom tab bar */
 .rail {
   position: fixed;

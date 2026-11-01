@@ -1,4 +1,4 @@
-import { computed, reactive, watch } from 'vue'
+import { reactive, watch } from 'vue'
 import seed from '@seed'
 import { loanBalanceAt, propertyValueAt } from '../lib/loan'
 import { encodePathPart, loadProfile, loadRemote, send, sync } from '../lib/api'
@@ -158,8 +158,6 @@ export function resetToSheetData(): void {
   }
   Object.assign(state, withPlan(clone(seed)))
 }
-
-export const isSampleData = computed(() => !!state.sample)
 
 export const uid = (p = 'e'): string => `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 
