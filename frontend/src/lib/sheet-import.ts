@@ -55,6 +55,12 @@ function toIsoDate(v: Cell): string | null {
   const s = String(v ?? '').trim()
   let m = s.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/)
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3] || 1)}`
+  // "Oct-31-2024" (the Net Worth tracker's headings when they come through as text); Safari's Date can't parse it
+  m = s.match(/^([A-Za-z]{3})[a-z]*[-\s.]+(\d{1,2}),?[-\s]+(\d{4})$/)
+  if (m) {
+    const month = MONTH_NAMES.findIndex((name) => name.slice(0, 3).toLowerCase() === m![1].toLowerCase())
+    if (month >= 0) return `${m[3]}-${pad(month + 1)}-${pad(m[2])}`
+  }
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
   if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${pad(m[1])}-${pad(m[2])}`
   const d = new Date(s)
@@ -536,7 +542,7 @@ export async function parseNetWorthWorkbook(file: Blob): Promise<ParsedNetWorth>
     if (l.startsWith('cash')) return 'Cash'
     if (l.startsWith('invest')) return 'Investments'
     if (l.startsWith('otherasset')) return 'Other assets'
-    if (l.startsWith('debt')) return 'Debt'
+    if (l.startsWith('debt') || l.startsWith('liabilit')) return 'Debt'
     return null
   }
   let group: AccountGroup = 'Cash'

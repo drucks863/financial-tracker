@@ -200,6 +200,11 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
 - Which years to import (Devin, 2026-11-01): '24 fully real; '23 worth it but its bills were copied forward
   (Water/Electric are estimates) and income is the fixed "Job (30 days)" figure plus monthly gifts; '22 is only
   Nov–Dec right after moving in (mostly furniture), suggested to skip.
+- Net worth: "Net worth tracker" import reads the `Net Worth Tracker` tab of "Net Worth / Retirement Calculator"
+  (month-end date headings like `Oct-31-2024`, accounts in column C under Cash / Investment Accounts / Other
+  Assets / Debt or Liabilities headings in column B; subtotal and net worth rows skipped). The Retirement
+  Calculator and Misc tabs are ignored. Loans live on the financial profile, so don't also type them into the
+  sheet's debt rows before importing (they'd count twice).
 - The year comes from the file name (`Cash Flow '23.xlsx` → 2023), or the tab name for '22/'23.
 - Known differences from the sheets, where the import is right and the sheet isn't: November '22's own
   "Total Expenses" leaves out the recurring bills; October '23 has a line typed with a decimal comma ("12,34" as text, so the

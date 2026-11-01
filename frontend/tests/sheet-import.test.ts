@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import * as XLSX from 'xlsx'
-import { parseCashFlowWorkbook, yearFromFileName } from '../src/lib/sheet-import.ts'
+import { parseCashFlowWorkbook, parseNetWorthWorkbook, yearFromFileName } from '../src/lib/sheet-import.ts'
 import type { EntryDraft } from '../src/types.ts'
 
 type Grid = (string | number | null)[][]
@@ -221,4 +221,45 @@ test('year comes from the file name', () => {
   assert.equal(yearFromFileName('Cash Flow ’22.xlsx'), 2022)
   assert.equal(yearFromFileName('cashflow-2025.xlsx'), 2025)
   assert.equal(yearFromFileName('export.xlsx'), null)
+})
+
+/* ---------- Net Worth / Retirement Calculator ---------- */
+
+test('net worth tracker tab: accounts by section, month-end dates, subtotals skipped', async () => {
+  const tracker: Grid = [
+    [null, null, null, 1, 2],
+    [null, null, null, 'Amount ($)'],
+    [null, 'Institution', 'Name / Type', 'Oct-31-2024', 'Nov-30-2024'],
+    [],
+    [null, 'Cash / Cash Equivalents'],
+    [null, 'Checking, savings, etc.'],
+    [1, null, 'Checking', 1000, 1200],
+    [2, null, 'HYSA', 5000, 5100],
+    [3, null, null, null, null],
+    [null, 'Subtotal - bank accounts', null, 6000, 6300],
+    [],
+    [null, 'Investment Accounts'],
+    [null, 'Taxable / non-taxable accounts, employer savings accounts, etc.'],
+    [1, null, 'Roth IRA', 20000, 20500],
+    [2, null, '401k', '$10,000', '$10,400'],
+    [null, 'Subtotal - investment accounts', null, 30000, 30900],
+    [],
+    [null, 'Other Assets'],
+    [null, 'Home value, car, other valuable possessions'],
+    [1, null, 'Car', 8000, 7900],
+    [],
+    [null, 'Liabilities'],
+    [1, null, 'Credit card', 300, 0],
+    [],
+    [null, 'Net Worth', null, 43700, 45100]
+  ]
+  const file = workbook({ 'Retirement Calcuator': [['Retirement Savings Calculator'], [null, 'Current Age', 30]], 'Net Worth Tracker': tracker })
+  const result = await parseNetWorthWorkbook(file)
+  assert.deepEqual(result.dates, ['2024-10-31', '2024-11-30'])
+  assert.deepEqual(
+    result.accounts.map((a) => `${a.group}: ${a.name}`),
+    ['Cash: Checking', 'Cash: HYSA', 'Investments: Roth IRA', 'Investments: 401k', 'Other assets: Car', 'Debt: Credit card']
+  )
+  assert.deepEqual(result.accounts.find((a) => a.name === '401k')!.values, { '2024-10-31': 10000, '2024-11-30': 10400 })
+  assert.deepEqual(result.problems, [])
 })
