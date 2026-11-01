@@ -38,7 +38,7 @@ class GoogleSignInTest(@Autowired val mockMvc: MockMvc) {
     }
 
     @Test
-    fun `the health check stays open for Beanstalk`() {
+    fun `the health check stays open`() {
         mockMvc.get("/actuator/health").andExpect { status { isOk() } }
     }
 

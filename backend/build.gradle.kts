@@ -20,6 +20,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-security-oauth2-client")
+    // sessions in DynamoDB, so sign-in survives across Lambda instances
+    implementation("org.springframework.session:spring-session-core")
+    // runs the app inside AWS Lambda (function URL events -> the servlet stack)
+    implementation("com.amazonaws.serverless:aws-serverless-java-container-springboot4:3.0.3")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation(platform("software.amazon.awssdk:bom:2.56.0"))
@@ -97,15 +101,16 @@ tasks.register<JavaExec>("dynamoDbLocal") {
     args("-inMemory", "-port", "8000")
 }
 
-/* ---------- Elastic Beanstalk ---------- */
+/* ---------- AWS Lambda ---------- */
 
-// `./gradlew :backend:beanstalkBundle` builds build/distributions/financial-tracker-beanstalk.zip:
-// the jar (UI included), the Procfile and .ebextensions from deploy/beanstalk. Upload it as an
-// application version; nothing here deploys or talks to AWS by itself.
-tasks.register<Zip>("beanstalkBundle") {
+// `./gradlew :backend:lambdaZip` builds build/distributions/financial-tracker-lambda.zip: the app's
+// classes and resources (UI included) at the root and its dependencies in lib/, the layout Lambda's
+// Java runtime loads. Handler: app.financetracker.LambdaHandler. Nothing here talks to AWS.
+tasks.register<Zip>("lambdaZip") {
     group = "distribution"
-    description = "Zips the jar with the Beanstalk Procfile and .ebextensions"
-    from(tasks.bootJar) { rename { "financial-tracker.jar" } }
-    from(rootProject.layout.projectDirectory.dir("deploy/beanstalk"))
-    archiveFileName = "financial-tracker-beanstalk.zip"
+    description = "Packages the app for AWS Lambda"
+    from(tasks.compileKotlin)
+    from(tasks.processResources)
+    into("lib") { from(configurations.runtimeClasspath) }
+    archiveFileName = "financial-tracker-lambda.zip"
 }

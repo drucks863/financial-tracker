@@ -4,7 +4,6 @@ spring:
 
 server:
   port: 8080
-  # Beanstalk's nginx forwards to 5000 by default; set SERVER_PORT there.
 
 finance:
   # A new user's data starts from this file. `./gradlew bootRun` points it at
@@ -34,16 +33,13 @@ finance:
     endpoint: http://localhost:8000
 
 ---
-# What runs on Elastic Beanstalk (SPRING_PROFILES_ACTIVE=aws). Everything secret or account-specific
-# comes from environment variables set on the environment; see docs/deploy.md.
+# What runs on AWS Lambda (SPRING_PROFILES_ACTIVE=aws). Everything secret or account-specific
+# comes from the function's environment variables; see docs/deploy.md.
 spring.config.activate.on-profile: aws
 server:
-  port: 5000
-  # Behind Beanstalk's load balancer / nginx: trust X-Forwarded-* so redirects use https and the real host
-  forward-headers-strategy: native
-  servlet.session.cookie:
-    secure: true
-    same-site: lax
+  # CloudFront sends X-Forwarded-Host/-Proto (added by its viewer-request function), so redirects and
+  # links use the public https address instead of the function URL's own host
+  forward-headers-strategy: framework
 finance:
   storage: dynamodb
   dynamodb:
@@ -51,10 +47,11 @@ finance:
   auth:
     mode: google
     allowed-emails: ${ALLOWED_EMAILS}
+    # Lambda instances share nothing in memory
+    session-store: dynamodb
 spring.security.oauth2.client.registration.google:
   client-id: ${GOOGLE_CLIENT_ID}
   client-secret: ${GOOGLE_CLIENT_SECRET}
   scope: openid, profile, email
-  # CloudFront sends no X-Forwarded-Proto, so the app can't work out its public https address
-  # from the request; PUBLIC_URL is that address, e.g. https://d1abc.cloudfront.net
+  # the public address, e.g. https://d1abc.cloudfront.net, so Google's redirect never depends on headers
   redirect-uri: ${PUBLIC_URL}/login/oauth2/code/{registrationId}

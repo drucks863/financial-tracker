@@ -1,1 +1,0 @@
-web: java -XX:+UseSerialGC -XX:MaxRAMPercentage=55 -XX:MaxMetaspaceSize=160m -Xss512k -XX:TieredStopAtLevel=1 -jar financial-tracker.jar

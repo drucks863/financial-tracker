@@ -32,12 +32,15 @@
 - [ ] Devin reviews the backend branch
 - [x] DynamoDB repository layer (one table), tested on DynamoDB Local; `local-dynamodb` profile for dev
 - [x] Login: Google sign-in via Spring Security OAuth2 with an allowed-email list; avatar shows the Google photo, Sign out
-- [x] Beanstalk bundle task, `.ebextensions`, IAM policy, `docs/deploy.md` (nothing deployed)
+- [x] Hosting under $5/month: Lambda (SnapStart) + CloudFront instead of Beanstalk; sessions in DynamoDB; `lambdaZip`
 - [ ] Frontend reads server-side summaries instead of recomputing (optional; keep the math in one place)
 - [ ] CI: GitHub Actions running backend tests and frontend typecheck
 - [ ] Move import/export parsing server-side (Apache POI) and keep the UI as the front end for it
 - [ ] Recurring subscriptions feeding the Subscriptions category automatically
-- [ ] Devin: go-ahead for AWS and which account; domain name for HTTPS; Google OAuth client (see `docs/deploy.md`)
-- [ ] Deploy: create the table, Beanstalk environment, env vars; first sign-in and import the real sheets
+- [x] Devin: AWS go-ahead, personal account via an admin IAM user; HTTPS via CloudFront's free address
+- [x] DynamoDB table created (us-east-1, on-demand, point-in-time recovery)
+- [ ] Deploy: TTL on the table, Lambda + role, CloudFront (see `docs/deploy.md`)
+- [ ] Devin: which Google account(s) may sign in; Google OAuth client
+- [ ] First sign-in and import the real sheets
 - [ ] S3 for exports/backups
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)

@@ -2,6 +2,7 @@ package app.financetracker.security
 
 import app.financetracker.service.CurrentUser
 import app.financetracker.service.LocalUser
+import app.financetracker.repository.FinanceProperties
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -18,13 +19,24 @@ import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
+import org.springframework.session.config.annotation.web.http.EnableSpringHttpSession
+import org.springframework.session.web.http.CookieSerializer
+import org.springframework.session.web.http.DefaultCookieSerializer
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient
+import java.time.Duration
 
 @ConfigurationProperties("finance.auth")
 data class AuthProperties(
     val mode: AuthMode = AuthMode.NONE,
     /** Google accounts allowed in (google mode). Anyone else is turned away after signing in. */
     val allowedEmails: List<String> = emptyList(),
+    /** Where sign-in sessions live: the servlet container's memory, or DynamoDB (needed on Lambda). */
+    val sessionStore: SessionStore = SessionStore.CONTAINER,
+    /** How long a sign-in lasts without use. */
+    val sessionLength: Duration = Duration.ofDays(30),
 )
+
+enum class SessionStore { CONTAINER, DYNAMODB }
 
 enum class AuthMode {
     /** No login: everyone is the local user. For local runs and tests only. */
@@ -94,5 +106,23 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
 
     companion object {
         const val GOOGLE_SIGN_IN_PATH = "/oauth2/authorization/google"
+    }
+}
+
+/** Sessions in the DynamoDB table, so any Lambda instance can serve a signed-in request. */
+@Configuration
+@EnableSpringHttpSession
+@ConditionalOnProperty("finance.auth.session-store", havingValue = "dynamodb")
+class DynamoDbSessionConfig {
+    @Bean
+    fun sessionRepository(dynamoDbClient: DynamoDbClient, financeProperties: FinanceProperties, authProperties: AuthProperties) =
+        DynamoDbSessionRepository(dynamoDbClient, financeProperties.dynamodb.tableName, authProperties.sessionLength)
+
+    /** Stays signed in across browser restarts for as long as the session lasts. */
+    @Bean
+    fun cookieSerializer(authProperties: AuthProperties): CookieSerializer = DefaultCookieSerializer().apply {
+        setSameSite("Lax")
+        setUseSecureCookie(true)
+        setCookieMaxAge(authProperties.sessionLength.seconds.toInt())
     }
 }

@@ -1,78 +1,67 @@
 # Deploying to AWS
 
-**Nothing in this repo has been run against AWS.** Devin's rule (2026-10-27): no AWS action of any
-kind until he says so, and never with his own credentials (those are for the company account).
-Everything below is the plan for when he gives the go-ahead and says which account to use.
+Hosting is **AWS Lambda** behind CloudFront, chosen 2026-11-01 to stay under $5/month (an always-on
+server was ~$7+ once the public IPv4 charge is counted). Expected cost at personal traffic: about $0–1/month.
+
+AWS commands run on Devin's computer (Remote Control) with `--profile personal --region us-east-1` on every
+command, signed in as the IAM user `drucks`, never root. His default profile is a work account: never use it.
 
 ## What runs where
 
 | Piece | AWS | Notes |
 |---|---|---|
-| App (API + UI in one jar) | Elastic Beanstalk, Java SE platform (Corretto 17), single t4g.nano | `SPRING_PROFILES_ACTIVE=aws`, port 5000; small JVM settings in the Procfile and a 1 GB swap file (Devin wanted the smallest instance, 2026-11-01) |
-| Table | `financial-tracker`, us-east-1, on-demand, point-in-time recovery on | created 2026-11-01 |
-| Data | DynamoDB table `financial-tracker` | on-demand billing; one table for everyone |
-| HTTPS | CloudFront distribution in front of Beanstalk | free `https://<id>.cloudfront.net` address (Devin, 2026-11-01); a real domain can come later |
+| App (API + UI) | Lambda `financial-tracker`, Java 21 runtime, arm64, 1024 MB, SnapStart | handler `app.financetracker.LambdaHandler`, alias `live`, function URL on the alias |
+| HTTPS | CloudFront distribution in front of the function URL | free `https://<id>.cloudfront.net` address; a real domain can come later |
+| Data + sessions | DynamoDB table `financial-tracker` (us-east-1, on-demand, point-in-time recovery) | created 2026-11-01; sign-in sessions are `SESSION#` items, TTL attribute `expiresAt` |
 | Sign-in | Google OAuth client (Google Cloud console) | only emails in `ALLOWED_EMAILS` get in |
-| App bundles | S3 (Beanstalk's own bucket) | backups/exports bucket comes later |
+| Code bundles | S3 bucket `financial-tracker-deploy-<account id>` | the Lambda zip is uploaded here |
 
-## Run it locally first (no AWS)
+## Run it locally (no AWS)
 
 ```bash
 ./gradlew :backend:dynamoDbLocal                                   # terminal 1: DynamoDB Local on :8000, in memory
 ./gradlew :backend:bootRun --args='--spring.profiles.active=local-dynamodb'   # terminal 2
 ```
 
-The `local-dynamodb` profile points at `http://localhost:8000` with dummy credentials, so it can't
-reach a real AWS account. Without the profile, data stays in memory as before.
+Locally the app still runs on Tomcat; only Lambda uses `LambdaHandler`. `LambdaHandlerTest` feeds the
+handler function URL events, so the Lambda path is tested without AWS.
 
-To try Google sign-in locally, add the Google client details (below) and run with
-`--finance.auth.mode=google --finance.auth.allowed-emails=you@gmail.com` plus the three
-`spring.security.oauth2.client.registration.google.*` settings from the `aws` profile in
-`application.yml`. Google allows `http://localhost:8080/login/oauth2/code/google` as a redirect URI.
-
-## Build the bundle
+## Build
 
 ```bash
-./gradlew :backend:beanstalkBundle
-# -> backend/build/distributions/financial-tracker-beanstalk.zip (jar + Procfile + .ebextensions)
+./gradlew :backend:lambdaZip
+# -> backend/build/distributions/financial-tracker-lambda.zip (classes + UI at the root, jars in lib/)
 ```
 
-## One-time setup (when Devin says go)
+## One-time setup
 
-AWS commands run on Devin's computer (Remote Control) with `--profile personal` on every command.
-His default profile is a work account: never use it.
+1. **Table** (done): `pk`/`sk` strings, on-demand, point-in-time recovery. Turn on TTL:
+   `aws dynamodb update-time-to-live --table-name financial-tracker --time-to-live-specification Enabled=true,AttributeName=expiresAt`
+2. **Execution role** `financial-tracker-lambda`: trusted by `lambda.amazonaws.com`, managed policy
+   `AWSLambdaBasicExecutionRole` (logs), inline policy from `deploy/iam-dynamodb-policy.json` (this table only).
+3. **Deploy bucket** `financial-tracker-deploy-<account id>`, private, upload the zip.
+4. **Function**: runtime `java21`, architecture `arm64`, memory 1024 MB, timeout 30 s, handler
+   `app.financetracker.LambdaHandler`, SnapStart `ApplyOn=PublishedVersions`, environment:
+   - `SPRING_PROFILES_ACTIVE=aws`, `FINANCE_TABLE_NAME=financial-tracker`
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` (comma separated), `PUBLIC_URL`
+     (the CloudFront `https://` address, no trailing slash); placeholders until the Google client exists
+   - `JAVA_TOOL_OPTIONS=-XX:+TieredCompilation -XX:TieredStopAtLevel=1` (faster cold start)
 
-1. **DynamoDB table** (region of choice, e.g. us-east-1):
-   ```bash
-   aws dynamodb create-table --table-name financial-tracker \
-     --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S \
-     --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE \
-     --billing-mode PAY_PER_REQUEST
-   aws dynamodb update-continuous-backups --table-name financial-tracker \
-     --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
-   ```
-2. **IAM**: add `deploy/iam-dynamodb-policy.json` to the Beanstalk instance profile
-   (`aws-elasticbeanstalk-ec2-role`), so the app reaches the table without any keys.
-3. **HTTPS** (chosen 2026-11-01: CloudFront's free address). Google only redirects to `https://` (or
-   localhost). Beanstalk runs as a single instance (no load balancer) and a CloudFront distribution sits
-   in front: origin = the environment's `*.elasticbeanstalk.com` address over HTTP, viewer protocol
-   "redirect HTTP to HTTPS", all methods allowed, cache policy `CachingDisabled`, origin request policy
-   `AllViewerExceptHostHeader` (forwards cookies, query strings and the CSRF header). Set `PUBLIC_URL` to
-   the `https://<id>.cloudfront.net` address. Later: limit the instance's security group to CloudFront's
-   managed prefix list so the plain-HTTP Beanstalk address isn't reachable directly.
-4. **Google OAuth client**: Google Cloud console → APIs & Services → Credentials → OAuth client ID,
+   Publish a version, point alias `live` at it, create a function URL on `live` with auth type `NONE`
+   and allow public invokes (`lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` via the function URL).
+   The app itself requires Google sign-in for everything but `/actuator/health`.
+5. **CloudFront**: origin = the function URL's host, HTTPS only; viewer protocol redirect-to-https;
+   all methods; cache policy `Managed-CachingDisabled`; origin request policy
+   `Managed-AllViewerExceptHostHeader`; a CloudFront Function from `deploy/cloudfront-forwarded-host.js`
+   on viewer request. Then set `PUBLIC_URL` on the function and publish a new version.
+6. **Google OAuth client**: Google Cloud console → APIs & Services → Credentials → OAuth client ID,
    type Web application. Authorized redirect URI: `<PUBLIC_URL>/login/oauth2/code/google`.
-   Consent screen: External, in testing mode, Devin as a test user is enough.
-5. **Beanstalk**: create the application and an environment on "Corretto 17 running on 64bit Amazon Linux 2023",
-   upload the bundle, and set these environment properties (secrets live only here):
-   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-   - `ALLOWED_EMAILS` (comma separated)
-   - `PUBLIC_URL` (the CloudFront `https://` address, no trailing slash)
-   - `FINANCE_TABLE_NAME` if the table isn't called `financial-tracker`
-6. **First sign-in** starts from the sample data. Import the real sheets from the profile
+   Consent screen: External, testing mode, the allowed accounts as test users.
+7. **First sign-in** starts from the sample data. Import the real sheets from the profile
    (Import & export), which replaces it.
 
 ## Updating
 
-Build the bundle, upload it as a new application version, deploy it. Sessions are in memory, so a
-deploy signs everyone out; data is in DynamoDB and survives.
+Build the zip, upload it, `update-function-code`, wait, `publish-version`, move alias `live` to the new
+version. Environment variable changes also need a new published version (SnapStart snapshots per version).
+Sessions are in DynamoDB, so a deploy doesn't sign anyone out.

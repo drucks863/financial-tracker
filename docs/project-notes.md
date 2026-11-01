@@ -22,8 +22,8 @@ monthly and yearly averages, and net worth.
 - Backend: Spring Boot, Kotlin, JUnit tests, Gradle.
 - Frontend: Vue 3 + PrimeVue, **TypeScript**, Vite, npm. Strict mode; `npm run typecheck` runs vue-tsc.
   Domain types live in `frontend/src/types.ts`.
-- AWS: DynamoDB, S3, Elastic Beanstalk (and whatever else fits).
-- **Monorepo.** The Vue UI gets bundled into the Spring Boot jar for deployment, but must
+- AWS: DynamoDB, S3, Lambda + CloudFront (Lambda replaced Elastic Beanstalk on 2026-11-01 for cost).
+- **Monorepo.** The Vue UI gets bundled into the Spring Boot app (jar locally, Lambda zip on AWS), but must
   also run on its own locally (`npm run dev` in `frontend/`, proxying `/api` to `localhost:8080`).
 
 ## Code style
@@ -44,8 +44,10 @@ monthly and yearly averages, and net worth.
   The profile must be signed in as an admin IAM user, not the account's root user (Devin, 2026-11-01);
   check with `aws sts get-caller-identity --profile personal` before any change. Don't commit the
   account ID here (public repo).
-- HTTPS: CloudFront's free `*.cloudfront.net` address in front of a single-instance Beanstalk
-  environment; no domain for now (Devin, 2026-11-01). `PUBLIC_URL` sets the Google redirect URI.
+- Hosting: **AWS Lambda** behind CloudFront's free `*.cloudfront.net` address, no domain for now. Devin wants it
+  under $5/month (2026-11-01); Beanstalk dropped because any always-on server is ~$7+ with the IPv4 charge.
+  `PUBLIC_URL` sets the Google redirect URI. Steps and settings: `docs/deploy.md`.
+- Created in AWS so far (2026-11-01): DynamoDB table `financial-tracker`, us-east-1, on-demand, PITR on.
 
 ## Git
 
@@ -56,7 +58,7 @@ monthly and yearly averages, and net worth.
 ```
 frontend/   Vue 3 + PrimeVue app (TypeScript, Vite)
 backend/    Spring Boot 4 + Kotlin API (Gradle module `:backend`)
-deploy/     Beanstalk bundle files and the IAM policy for the table
+deploy/     the table's IAM policy and the CloudFront function
 docs/       these notes, the todo list, deploy.md
 ```
 
@@ -88,17 +90,21 @@ docs/       these notes, the todo list, deploy.md
 - **Sign-in** (`finance.auth.mode`, added 2026-10-27): `none` (default; `LocalUser`, id `"local"`) or
   `google` (Spring Security OAuth2 login, `GoogleUser`, data keyed by the Google `sub`). Only verified
   emails in `finance.auth.allowed-emails` get in; the app won't start in google mode without the list.
+  Sessions: container memory by default; `finance.auth.session-store=dynamodb` (the `aws` profile) keeps
+  them as `SESSION#<id>` items in the same table (`security/DynamoDbSessionRepository`, Spring Session,
+  30-day cookie), since Lambda instances share no memory.
   `/api/**` answers 401 when signed out (the UI then goes to `/oauth2/authorization/google`), pages
   redirect to Google, `/actuator/health` stays open. Session is a server-side cookie; writes need the
   `XSRF-TOKEN` cookie echoed as `X-XSRF-TOKEN` (`lib/api.ts` does this). `GET /api/me` gives name,
   email, photo for the avatar; the profile shows them with a Sign out button.
 - **Profiles**: `local-dynamodb` (DynamoDB Local on :8000, `./gradlew :backend:dynamoDbLocal`) and
-  `aws` (Beanstalk: port 5000, forwarded headers, secure cookie, dynamodb, google; secrets from env vars).
+  `aws` (Lambda: forwarded headers from CloudFront, dynamodb storage and sessions, google; secrets from env vars).
+- **Lambda**: `LambdaHandler` (aws-serverless-java-container-springboot4) starts Spring at class load, which
+  SnapStart snapshots. `./gradlew :backend:lambdaZip` packages it.
 - Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),
   `PlanCalculator` (budget setup figures), `Summaries` (month totals, net worth series). The frontend
   still computes its own; keep the two in step until it reads these.
-- Health check for Beanstalk: `/actuator/health`. `./gradlew :backend:beanstalkBundle` zips the jar with
-  `deploy/beanstalk` (Procfile, `.ebextensions`). See `docs/deploy.md`.
+- Health check: `/actuator/health` (open even with sign-in on).
 - In this sandbox Maven Central rate-limits Gradle; a user-level init script points it at Google's
   Maven mirror. That's environment-only, not in the repo.
 

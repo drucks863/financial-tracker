@@ -1,6 +1,7 @@
 package app.financetracker.repository
 
 import app.financetracker.model.FinanceData
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -48,18 +49,18 @@ class RepositoryConfig {
         SeedData(normalize(financeProperties.seed.inputStream.use { stream -> jsonMapper.readValue<FinanceData>(stream) }))
 
     @Bean
-    fun financeRepository(financeProperties: FinanceProperties, seedData: SeedData, jsonMapper: JsonMapper): FinanceRepository =
-        when (financeProperties.storage) {
-            StorageKind.MEMORY -> InMemoryFinanceRepository { seedData.data }
-            StorageKind.DYNAMODB -> {
-                val dynamoDbProperties = financeProperties.dynamodb
-                val dynamoDbClient = dynamoDbClient(dynamoDbProperties)
-                if (dynamoDbProperties.endpoint != null) createTableIfMissing(dynamoDbClient, dynamoDbProperties.tableName)
-                DynamoDbFinanceRepository(dynamoDbClient, dynamoDbProperties.tableName, jsonMapper) { seedData.data }
-            }
-        }
+    @ConditionalOnProperty("finance.storage", havingValue = "memory", matchIfMissing = true)
+    fun inMemoryFinanceRepository(seedData: SeedData): FinanceRepository = InMemoryFinanceRepository { seedData.data }
 
-    private fun dynamoDbClient(dynamoDbProperties: DynamoDbProperties): DynamoDbClient {
+    @Bean
+    @ConditionalOnProperty("finance.storage", havingValue = "dynamodb")
+    fun dynamoDbFinanceRepository(dynamoDbClient: DynamoDbClient, financeProperties: FinanceProperties, seedData: SeedData, jsonMapper: JsonMapper): FinanceRepository =
+        DynamoDbFinanceRepository(dynamoDbClient, financeProperties.dynamodb.tableName, jsonMapper) { seedData.data }
+
+    @Bean
+    @ConditionalOnProperty("finance.storage", havingValue = "dynamodb")
+    fun dynamoDbClient(financeProperties: FinanceProperties): DynamoDbClient {
+        val dynamoDbProperties = financeProperties.dynamodb
         val builder = DynamoDbClient.builder()
         dynamoDbProperties.region?.let { region -> builder.region(Region.of(region)) }
         dynamoDbProperties.endpoint?.let { localEndpoint ->
@@ -67,11 +68,13 @@ class RepositoryConfig {
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("local", "local")))
             if (dynamoDbProperties.region == null) builder.region(Region.US_EAST_1)
         }
-        return builder.build()
+        return builder.build().also { dynamoDbClient ->
+            if (dynamoDbProperties.endpoint != null) createTableIfMissing(dynamoDbClient, dynamoDbProperties.tableName)
+        }
     }
 }
 
-/** The table's shape (see [DynamoDbFinanceRepository]). On AWS it's created by hand once; see docs/deploy.md. */
+/** The table's shape (see [DynamoDbFinanceRepository]). On AWS it was created by hand once; see docs/deploy.md. */
 fun createTableIfMissing(dynamoDbClient: DynamoDbClient, tableName: String) {
     if (dynamoDbClient.listTables().tableNames().contains(tableName)) return
     dynamoDbClient.createTable { request ->
