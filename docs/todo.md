@@ -34,7 +34,7 @@
 - [x] Login: Google sign-in via Spring Security OAuth2 with an allowed-email list; avatar shows the Google photo, Sign out
 - [x] Hosting under $5/month: Lambda (SnapStart) + CloudFront instead of Beanstalk; sessions in DynamoDB; `lambdaZip`
 - [ ] Frontend reads server-side summaries instead of recomputing (optional; keep the math in one place)
-- [ ] CI: GitHub Actions running backend tests and frontend typecheck
+- [ ] CI: GitHub Actions running backend tests, frontend typecheck and `npm test`
 - [ ] Move import/export parsing server-side (Apache POI) and keep the UI as the front end for it
 - [ ] Recurring subscriptions feeding the Subscriptions category automatically
 - [x] Devin: AWS go-ahead, personal account via an admin IAM user; HTTPS via CloudFront's free address
@@ -43,6 +43,7 @@
 - [ ] Devin: which Google account(s) may sign in; Google OAuth client
 - [ ] Put the Google client id/secret and allowed emails on the function, publish, move `live`
 - [ ] Later: CI deploy (GitHub Actions + OIDC role) so deploys don't need Devin's Mac
-- [ ] First sign-in and import the real sheets
+- [x] Make the Cash Flow '22 to '26 sheets importable: older layouts mapped to the 2026 categories, checked against the real files
+- [ ] First sign-in and import the real sheets ('22 to '26 with "Cash Flow workbook", one file at a time)
 - [ ] S3 for exports/backups
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)

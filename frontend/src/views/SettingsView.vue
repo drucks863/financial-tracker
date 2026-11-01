@@ -28,7 +28,7 @@ import {
   setEssential,
   bulkChange
 } from '../store/finance'
-import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook } from '../lib/io'
+import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook, yearFromFileName } from '../lib/io'
 import { money, money2, shortDate } from '../lib/format'
 import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
 import { useExport } from '../lib/use-export'
@@ -71,6 +71,8 @@ async function onFile(ev: Event): Promise<void> {
   input.value = ''
   if (!f) return
   imp.file = f
+  // "Cash Flow '23.xlsx" covers 2023
+  imp.year = yearFromFileName(f.name) ?? imp.year
   await parse()
 }
 // Each run gets a number; a slower earlier run (e.g. a previous year) can't overwrite a newer one.
@@ -309,7 +311,7 @@ function reset() {
           Columns: <strong>Date, Type, Category, Subcategory, Description, Amount</strong>. Type is Income or Expense. New categories are created for you.
         </p>
         <div v-else-if="imp.kind === 'cashflow'" class="cf-year">
-          <p class="ink2 small">Reads a Cash Flow workbook laid out like your ’26 sheet: the Expenses and Income tabs plus each month tab’s itemized lines.</p>
+          <p class="ink2 small">Reads any of your “Cash Flow ’YY” workbooks: the Expenses and Income tabs plus each month tab’s itemized lines. Older layouts (’22 to ’24) are mapped to today’s categories. The year comes from the file name when it has one.</p>
           <label class="year-field">
             <span class="small ink2">Year this workbook covers</span>
             <InputNumber v-model="imp.year" input-id="import-year" :use-grouping="false" :min="2000" :max="2100" show-buttons size="small" @update:model-value="parse" />

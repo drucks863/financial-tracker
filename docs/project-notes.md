@@ -168,7 +168,36 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
 - Subscriptions tab: service, price, category (Essential/Discretionary), frequency, when, paid from.
 - Net worth tab: month-end columns; rows for Checking, Savings, HYSA (cash) and Taxable,
   Roth IRA, 401k, HSA, REIT (investments); Other assets and Debt sections are empty so far.
-- Older years exist as separate files: Cash Flow '22, '23, '24, '25.
+- Older years exist as separate files: Cash Flow '22, '23, '24, '25. **2026 is the standard layout going
+  forward** (Devin, 2026-11-01); the older files only matter for their data.
+
+### Older layouts and the import (checked against the real files, 2026-11-01)
+
+- **'25, '26**: the standard layout above. '25 still says `Home › Improvements` and `Subscriptions › YouTube TV`.
+- **'24**: Expenses and Income tabs like '26 (but `Insurance` and `Misc` categories), month tabs January to
+  September in the old layout, October to December in the new one.
+- **'22 (November and December only), '23**: no Expenses/Income tabs. Month tabs named `November 22`. Each has
+  "Expenses (Recurring)" (name, amount, Bank/Card, when) ending at Total; an "Expenses" title over a row of
+  column-pair headings (Groceries / Food, Household, Clothing, Truck, Entertainment, Dog, Other) with
+  description/amount lines down to each column's Total; "Income (Recurring)" (Job) and "Income (Other)"
+  (gifts and the like); "Savings (Recurring)" and "Result" are skipped. In '22 November the itemized block
+  sits beside the recurring list instead of below it.
+- The Cash Flow workbook import (`frontend/src/lib/sheet-import.ts`) reads all of these and **maps everything
+  to the 2026 names**: recurring bills by name (Rent, Water, Electric, TV, Gym, Music, Amazon, Renters
+  Insurance → Insurance/Taxes › Home...), column headings to categories (Household → Home › Other, Truck →
+  Vehicle, Dog → Pets, Other → Everyday › Other), plus item rules (known restaurants → Food › Restaurants, Gas
+  → Fuel, Sunpass, vet/food/toys/supplies for pets, hospital/doctor/pharmacy → Health/medical, gifts → Gifts).
+  Renames: Insurance → Insurance/Taxes, Misc → Everyday › Other, Improvements → Projects, YouTube TV → TV.
+- Where a workbook has an Expenses tab ('24 on), its totals win: older-layout lines are only kept when they
+  fit a subcategory total; the rest is a "Monthly total" entry. When a new-layout month tab's lines come to
+  *more* than the Expenses tab (a SUM range that stops short), the lines are kept and the preview says so.
+- The year comes from the file name (`Cash Flow '23.xlsx` → 2023), or the tab name for '22/'23.
+- Known differences from the sheets, where the import is right and the sheet isn't: November '22's own
+  "Total Expenses" leaves out the recurring bills; October '23 has a line typed with a decimal comma ("12,34" as text, so the
+  sheet's SUM skips it; the import reads it as 12.34); October '26 Restaurants SUM stops at row 58, missing
+  the last three lines. Every other month of every year matches the sheet to the cent.
+- `npm test` (in `frontend/`, Node's built-in runner) covers each layout with made-up numbers. To check real
+  files, keep them outside the repo (Devin's are in `~/Desktop/FinanceFiles`).
 
 ## Financial profile (plan)
 

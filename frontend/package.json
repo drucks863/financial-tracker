@@ -10,7 +10,8 @@
     "build:preview": "vue-tsc --build && vite build --mode preview && node scripts/to-artifact.ts",
     "sample-seed": "node scripts/make-sample-seed.ts",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --build"
+    "typecheck": "vue-tsc --build",
+    "test": "node --test 'tests/*.test.ts'"
   },
   "dependencies": {
     "@primeuix/themes": "2.0.3",
