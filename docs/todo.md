@@ -96,4 +96,5 @@
 - [x] More color (Devin found it too white): Net worth Trend line in the app's green, tinted Overview KPI icons, active nav icon, group dots and income/expense swatches
 - [x] Deployed main 7d47bf9 (PRs #22 DynamoDB docs, #23 more color, #24 Retirement reset bar) as Lambda version 17, 2026-11-01
 - [x] Deployed main 666aecd (PR #26 Retirement redesign, In retirement inputs back at the bottom) as Lambda version 18, 2026-11-01
+- [x] Deployed main 37fa9f4 (PR #27 Retirement chart axis fits the average-years line) as Lambda version 19, 2026-11-01
 - [x] Retirement: easy way back to your real numbers ("Reset to my numbers" bar that follows you down the page)
