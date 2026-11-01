@@ -30,6 +30,9 @@
 - [x] Bug hunt fixes and the loan double-count block live as Lambda version 14 (2026-11-01)
 - [ ] Devin: if an entries CSV was ever re-imported, check entries dated the last day of a month (they were on the 1st)
 - [ ] Devin: delete any empty $0 months at the end of Net worth history (from the blank-cell bug; re-importing doesn't remove them)
+- [x] Loading splash while the app cold starts (animated trend-line icon instead of a black page)
+- [ ] Deploy the loading splash
+- [ ] Maybe: serve `index.html` and `/assets/*` from S3/CloudFront so the splash shows before the Lambda wakes
 
 ## Next
 
