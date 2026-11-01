@@ -295,10 +295,10 @@ const inputProps = (spec: FieldSpec) =>
 
 /* ---- chart ---- */
 
-/** Rounds up to 1, 2 or 5 times a power of ten, for a tidy axis top. */
+/** Rounds up to a tidy axis top (1, 1.5, 2, 2.5, 3, 4, 5, 6, 8 or 10 times a power of ten). */
 function niceCeiling(value: number): number {
   const power = Math.pow(10, Math.floor(Math.log10(value)))
-  return ([1, 2, 5, 10].find((step) => step * power >= value) ?? 10) * power
+  return ([1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((step) => step * power >= value) ?? 10) * power
 }
 
 const chart = computed<ChartBuilder>(() => {
@@ -307,9 +307,10 @@ const chart = computed<ChartBuilder>(() => {
   const real = changed.value ? project(realEngine.value, realEngine.value.targetAge).years : null
   const retireIndex = mine.findIndex((year) => year.age === target.value.retireAge)
   const showRange = varied.value
-  // Good-years runs compound to huge numbers late in life; cap the axis so the average line stays readable.
+  // The axis fits the average-years lines (yours and your real numbers), not the good-years band, which
+  // compounds to huge numbers late in life; the band is cut off at the top instead.
   const averageTop = Math.max(...mine.map((year) => shown(year.balance, year.age)), ...(real ?? []).map((year) => shown(year.balance, year.age)), 1)
-  const yMax = showRange ? niceCeiling(averageTop * 1.6) : undefined
+  const yMax = niceCeiling(averageTop * 1.05)
   return (dark, colors) => {
     const blue = series(ROLE.investments, dark)
     return {
