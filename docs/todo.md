@@ -78,3 +78,5 @@
 - [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
 - [x] Net worth: Snapshots list fills its box; Over time chart gets a Trend view with a fitted y-axis (Breakdown keeps the stacked view)
 - [ ] Deploy the Net worth chart and snapshots changes
+- [x] Add entry: category icons and tap-to-pick chips, Description first and required with suggestions from past entries; icons on Cash flow, Overview, Settings
+- [ ] Maybe: let a category's icon be picked in Settings → Categories (today it's chosen from the name)

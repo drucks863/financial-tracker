@@ -34,6 +34,7 @@ import { money, money2, shortDate } from '../lib/format'
 import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
 import { useExport } from '../lib/use-export'
 import type { Category, EntryType, Subscription } from '../types'
+import CategoryIcon from '../components/CategoryIcon.vue'
 
 // The non-plan tabs of the financial profile: one group of panels per tab.
 defineProps<{ section: 'categories' | 'subscriptions' | 'files' }>()
@@ -384,6 +385,7 @@ function reset() {
             <button type="button" class="chev" :aria-expanded="!!openCats[cat.id]" :aria-label="`Show subcategories of ${cat.name}`" @click="openCats[cat.id] = !openCats[cat.id]">
               <i class="pi" :class="openCats[cat.id] ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true"></i>
             </button>
+            <CategoryIcon :name="cat.name" :type="cat.type" size="sm" />
             <InputText
               v-if="editing.key === cat.id"
               :id="`rename-${cat.id}`"
