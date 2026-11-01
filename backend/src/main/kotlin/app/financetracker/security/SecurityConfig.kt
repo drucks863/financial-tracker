@@ -89,6 +89,9 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
         }
         .oauth2Login { login ->
             login.userInfoEndpoint { userInfo -> userInfo.oidcUserService(allowedGoogleUsers()) }
+            // Always land on the app's home page. The UI routes with #hashes, so there's no deeper page
+            // worth returning to, and Spring's "/?continue" return address got stuck on Lambda.
+            login.defaultSuccessUrl("/", true)
             // Answer a failed sign-in with a page saying why. Redirecting anywhere protected would
             // send the browser straight back to Google, round and round.
             login.failureHandler { _, response, exception ->
