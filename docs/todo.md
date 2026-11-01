@@ -90,5 +90,5 @@
 - [x] Add entry: category icons and tap-to-pick chips, Description first and required with suggestions from past entries; icons on Cash flow, Overview, Settings
 - [ ] Maybe: let a category's icon be picked in Settings → Categories (today it's chosen from the name)
 - [x] More color (Devin found it too white): Net worth Trend line in the app's green, tinted Overview KPI icons, active nav icon, group dots and income/expense swatches
-- [ ] Deploy the color changes (with Retirement)
+- [x] Deployed main 7d47bf9 (Retirement #19, DynamoDB docs #22, more color #23, Retirement reset bar #24) as Lambda version 17, 2026-11-01
 - [x] Retirement: easy way back to your real numbers ("Reset to my numbers" bar that follows you down the page)
