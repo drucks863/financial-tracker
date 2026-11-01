@@ -78,7 +78,11 @@
 - [x] Retirement deployed as Lambda version 16 (2026-11-01)
 - [ ] Devin: add your birth year on the profile so Retirement starts from your real age
 - [ ] Next playground: home budgeting (down payment, 401k %, savings), built on the same plumbing
-- [ ] Maybe later: Retirement with home equity or cash counted, retirement taxes (Roth vs pre-tax), market swings
+- [x] Realistic Retirement (Devin, 2026-11-01): spending target in today's dollars up front, loans dropping off at payoff,
+  health insurance before 65, tax on withdrawals, Social Security estimate, market ups and downs (chance it lasts,
+  range on the chart), today's/future dollars, monthly retirement budget
+- [ ] Maybe later: Retirement with home equity or cash counted, separate Roth/pre-tax balances, contribution limits,
+  required minimum distributions, a spouse
 - [x] Make double counting loans impossible: rows repeating a profile loan or its property are skipped on import,
   blocked in the snapshot dialog and left out of net worth (Devin picked this over planning-only loans, 2026-11-01)
 - [ ] Back burner (Devin, 2026-11-01): import Chase CSV activity (chase.com → Download account activity, ~24 months) to get real transaction dates. Proposed: "Chase CSV" import option, skip transfers/card payments, remembered Chase-category and description rules mapped to our categories, and match sheet lines by amount within the month to set their real date (unmatched rows reviewed in a preview). Overlap approach not decided yet.
