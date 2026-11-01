@@ -91,3 +91,4 @@
 - [ ] Maybe: let a category's icon be picked in Settings → Categories (today it's chosen from the name)
 - [x] More color (Devin found it too white): Net worth Trend line in the app's green, tinted Overview KPI icons, active nav icon, group dots and income/expense swatches
 - [ ] Deploy the color changes (with Retirement)
+- [x] Retirement: easy way back to your real numbers ("Reset to my numbers" bar that follows you down the page)

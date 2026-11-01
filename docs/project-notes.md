@@ -290,9 +290,10 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
     are kept as **overrides** on top, so untouched fields keep following the profile and tweaked ones stay put.
     Plain numbers only, so nothing can write back into the store. Overrides are saved in this browser only
     (localStorage `financial-tracker.scenario.<key>`), never sent to the server. Setting a field back to the real
-    value (or "Use it") drops the override; "Reset all" clears them.
-  - `components/SimulatorShell.vue` (header, "changed here, profile not touched" note, Reset all) and
-    `components/SimField.vue` (an input with where its value came from, a dot when changed, "Use it" to go back).
+    value (or its "Reset" link) drops the override; "Reset to my numbers" clears them all.
+  - `components/SimulatorShell.vue` (header, "changed here, profile not touched" note, "Reset to my numbers" there and in a bar that sticks above the tab bar while anything is changed,
+    added 2026-11-01 because Devin couldn't find the way back) and
+    `components/SimField.vue` (an input with where its value came from, a dot when changed, "Reset" to go back).
 - **Retirement math** (`lib/retirement.ts`, tested in `tests/retirement.test.ts`): yearly steps in today's dollars
   (real return = (1 + return) / (1 + inflation) − 1; saving grows with raises above inflation; mid-year timing).
   Saving stops at the retire age, then spending comes out, less Social Security from its start age. "Earliest age"

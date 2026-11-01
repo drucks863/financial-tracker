@@ -25,7 +25,7 @@ const emit = defineEmits<{ reset: [] }>()
     </label>
     <small v-if="changed" class="origin">
       Yours: {{ realText }}<template v-if="source"> ({{ source }})</template> ·
-      <button type="button" class="back" @click="emit('reset')">Use it</button>
+      <button type="button" class="back" @click="emit('reset')">Reset</button>
     </small>
     <small v-else-if="source" class="origin muted">From {{ source }}</small>
     <small v-if="hint" class="muted">{{ hint }}</small>

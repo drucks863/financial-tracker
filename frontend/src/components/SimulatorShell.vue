@@ -4,7 +4,8 @@ import Button from 'primevue/button'
 import { SIMULATORS } from '../lib/simulators'
 
 // The frame every Plan page (what-if simulator) sits in: a "What-if" header, a note that changes
-// stay on the page, a Reset all button, and links between simulators once there's more than one.
+// stay on the page, a "Reset to my numbers" button (also in a bar that sticks to the bottom while
+// anything is changed), and links between simulators once there's more than one.
 const props = defineProps<{ id: string; changedCount: number }>()
 const emit = defineEmits<{ reset: []; navigate: [id: string] }>()
 const info = computed(() => SIMULATORS.find((simulator) => simulator.id === props.id)!)
@@ -38,10 +39,18 @@ const info = computed(() => SIMULATORS.find((simulator) => simulator.id === prop
         Your profile and data aren't touched.
       </p>
       <p v-else>Starts from your profile and real data. Change anything here; it never changes your profile.</p>
-      <Button v-if="changedCount" label="Reset all" icon="pi pi-replay" size="small" text severity="secondary" @click="emit('reset')" />
+      <Button v-if="changedCount" label="Reset to my numbers" icon="pi pi-replay" size="small" outlined severity="secondary" @click="emit('reset')" />
     </div>
 
     <slot />
+
+    <!-- Follows you down the page while anything is changed, so the way back is always in reach. -->
+    <Transition name="reset-bar">
+      <div v-if="changedCount" class="reset-bar" role="status">
+        <span class="reset-count"><span class="dot" aria-hidden="true"></span>{{ changedCount }} changed</span>
+        <Button label="Reset to my numbers" icon="pi pi-replay" size="small" rounded @click="emit('reset')" />
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -119,5 +128,50 @@ const info = computed(() => SIMULATORS.find((simulator) => simulator.id === prop
 }
 .sim-note > .pi {
   color: var(--muted);
+}
+.reset-bar {
+  position: sticky;
+  /* above the phone tab bar; the page's own bottom padding leaves room for it */
+  bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+.reset-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.reset-count .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.reset-bar-enter-active,
+.reset-bar-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.reset-bar-enter-from,
+.reset-bar-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+@media (min-width: 960px) {
+  .reset-bar {
+    bottom: 20px;
+  }
 }
 </style>
