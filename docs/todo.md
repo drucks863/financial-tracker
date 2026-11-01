@@ -52,3 +52,4 @@
 - [x] App icon and favicon (trend line): tab icon, iOS home screen, Android/PWA manifest; open before sign-in
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
+- [x] Tapping "Paid" (and other Select fields) in the profile opened the link-marker popover; fixed

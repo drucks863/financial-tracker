@@ -18,19 +18,25 @@ function toggle(e: Event) {
 </script>
 
 <template>
-  <button
-    type="button"
+  <!-- A span, not a <button>: this sits inside field <label>s, and a label forwards
+       every tap on its text or on a non-input control (like Select) to its first
+       labelable child. A button would catch those taps and open the popover. -->
+  <span
+    role="button"
+    tabindex="0"
     class="used-by"
     aria-label="Used elsewhere in the app"
     aria-haspopup="true"
     @click.prevent.stop="toggle"
+    @keydown.enter.prevent.stop="toggle"
+    @keydown.space.prevent.stop="toggle"
     @mouseenter="show"
     @mouseleave="hide"
     @focus="show"
     @blur="hide"
   >
     <i class="pi pi-link" aria-hidden="true"></i>
-  </button>
+  </span>
   <Popover ref="pop" class="used-by-pop" @hide="pinned = false">
     <p class="ub-title">Used elsewhere</p>
     <p v-if="note" class="ub-note">{{ note }}</p>
