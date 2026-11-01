@@ -307,6 +307,11 @@ saved in the browser only.
 - Month strip bars (Cash flow tab): 84px zone, one shared scale, and the baseline moves to fit the
   data (bottom when every month saved), so small months stay readable. Devin found the old 46px
   split-in-half version too flat (2026-11-01).
+- Net worth "Over time" (2026-11-01): opens on **Trend**, the net worth line alone on a y-axis fitted to it
+  (8% headroom), because from zero a gradual climb looked flat; the tooltip lists each group and debt.
+  **Breakdown** is the old stacked view from zero (assets above, debt below). Devin left the choice to us.
+- Net worth Snapshots list: on desktop it fills its panel to the height of Accounts (360px minimum) and
+  scrolls inside; on phones it runs down the page with no inner scroll box (it used to stop at 360px).
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
 - Expense category colors: five palette slots go to the five biggest categories **of the year being viewed**
   (`categoryRank` in `store/ui.ts`, ties by all-time spend); everything else is grey "Other" ("Everything else"
