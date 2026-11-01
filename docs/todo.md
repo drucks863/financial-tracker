@@ -64,6 +64,7 @@
 - [x] Taller month strip bars on the Cash flow tab, baseline placed to fit the data (live as version 12)
 - [x] Deployed main c9db4df (PRs #6 to #12: Paid tooltip, plan check, sample accounts on import, Trends Other, phone tooltips/popovers) as Lambda version 13, 2026-11-01
 - [x] Deployed main ba5b86b (PRs #16 loading splash, #17 Net worth chart/snapshots, #18 category icons and Add entry form) as Lambda version 15, 2026-11-01
+- [x] Deployed main 8e90527 (PR #19 retirement calculator) as Lambda version 16, 2026-11-01
 - [x] App icon and favicon (trend line): tab icon, iOS home screen, Android/PWA manifest; open before sign-in
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
@@ -74,7 +75,7 @@
   your real numbers; Birth year on the profile
 - [ ] Devin: review the Retirement PR and its starting assumptions (7% return, 3% inflation and raises, to 95, no Social Security)
 - [x] Merge Retirement (PR #19; Devin asked to ship it with this round, 2026-11-01)
-- [ ] Deploy Retirement (with or right after the cold-start loading screen deploy)
+- [x] Retirement deployed as Lambda version 16 (2026-11-01)
 - [ ] Devin: add your birth year on the profile so Retirement starts from your real age
 - [ ] Next playground: home budgeting (down payment, 401k %, savings), built on the same plumbing
 - [ ] Maybe later: Retirement with home equity or cash counted, retirement taxes (Roth vs pre-tax), market swings
