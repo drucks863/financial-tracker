@@ -72,7 +72,8 @@
 - [x] Retirement calculator: earliest retirement age, invested balance by age, needed vs projected, compared with
   your real numbers; Birth year on the profile
 - [ ] Devin: review the Retirement PR and its starting assumptions (7% return, 3% inflation and raises, to 95, no Social Security)
-- [ ] Merge and deploy Retirement when Devin says (he wants it shipped separately, after the current fixes)
+- [x] Merge Retirement (PR #19; Devin asked to ship it with this round, 2026-11-01)
+- [ ] Deploy Retirement (with or right after the cold-start loading screen deploy)
 - [ ] Devin: add your birth year on the profile so Retirement starts from your real age
 - [ ] Next playground: home budgeting (down payment, 401k %, savings), built on the same plumbing
 - [ ] Maybe later: Retirement with home equity or cash counted, retirement taxes (Roth vs pre-tax), market swings
