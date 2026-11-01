@@ -263,6 +263,20 @@ saved in the browser only.
 - The year select sits above the month scroller on every screen size.
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
 
+### App icon and favicon (Devin picked "trend line", 2026-11-01)
+
+- A silver line ticking upward to a green dot (`#5fbf8f`) over a faint baseline, on the app's `#131312`
+  panel color. Picked over "rising bars" and "budget ring".
+- Sources: `frontend/icons/app-icon.svg` (full square; iOS/Android round the corners),
+  `frontend/icons/app-icon-maskable.svg` (mark shrunk into Android's safe circle) and
+  `frontend/public/favicon.svg` (rounded tile, no baseline, heavier line for 16px).
+- PNGs in `frontend/public/` (`apple-touch-icon.png` 180, `icon-192/512.png`, `icon-maskable-512.png`,
+  `favicon-32.png`) are generated: `NODE_PATH=$(npm root -g) node scripts/make-icons.ts` with a global
+  Playwright. Commit the PNGs; the build just copies `public/`.
+- `public/site.webmanifest`: name "Financial Tracker", home-screen label "Finances", standalone, dark theme color.
+- These files are open before sign-in (`PUBLIC_ICON_PATHS` in `SecurityConfig.kt`): the manifest is fetched
+  without cookies, and a phone may fetch icons before anyone signs in. Add new icon files to that list.
+
 ## Code conventions
 
 - Prefer long, descriptive variable names over short abbreviations, including for services

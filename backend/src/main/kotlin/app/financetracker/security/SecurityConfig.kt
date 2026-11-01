@@ -68,7 +68,7 @@ class NoLoginSecurityConfig {
 }
 
 /**
- * Google sign-in. The whole app sits behind it except the health check: a browser is sent to Google,
+ * Google sign-in. The whole app sits behind it except the health check and the app icons: a browser is sent to Google,
  * and /api answers 401 so the UI can send the browser there itself when a session runs out.
  * The session is a server-side cookie; writes need the XSRF-TOKEN cookie echoed in X-XSRF-TOKEN.
  */
@@ -85,6 +85,9 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
     fun securityFilterChain(http: HttpSecurity): SecurityFilterChain = http
         .authorizeHttpRequests { requests ->
             requests.requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
+            // App icons and the web app manifest: browsers fetch the manifest without cookies, and a phone
+            // saving the site to its home screen may ask for the icons before anyone has signed in
+            requests.requestMatchers(*PUBLIC_ICON_PATHS).permitAll()
             requests.anyRequest().authenticated()
         }
         .oauth2Login { login ->
@@ -134,6 +137,12 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
 
     companion object {
         const val GOOGLE_SIGN_IN_PATH = "/oauth2/authorization/google"
+
+        /** The files in frontend/public that a browser or phone needs before sign-in. */
+        val PUBLIC_ICON_PATHS = arrayOf(
+            "/favicon.svg", "/favicon-32.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png",
+            "/icon-maskable-512.png", "/site.webmanifest",
+        )
 
         fun signInFailedPage(reason: String) = """
             <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
