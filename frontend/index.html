@@ -16,9 +16,42 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+    <!-- Splash: shows until the app mounts (Vue replaces #app). Inline so it paints with the HTML,
+         before the scripts download and the first API call returns (a Lambda cold start takes seconds). -->
+    <style>
+      html, body { margin: 0; background: #0c0c0b; }
+      html[data-theme='light'], html[data-theme='light'] body { background: #f7f7f6; }
+      .splash {
+        position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 20px; padding: 16px; color: #85847e; font: 500 14px/1.4 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        animation: splash-in 0.3s ease-out both;
+      }
+      html[data-theme='light'] .splash { color: #7b766b; }
+      .splash svg { width: 88px; height: 88px; }
+      .splash .line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: splash-draw 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+      .splash .dot { transform-origin: 398px 150px; transform: scale(0); animation: splash-dot 2.4s ease-out infinite; }
+      .splash p { margin: 0; text-align: center; opacity: 0; animation: splash-in 0.4s ease-out 1.5s both; }
+      @keyframes splash-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes splash-draw { 0% { stroke-dashoffset: 1; } 45%, 80% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+      @keyframes splash-dot { 0%, 38% { transform: scale(0); } 50% { transform: scale(1.15); } 58%, 80% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        .splash .line { animation: none; stroke-dashoffset: 0; }
+        .splash .dot { animation: splash-pulse 1.6s ease-in-out infinite alternate; transform: scale(1); }
+        @keyframes splash-pulse { from { opacity: 1; } to { opacity: 0.35; } }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="splash" role="status" aria-live="polite">
+        <svg viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="104" fill="#131312" />
+          <polyline class="line" pathLength="1" points="88,372 200,262 276,318 392,170" fill="none" stroke="#d6d5d0" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" />
+          <circle class="dot" cx="398" cy="150" r="62" fill="#5fbf8f" />
+        </svg>
+        <p>Waking up, this can take a few seconds…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

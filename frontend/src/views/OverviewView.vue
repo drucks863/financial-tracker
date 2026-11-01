@@ -7,6 +7,7 @@ import Popover from 'primevue/popover'
 import Menu from 'primevue/menu'
 import BaseChart from '../components/BaseChart.vue'
 import { ui, openEntry, categoryColor, categoryRank } from '../store/ui'
+import CategoryIcon from '../components/CategoryIcon.vue'
 import { state, monthTotals, avgNonZero, categoryTotals, netWorthSeries, yearsAvailable, findCategory } from '../store/finance'
 import { money, money2, moneyCompact, signedMoney, pct, MONTHS, MONTHS_LONG, shortDate, dayLabel as day } from '../lib/format'
 import { series, otherColor, ROLE, CATEGORY_COLOR_COUNT } from '../lib/chart-colors'
@@ -503,7 +504,7 @@ const pageItems = computed(() => [
                 <small class="muted sub-cat">{{ e.category }}</small>
               </td>
               <td class="col-cat">
-                <span class="tag"><i class="dot" :style="{ background: e.type === 'income' ? 'var(--series-income)' : categoryColor(e.category, isDark) }"></i>{{ e.category }}</span>
+                <span class="tag"><CategoryIcon :name="e.category" :type="e.type" size="sm" />{{ e.category }}</span>
               </td>
               <td class="r num nowrap" :class="{ pos: e.type === 'income' }">{{ e.type === 'income' ? '+' : '' }}{{ money2(e.amount) }}</td>
             </tr>
@@ -578,7 +579,7 @@ const pageItems = computed(() => [
           />
           <ul v-if="showAllCats" class="cat-list">
             <li v-for="c in spend" :key="c.name">
-              <i class="dot" :style="{ background: categoryColor(c.name, isDark) }"></i>
+              <CategoryIcon :name="c.name" size="sm" />
               <span class="cat-name">{{ c.name }}</span>
               <span class="num">{{ money(c.total) }}</span>
               <span v-if="c.delta !== null" class="delta num" :title="`Monthly average ${money(c.avg)}`">

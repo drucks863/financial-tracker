@@ -338,12 +338,26 @@ saved in the browser only.
 - Month strip bars (Cash flow tab): 84px zone, one shared scale, and the baseline moves to fit the
   data (bottom when every month saved), so small months stay readable. Devin found the old 46px
   split-in-half version too flat (2026-11-01).
+- Net worth "Over time" (2026-11-01): opens on **Trend**, the net worth line alone on a y-axis fitted to it
+  (8% headroom), because from zero a gradual climb looked flat; the tooltip lists each group and debt.
+  **Breakdown** is the old stacked view from zero (assets above, debt below). Devin left the choice to us.
+- Net worth Snapshots list: on desktop it fills its panel to the height of Accounts (360px minimum) and
+  scrolls inside; on phones it runs down the page with no inner scroll box (it used to stop at 360px).
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
 - Expense category colors: five palette slots go to the five biggest categories **of the year being viewed**
   (`categoryRank` in `store/ui.ts`, ties by all-time spend); everything else is grey "Other" ("Everything else"
   when a real category is called Other). Ranked all-time until 2026-11-01, which pushed a year's big categories
   into Other once older years were imported. Trends lists what's in Other under the chart, and its tooltip
   breaks the Other bar down by category (Devin asked why Other was so big).
+- Category icons (2026-11-01, Devin wanted repeated actions quicker to scan): every category gets a PrimeIcons
+  icon picked from the words in its name (`lib/category-icons.ts`, tag icon when nothing matches), shown on a tile
+  tinted with the category's chart color (`CategoryIcon.vue`). Icons carry the identity, since only the top five
+  categories get a color; colors stay the chart colors so a category looks the same everywhere. Shown in Add entry,
+  Cash flow, Overview (activity, category list) and Settings → Categories.
+- Add entry form (2026-11-01, Devin): Description first and required. It suggests past descriptions (newest first,
+  with their category), and picking one on a new entry fills in the type, category and subcategory from the last
+  entry with that description. Category and subcategory are tap-to-pick chips instead of dropdowns. New entries
+  focus the description, edits focus the amount.
 - Chart tooltips on touch: a tap outside the chart, a scroll, or a second tap on the same bar closes it
   (`BaseChart.vue`); Chart.js alone only listens on the canvas, so the tooltip used to get stuck on phones.
   Charts don't listen to touchstart/touchmove (`events` in `BaseChart.vue`), so a finger scrolling past a
@@ -365,6 +379,17 @@ saved in the browser only.
 - `public/site.webmanifest`: name "Financial Tracker", home-screen label "Finances", standalone, dark theme color.
 - These files are open before sign-in (`PUBLIC_ICON_PATHS` in `SecurityConfig.kt`): the manifest is fetched
   without cookies, and a phone may fetch icons before anyone signs in. Add new icon files to that list.
+
+### Loading splash (2026-11-01)
+
+- A Lambda cold start used to show a black page until the app mounted. `frontend/index.html` now has an inline
+  splash inside `#app`: the trend-line icon drawing itself on a loop, and "Waking up, this can take a few
+  seconds…" fading in after 1.5 s (so warm loads don't flash text). Inline CSS, no JS, so it paints with the HTML.
+- `main.ts` awaits `initStore()` (the first API data) before mounting, and Vue's mount replaces `#app`, so the
+  splash stays exactly until the data is in. Respects `prefers-reduced-motion` (static icon, pulsing dot).
+- Limit: the HTML itself comes from the Lambda (CloudFront caching is off), so the very first wait, before
+  the HTML arrives, still shows the browser's (or home-screen app's) background. Fixing that means serving
+  `index.html` and `/assets/*` from S3 or the CloudFront cache instead of the Lambda.
 
 ## Code conventions
 
