@@ -237,6 +237,12 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   Other screens should read `planned`, not recompute. Used by: Overview "Plan check" widget,
   Net worth "Expected each month", Add entry amount prefill (matched by subcategory name),
   Trends planned lines.
+- Overview plan check, Rent and bills row (2026-11-01): the spent side counts only entries whose
+  subcategory (then category) matches a Rent and bills item or an active loan by name
+  (`lib/plan-match.ts`), and the row lists what it counted. It used to count every Essential
+  category, so editing Rent and bills only moved the target and Devin thought it ignored them.
+  "Everything else" is all other spending. Short names (under 4 letters) only match exactly, so
+  insurance "Car" doesn't count as "Car loan".
 - Loans (amount, rate, term, first payment month, extra/month) live on the financial profile;
   `lib/loan.ts` amortizes them. Net worth adds each loan's balance as debt for every snapshot
   month (owed from the month before the first payment), so loans are never typed into snapshots.

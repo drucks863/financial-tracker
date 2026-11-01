@@ -14,6 +14,7 @@ import { isDark } from '../lib/theme-mode'
 import { useWidgetOrder } from '../lib/widget-order'
 import { useExport } from '../lib/use-export'
 import { planned } from '../store/plan'
+import { planItemSpend } from '../lib/plan-match'
 import type { ChartBuilder } from '../lib/chart-types'
 import type { Entry } from '../types'
 
@@ -284,15 +285,39 @@ const essentials = computed(() => spend.value.filter((c) => c.essential).reduce(
 /* ---------- plan check: this period against your profile ---------- */
 // Year mode scales the monthly plan by the months that have entries, so a partial year compares fairly.
 const planMonths = computed(() => (mode.value === 'month' ? 1 : year.value.filter((r) => r.count).length))
+// Rent and bills compares what was spent on the profile's Rent and bills items and loans
+// (matched by name) against your share, so editing that list moves both numbers.
+const housingItems = computed(() => [
+  ...planned.value.housing,
+  ...planned.value.loans.filter((l) => l.balance > 0).map((l) => ({ id: l.loan.id, name: l.loan.name }))
+])
+const housingSpend = computed(() => planItemSpend(state.entries.filter(inPeriod), housingItems.value))
 const planRows = computed(() => {
   const n = planned.value.monthly
   const k = planMonths.value
   const c = current.value
+  const housing = housingSpend.value
   const budget = Math.max(0, n.afterHousing) * k
   return [
-    { id: 'income', label: 'Income', note: 'vs take-home pay', actual: c.income, plan: n.takeHome * k, upIsGood: true },
-    { id: 'housing', label: 'Rent and utilities', note: 'vs your share', actual: essentials.value, plan: (n.housingMine + n.loanPayments) * k, upIsGood: false },
-    { id: 'other', label: 'Everything else', note: 'vs what’s left after housing', actual: spendTotal.value - essentials.value, plan: budget, upIsGood: false }
+    { id: 'income', label: 'Income', note: 'vs take-home pay', actual: c.income, plan: n.takeHome * k, upIsGood: true, detail: '' },
+    {
+      id: 'housing',
+      label: n.loanPayments ? 'Rent, bills and loans' : 'Rent and bills',
+      note: 'vs your share',
+      actual: housing.total,
+      plan: (n.housingMine + n.loanPayments) * k,
+      upIsGood: false,
+      detail: housing.counted.length ? `Counts ${housing.counted.join(', ')}` : 'No entries match your Rent and bills items by name'
+    },
+    {
+      id: 'other',
+      label: 'Everything else',
+      note: 'vs what’s left after housing',
+      actual: spendTotal.value - housing.total,
+      plan: budget,
+      upIsGood: false,
+      detail: ''
+    }
   ]
     .filter((r) => r.plan > 0)
     .map((r) => {
@@ -594,6 +619,7 @@ const pageItems = computed(() => [
             <small class="num" :class="r.good ? 'pos' : 'neg'">
               {{ r.diff >= 0 ? `${money(r.diff)} over` : `${money(-r.diff)} under` }}
             </small>
+            <small v-if="r.detail" class="plan-detail muted">{{ r.detail }}</small>
           </li>
         </ul>
         <p v-else-if="!hasPlan" class="empty">Fill in your financial profile to compare each month to your plan.</p>
@@ -1042,6 +1068,11 @@ const pageItems = computed(() => [
   background: var(--bad);
 }
 .plan-list small.num {
+  font-size: 0.75rem;
+}
+.plan-detail {
+  display: block;
+  margin-top: 2px;
   font-size: 0.75rem;
 }
 

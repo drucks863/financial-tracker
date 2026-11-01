@@ -26,7 +26,7 @@ const USES = {
   takeHome: TAKE_HOME,
   saving: SAVING,
   pay: [...TAKE_HOME, ...SAVING],
-  housing: ['Overview: plan check, rent and utilities', 'Trends: a planned line for that category', 'Add entry: fills in your share'],
+  housing: ['Overview: plan check, spending on these items vs your share', 'Trends: a planned line for that category', 'Add entry: fills in your share'],
   loans: [
     'Net worth: what you owe each month, and the loan chart',
     'Net worth: principal counts toward expected growth',
