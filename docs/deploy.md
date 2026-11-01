@@ -63,6 +63,8 @@ handler function URL events, so the Lambda path is tested without AWS.
 
 ## Updating
 
-Build the zip, upload it, `update-function-code`, wait, `publish-version`, move alias `live` to the new
-version. Environment variable changes also need a new published version (SnapStart snapshots per version).
+Build the zip, upload it, `update-function-code`, wait, `publish-version`, then
+`aws lambda wait published-version-active --qualifier <version>` before moving alias `live` to the new
+version. A new version stays Pending for a minute or two while SnapStart builds its snapshot; moving the
+alias earlier gives 504s until it goes Active (seen 2026-11-01). Environment variable changes also need a new published version (SnapStart snapshots per version).
 Sessions are in DynamoDB, so a deploy doesn't sign anyone out.
