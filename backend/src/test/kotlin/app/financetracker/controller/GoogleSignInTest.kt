@@ -40,6 +40,15 @@ class GoogleSignInTest(@Autowired val mockMvc: MockMvc) {
     }
 
     @Test
+    fun `a failed sign-in shows a page instead of looping back to Google`() {
+        // a callback with no sign-in started is a failure (no saved authorization request)
+        mockMvc.get("/login/oauth2/code/google?code=abc&state=xyz").andExpect {
+            status { isUnauthorized() }
+            content { string(org.hamcrest.Matchers.containsString("Sign-in didn't work")) }
+        }
+    }
+
+    @Test
     fun `the health check stays open`() {
         mockMvc.get("/actuator/health").andExpect { status { isOk() } }
     }

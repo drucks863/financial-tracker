@@ -20,6 +20,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint
+import org.slf4j.LoggerFactory
+import org.springframework.web.util.HtmlUtils
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
 import org.springframework.session.config.annotation.web.http.EnableSpringHttpSession
 import org.springframework.session.web.http.CookieSerializer
@@ -73,6 +75,8 @@ class NoLoginSecurityConfig {
 @Configuration
 @ConditionalOnProperty("finance.auth.mode", havingValue = "google")
 class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
+    private val logger = LoggerFactory.getLogger(GoogleSignInSecurityConfig::class.java)
+
     init {
         check(authProperties.allowedEmails.isNotEmpty()) { "finance.auth.allowed-emails must list who may sign in" }
     }
@@ -83,7 +87,17 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
             requests.requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
             requests.anyRequest().authenticated()
         }
-        .oauth2Login { login -> login.userInfoEndpoint { userInfo -> userInfo.oidcUserService(allowedGoogleUsers()) } }
+        .oauth2Login { login ->
+            login.userInfoEndpoint { userInfo -> userInfo.oidcUserService(allowedGoogleUsers()) }
+            // Answer a failed sign-in with a page saying why. Redirecting anywhere protected would
+            // send the browser straight back to Google, round and round.
+            login.failureHandler { _, response, exception ->
+                logger.warn("Google sign-in failed: {}", exception.message)
+                response.status = HttpStatus.UNAUTHORIZED.value()
+                response.contentType = "text/html;charset=UTF-8"
+                response.writer.write(signInFailedPage(exception.message ?: "Unknown error"))
+            }
+        }
         .logout { logout -> logout.logoutSuccessUrl("/") }
         .exceptionHandling { exceptions ->
             exceptions.defaultAuthenticationEntryPointFor(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), PathPatternRequestMatcher.pathPattern("/api/**"))
@@ -117,6 +131,16 @@ class GoogleSignInSecurityConfig(private val authProperties: AuthProperties) {
 
     companion object {
         const val GOOGLE_SIGN_IN_PATH = "/oauth2/authorization/google"
+
+        fun signInFailedPage(reason: String) = """
+            <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Sign-in didn't work</title></head>
+            <body style="font-family:system-ui,sans-serif;background:#111;color:#eee;padding:24px;max-width:32rem;margin:auto">
+            <h1 style="font-size:1.25rem">Sign-in didn't work</h1>
+            <p>${HtmlUtils.htmlEscape(reason)}</p>
+            <p><a style="color:#ccc" href="$GOOGLE_SIGN_IN_PATH">Try again</a></p>
+            </body></html>
+        """.trimIndent()
     }
 }
 

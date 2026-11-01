@@ -54,4 +54,28 @@ class LambdaHandlerTest {
         assertEquals(200, summary["statusCode"].asInt())
         assertEquals(12, jsonMapper.readTree(summary["body"].asString()).size())
     }
+
+    @Test
+    fun `every cookie goes into the cookies array function URLs read`() {
+        val containerResponse = jsonMapper.readTree(
+            """
+            {"statusCode": 302, "isBase64Encoded": false, "body": "",
+             "headers": {"Location": "https://accounts.google.com/o/oauth2/v2/auth", "Set-Cookie": "XSRF-TOKEN=a; Path=/; Secure"},
+             "multiValueHeaders": {
+               "Location": ["https://accounts.google.com/o/oauth2/v2/auth"],
+               "Set-Cookie": ["XSRF-TOKEN=a; Path=/; Secure", "SESSION=b; Path=/; Secure; HttpOnly; SameSite=Lax"],
+               "Vary": ["Origin", "Accept"]
+             }}
+            """,
+        )
+        val functionUrlResponse = LambdaHandler.toFunctionUrlResponse(containerResponse)
+        assertEquals<List<String>>(
+            listOf("XSRF-TOKEN=a; Path=/; Secure", "SESSION=b; Path=/; Secure; HttpOnly; SameSite=Lax"),
+            functionUrlResponse["cookies"].values().map { cookie -> cookie.asString() },
+        )
+        assertEquals(302, functionUrlResponse["statusCode"].asInt())
+        assertEquals("https://accounts.google.com/o/oauth2/v2/auth", functionUrlResponse["headers"]["Location"].asString())
+        assertEquals("Origin,Accept", functionUrlResponse["headers"]["Vary"].asString())
+        assertTrue(functionUrlResponse["headers"]["Set-Cookie"] == null)
+    }
 }

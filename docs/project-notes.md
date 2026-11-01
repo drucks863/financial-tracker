@@ -106,7 +106,11 @@ docs/       these notes, the todo list, deploy.md
 - Behind CloudFront the app does **not** use X-Forwarded-* (`forward-headers-strategy: framework` made every
   Lambda request a 400). `PublicUrlFilter` makes requests look like they reached `PUBLIC_URL` instead.
 - **Lambda**: `LambdaHandler` (aws-serverless-java-container-springboot4) starts Spring at class load, which
-  SnapStart snapshots. `./gradlew :backend:lambdaZip` packages it.
+  SnapStart snapshots. `./gradlew :backend:lambdaZip` packages it. The container answers in the 1.0 response
+  shape; `LambdaHandler` rewrites it to 2.0 (all Set-Cookie values into `cookies`), because function URLs drop
+  `multiValueHeaders` and the session cookie was being lost (sign-in loop, 2026-11-01).
+- A failed Google sign-in answers with a small "Sign-in didn't work" page and logs the reason, instead of
+  redirecting (which looped back to Google).
 - Server-side ports of the math, tested: `LoanMath` (amortization, balance by month, property value),
   `PlanCalculator` (budget setup figures), `Summaries` (month totals, net worth series). The frontend
   still computes its own; keep the two in step until it reads these.
