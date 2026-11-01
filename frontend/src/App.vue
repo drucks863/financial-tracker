@@ -112,7 +112,9 @@ onMounted(() => {
         </p>
         <Button label="Reload" size="small" severity="secondary" @click="reload" />
       </div>
-      <p v-if="isSampleData" class="sample-note">Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export), or add <code>src/data/seed.local.json</code>.</p>
+      <p v-if="isSampleData" class="sample-note">
+        Showing made-up sample data. Import your sheets from your profile (avatar, then Import &amp; export)<template v-if="!sync.remote">, or add <code>src/data/seed.local.json</code></template>.
+      </p>
       <component :is="view.component" @navigate="go" />
     </main>
 
