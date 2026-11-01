@@ -25,7 +25,9 @@ type Rows = Cell[][]
 
 async function readWorkbook(file: Blob): Promise<XLSX.WorkBook> {
   const buffer = await file.arrayBuffer()
-  return XLSX.read(buffer, { cellDates: true, type: 'array' })
+  // raw: CSV cells stay text. Otherwise SheetJS turns "2026-10-01" into midnight UTC, which is
+  // still September 30 in the US, so every entry on the 1st moved to the month before.
+  return XLSX.read(buffer, { cellDates: true, raw: true, type: 'array' })
 }
 const sheetRows = (sheet: XLSX.WorkSheet): Rows => XLSX.utils.sheet_to_json<Cell[]>(sheet, { header: 1, raw: true, defval: null })
 
@@ -430,12 +432,14 @@ export async function parseCashFlowWorkbook(file: Blob, year: number): Promise<P
   for (const cat of expense) {
     for (const sub of cat.subs) {
       cat.totals[sub].forEach((t, mi) => {
-        const diff = round2(t - (found[key(cat.name, sub, mi)] || 0))
-        if (diff < -0.01) {
+        const itemized = found[key(cat.name, sub, mi)] || 0
+        const diff = round2(t - itemized)
+        if (diff < -0.01 && itemized > 0) {
           // The month tab's lines add up to more than the Expenses tab says, usually a SUM range
           // that stops short of the last lines. The lines are what was spent, so they stay.
           problems.push(`${MONTH_NAMES[mi]} ${year} ${cat.name} › ${sub}: the itemized lines come to $${(-diff).toFixed(2)} more than the Expenses tab total. Kept the lines.`)
-        } else if (diff > 0.01)
+        } else if (Math.abs(diff) > 0.01)
+          // a negative total with no lines is a refund, and counts against spending like in the sheet
           entries.push({ date: `${year}-${pad(mi + 1)}-01`, type: 'expense', category: cat.name, subcategory: sub, description: 'Monthly total', amount: diff })
       })
     }
@@ -552,10 +556,21 @@ export async function parseNetWorthWorkbook(file: Blob): Promise<ParsedNetWorth>
     if (g) group = g
     const label = r[2]
     if (!label || /total|subtotal|net worth/i.test(String(r[1] ?? '') + label)) continue
-    const values = Object.fromEntries(dateCols.map((d) => [d.date, num(r[d.ci]) || 0]))
+    // Only cells with a number. A blank cell (a month not filled in yet, an account not opened yet)
+    // is not a $0 balance: as one it made empty future months show net worth near zero, and it
+    // overwrote balances already saved in the app.
+    const values: Record<string, number> = {}
+    for (const d of dateCols) {
+      const value = num(r[d.ci])
+      if (value !== null) values[d.date] = value
+    }
     if (Object.values(values).some((v) => v !== 0)) accounts.push({ name: text(label), group, values })
   }
-  return { accounts, dates: dateCols.map((d) => d.date), problems: accounts.length ? [] : ['No account rows with balances were found.'] }
+  const filled = dateCols.filter((d) => accounts.some((account) => d.date in account.values)).map((d) => d.date)
+  const problems = accounts.length ? [] : ['No account rows with balances were found.']
+  const empty = dateCols.length - filled.length
+  if (accounts.length && empty) problems.push(`Skipped ${empty} month${empty === 1 ? '' : 's'} with no balances filled in.`)
+  return { accounts, dates: filled, problems }
 }
 
 /** "Cash Flow '23.xlsx" → 2023, so the year picker follows the file. */

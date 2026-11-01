@@ -17,12 +17,14 @@ export interface EntryLike {
   amount: number
 }
 
-const norm = (name: string | null | undefined): string => (name || '').toLowerCase().replace(/[^a-z]/g, '')
+export const normName = (name: string | null | undefined): string => (name || '').toLowerCase().replace(/[^a-z]/g, '')
+const norm = normName
 
 // One name containing the other counts, but only when the shorter one has at least four
 // letters, so "Car" (insurance) doesn't match "Car loan". Short names must match exactly.
 const MIN_CONTAINED = 4
-function namesMatch(entryName: string, itemName: string): boolean {
+/** Two names (already passed through `normName`) that refer to the same thing. */
+export function namesMatch(entryName: string, itemName: string): boolean {
   if (!entryName || !itemName) return false
   if (entryName === itemName) return true
   const shorter = entryName.length < itemName.length ? entryName : itemName
@@ -63,4 +65,13 @@ export function planItemSpend(entries: EntryLike[], items: PlanItemName[]): Plan
     counted.add(entry.subcategory && entry.subcategory !== entry.category ? `${entry.category} / ${entry.subcategory}` : entry.category)
   }
   return { total, byItem, counted: [...counted].sort() }
+}
+
+/**
+ * The plan items that belong to a category: matched on the category's own name or any of its
+ * subcategories, with the same rule as the plan check. The Trends planned line sums these.
+ */
+export function planItemsForCategory<T extends PlanItemName>(category: string, subcategories: string[], items: T[]): T[] {
+  const names = [category, ...subcategories].map(norm)
+  return items.filter((item) => names.some((name) => namesMatch(name, norm(item.name))))
 }

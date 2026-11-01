@@ -29,7 +29,7 @@ import {
   bulkChange
 } from '../store/finance'
 import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook, yearFromFileName } from '../lib/io'
-import { mergeNetWorth, SAMPLE_ACCOUNT_IDS } from '../lib/net-worth-import'
+import { mergeNetWorth, withoutProfileCopies, SAMPLE_ACCOUNT_IDS } from '../lib/net-worth-import'
 import { money, money2, shortDate } from '../lib/format'
 import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
 import { useExport } from '../lib/use-export'
@@ -103,8 +103,8 @@ async function parse() {
 const preview = computed(() => {
   if (!imp.result) return null
   if (imp.result.kind === 'networth') {
-    const r = imp.result.data
-    return { networth: true as const, accounts: r.accounts, dates: r.dates, problems: r.problems }
+    const { parsed: r, skipped } = withoutProfileCopies(imp.result.data, state.plan?.loans ?? [])
+    return { networth: true as const, accounts: r.accounts, dates: r.dates, skipped, problems: r.problems }
   }
   const r = imp.result.data
   const months = [...new Set(r.entries.map((e) => e.date.slice(0, 7)))].sort()
@@ -136,7 +136,8 @@ function commitImport(): void {
   // many changes at once: saved to the server as one document at the end
   bulkChange(() => {
     if (res.kind === 'networth') {
-      const r = res.data
+      // Rows for a loan (or its property) that's on the profile are left out: the profile already counts it.
+      const r = withoutProfileCopies(res.data, state.plan?.loans ?? []).parsed
       // While the data is still the sample, its made-up accounts go, so they don't sit beside the real ones.
       state.netWorth = mergeNetWorth(state.netWorth, r, () => uid('a'), state.sample ? SAMPLE_ACCOUNT_IDS : undefined)
       toast.add({ severity: 'success', summary: 'Net worth imported', detail: `${r.accounts.length} accounts, ${r.dates.length} months`, life: 3000 })
@@ -325,6 +326,9 @@ function reset() {
               <li v-for="a in preview.accounts" :key="a.name">{{ a.name }} <span class="muted">· {{ a.group }}</span></li>
             </ul>
             <p class="small muted">Matching months are updated; other months are kept.</p>
+            <p v-if="preview.skipped.length" class="small muted">
+              Skipped {{ preview.skipped.join(', ') }}: already counted from the loans on your profile.
+            </p>
           </template>
           <template v-else>
             <p>

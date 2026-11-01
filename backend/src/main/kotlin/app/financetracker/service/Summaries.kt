@@ -48,12 +48,39 @@ object Summaries {
     fun averageOfNonZero(values: List<Double>): Double =
         values.filter { abs(it) > 0.004 }.let { nonZero -> if (nonZero.isEmpty()) 0.0 else nonZero.average() }
 
+    private fun normName(name: String) = name.lowercase().filter { it in 'a'..'z' }
+
+    /** Same rule as the plan check (frontend `namesMatch`): equal, or one contains the other when the shorter has 4+ letters. */
+    private fun namesMatch(first: String, second: String): Boolean {
+        if (first.isEmpty() || second.isEmpty()) return false
+        if (first == second) return true
+        if (minOf(first.length, second.length) < 4) return false
+        return first.contains(second) || second.contains(first)
+    }
+
+    /**
+     * The budget setup loan an account repeats (a Debt account named like the loan, an Other assets account
+     * named like its property), or null. Port of `profileCopyOf` in frontend/src/lib/net-worth-import.ts.
+     */
+    fun profileCopyOf(account: Account, loans: List<Loan>): Loan? {
+        val name = normName(account.name)
+        return when (account.group) {
+            AccountGroup.DEBT -> loans.find { it.amount > 0 && namesMatch(name, normName(it.name)) }
+            AccountGroup.OTHER_ASSETS -> loans.find { loan ->
+                loan.property?.let { it.value != 0.0 && namesMatch(name, normName(it.name)) } ?: false
+            }
+            else -> null
+        }
+    }
+
     fun netWorthSeries(accounts: List<Account>, snapshots: List<Snapshot>, loans: List<Loan>): List<NetWorthPoint> {
         val schedulesByLoanId = loans.associate { loan -> loan.id to LoanMath.schedule(loan) }
+        // an account that repeats a budget setup loan (or its property) is left out: the loan already counts it
+        val countedAccounts = accounts.filter { profileCopyOf(it, loans) == null }
         return snapshots.sortedBy { it.date }.map { snapshot ->
             val totalsByGroup = AccountGroup.entries.associateWith { 0.0 }.toMutableMap()
             // Debt balances count as amounts owed whichever sign they were entered with.
-            for (account in accounts) {
+            for (account in countedAccounts) {
                 val balance = snapshot.values[account.id] ?: 0.0
                 totalsByGroup.merge(account.group, if (account.group == AccountGroup.DEBT) abs(balance) else balance, Double::plus)
             }

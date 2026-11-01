@@ -22,8 +22,13 @@
 - [x] Plan check: Rent and bills row counts spending on those items (by name), so editing them changes the check
 - [ ] Devin reviews the preview and sends tweaks
 - [x] Net worth import over the sample data removes the sample accounts (the stray −$25k Brokerage)
-- [ ] Devin: re-import the Net Worth tracker after the deploy to clear the sample Brokerage
-- [ ] Clear leftover sample cash flow entries (months no import covered) and the sample plan's Car loan
+- [x] Devin: re-import the Net Worth tracker after the deploy to clear the sample Brokerage
+- [x] Clear leftover sample data: Devin removed the sample Car loan, subscriptions and budget numbers by hand (2026-11-01).
+  The `sample` flag still never turns off after an import; harmless for him now, matters for new users
+- [x] Bug hunt on the math and imports: CSV dates shifting a day back (moved entries a month), blank net worth cells
+  read as $0, car insurance matched to the Car loan in Add entry and Trends, negative sheet totals dropped
+- [ ] Devin: if an entries CSV was ever re-imported, check entries dated the last day of a month (they were on the 1st)
+- [ ] Devin: re-import the Net Worth tracker after the deploy if it has empty month columns (they became $0 snapshots)
 
 ## Next
 
@@ -58,6 +63,11 @@
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
 - [x] Tapping "Paid" (and other Select fields) in the profile opened the link-marker popover; fixed
+- [ ] Idea (Devin, 2026-11-01): "playground" pages (e.g. home budgeting: down payment, 401k %, savings) that start
+  from the Budget setup numbers (`planned` in `store/plan.ts`) and let you tweak copies without changing the profile.
+  The profile stays the one place the main cash flow numbers live.
+- [x] Make double counting loans impossible: rows repeating a profile loan or its property are skipped on import,
+  blocked in the snapshot dialog and left out of net worth (Devin picked this over planning-only loans, 2026-11-01)
 - [ ] Back burner (Devin, 2026-11-01): import Chase CSV activity (chase.com → Download account activity, ~24 months) to get real transaction dates. Proposed: "Chase CSV" import option, skip transfers/card payments, remembered Chase-category and description rules mapped to our categories, and match sheet lines by amount within the month to set their real date (unmatched rows reviewed in a preview). Overlap approach not decided yet.
 - [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
