@@ -64,9 +64,15 @@
 - [ ] After the next deploy: add the site to a phone's home screen and check the icon, and that Google sign-in works from the home-screen app
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
 - [x] Tapping "Paid" (and other Select fields) in the profile opened the link-marker popover; fixed
-- [ ] Idea (Devin, 2026-11-01): "playground" pages (e.g. home budgeting: down payment, 401k %, savings) that start
-  from the Budget setup numbers (`planned` in `store/plan.ts`) and let you tweak copies without changing the profile.
-  The profile stays the one place the main cash flow numbers live.
+- [x] "Playground" pages (Devin, 2026-11-01): a Plan section in the nav, separate from the real-data pages, with
+  shared plumbing (`useScenario`, `realFigures`, `SimulatorShell`, `SimField`) so simulators tweak copies, never the profile
+- [x] Retirement calculator: earliest retirement age, invested balance by age, needed vs projected, compared with
+  your real numbers; Birth year on the profile
+- [ ] Devin: review the Retirement PR and its starting assumptions (7% return, 3% inflation and raises, to 95, no Social Security)
+- [ ] Merge and deploy Retirement when Devin says (he wants it shipped separately, after the current fixes)
+- [ ] Devin: add your birth year on the profile so Retirement starts from your real age
+- [ ] Next playground: home budgeting (down payment, 401k %, savings), built on the same plumbing
+- [ ] Maybe later: Retirement with home equity or cash counted, retirement taxes (Roth vs pre-tax), market swings
 - [x] Make double counting loans impossible: rows repeating a profile loan or its property are skipped on import,
   blocked in the snapshot dialog and left out of net worth (Devin picked this over planning-only loans, 2026-11-01)
 - [ ] Back burner (Devin, 2026-11-01): import Chase CSV activity (chase.com → Download account activity, ~24 months) to get real transaction dates. Proposed: "Chase CSV" import option, skip transfers/card payments, remembered Chase-category and description rules mapped to our categories, and match sheet lines by amount within the month to set their real date (unmatched rows reviewed in a preview). Overlap approach not decided yet.

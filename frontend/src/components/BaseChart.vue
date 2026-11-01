@@ -58,7 +58,13 @@ function baseOptions(c: ChartChrome): ChartOptions {
 
 function compactTick(v: number): string {
   const a = Math.abs(v)
-  const s = a >= 1000 ? `$${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}k` : `$${a}`
+  // millions as "$2.5M" (retirement projections), thousands as "$25k"
+  const s =
+    a >= 1_000_000
+      ? `$${(a / 1_000_000).toFixed(a % 1_000_000 === 0 ? 0 : 1)}M`
+      : a >= 1000
+        ? `$${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}k`
+        : `$${a}`
   return v < 0 ? `−${s}` : s
 }
 

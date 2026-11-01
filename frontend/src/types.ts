@@ -104,6 +104,8 @@ export interface LoanProperty {
 export interface Plan {
   /** display name for the avatar (until there's a login) */
   name?: string
+  /** year you were born; the Retirement page works out your age from it */
+  birthYear?: number | null
   /** gross yearly salary */
   salary: number
   payFrequency: PayFrequency
