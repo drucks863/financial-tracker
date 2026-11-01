@@ -9,7 +9,8 @@ import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import { useToast } from 'primevue/usetoast'
 import BaseChart from '../components/BaseChart.vue'
-import { state, netWorthSeries, saveSnapshot, deleteSnapshot, addAccount, NW_GROUPS } from '../store/finance'
+import { state, netWorthSeries, saveSnapshot, deleteSnapshot, addAccount, profileCopies, NW_GROUPS } from '../store/finance'
+import { profileCopyOf } from '../lib/net-worth-import'
 import { money, signedMoney, pct, shortDate, ymLabel, localIso } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
 import type { ChartBuilder } from '../lib/chart-types'
@@ -53,7 +54,7 @@ const GROUP_COLOR: Record<AccountGroup, number> = { Cash: ROLE.cash, Investments
 const groupsInUse = computed(() =>
   NW_GROUPS.filter(
     (g) =>
-      state.netWorth.accounts.some((a) => a.group === g) ||
+      countedAccounts.value.some((a) => a.group === g) ||
       (g === 'Other assets' && all.value.some((p) => Object.keys(p.properties).length)) ||
       (g === 'Debt' && all.value.some((p) => Object.keys(p.loans).length))
   )
@@ -134,11 +135,14 @@ const chart = computed<ChartBuilder>(() => {
   })
 })
 
+// Accounts that repeat a profile loan or its property aren't counted (the profile already is).
+const copies = computed(() => profileCopies())
+const countedAccounts = computed(() => state.netWorth.accounts.filter((account) => !copies.value.some((copy) => copy.account.id === account.id)))
 const accountRows = computed(() => {
   const l = last.value
   const p = prev.value
   if (!l) return []
-  return state.netWorth.accounts
+  return countedAccounts.value
     .map((a) => {
       const debt = a.group === 'Debt'
       const val = (pt: NetWorthPoint) => (debt ? Math.abs(pt.values[a.id] || 0) : pt.values[a.id] || 0)
@@ -250,9 +254,14 @@ function openSnapshot(point: NetWorthPoint | null = null): void {
   }
 }
 const dlgTotal = computed(() =>
-  state.netWorth.accounts.reduce((a, acc) => (acc.group === 'Debt' ? a - Math.abs(dlg.values[acc.id] || 0) : a + (dlg.values[acc.id] || 0)), 0)
+  countedAccounts.value.reduce((a, acc) => (acc.group === 'Debt' ? a - Math.abs(dlg.values[acc.id] || 0) : a + (dlg.values[acc.id] || 0)), 0)
 )
 function addAcct() {
+  const copy = profileCopyOf(newAcct, state.plan?.loans ?? [])
+  if (copy) {
+    toast.add({ severity: 'info', summary: 'Already counted', detail: `${newAcct.name.trim()} comes from ${copy.name || 'a loan'} on your profile, so it isn't added here.`, life: 4000 })
+    return
+  }
   const a = addAccount(newAcct.name, newAcct.group)
   if (!a) return
   dlg.values[a.id] = 0
@@ -397,6 +406,10 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
             </tr>
           </tbody>
         </table>
+        <p v-if="copies.length" class="muted small copies">
+          Not counted, already on your profile:
+          {{ copies.map((copy) => `${copy.account.name} (${copy.loan.name || 'loan'})`).join(', ') }}.
+        </p>
       </section>
 
       <section class="panel">
@@ -436,16 +449,16 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
         </label>
         <p class="muted small">Balances start from your last snapshot. For debts, enter what you still owe; it's subtracted. Loans set up in your financial profile are added for you.</p>
         <div v-for="g in NW_GROUPS" :key="g" class="grp">
-          <template v-if="state.netWorth.accounts.some((a) => a.group === g)">
+          <template v-if="countedAccounts.some((a) => a.group === g)">
             <h3>{{ g }}</h3>
-            <label v-for="a in state.netWorth.accounts.filter((x) => x.group === g)" :key="a.id" class="acct-row">
+            <label v-for="a in countedAccounts.filter((x) => x.group === g)" :key="a.id" class="acct-row">
               <span>{{ a.name }}<small v-if="g === 'Debt'" class="muted"> owed</small></span>
               <InputNumber v-model="dlg.values[a.id]" :input-id="`snap-${a.id}`" mode="currency" currency="USD" locale="en-US" fluid />
             </label>
           </template>
         </div>
         <div class="add-acct">
-          <InputText id="snap-new-account" v-model="newAcct.name" placeholder="New account, e.g. Car loan" />
+          <InputText id="snap-new-account" v-model="newAcct.name" placeholder="New account, e.g. Credit card" />
           <Select v-model="newAcct.group" :options="NW_GROUPS" aria-label="Account group" />
           <Button type="button" label="Add" size="small" outlined @click="addAcct" />
         </div>
@@ -472,6 +485,9 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 </template>
 
 <style scoped>
+.copies {
+  margin: 10px 0 0;
+}
 .equity {
   margin: 6px 0 0;
   font-size: 0.875rem;

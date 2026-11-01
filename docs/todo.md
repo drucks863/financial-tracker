@@ -64,8 +64,8 @@
 - [ ] Idea (Devin, 2026-11-01): "playground" pages (e.g. home budgeting: down payment, 401k %, savings) that start
   from the Budget setup numbers (`planned` in `store/plan.ts`) and let you tweak copies without changing the profile.
   The profile stays the one place the main cash flow numbers live.
-- [ ] Make double counting loans impossible (a loan on the profile and the same debt or property typed into net worth);
-  waiting on Devin's pick of approach
+- [x] Make double counting loans impossible: rows repeating a profile loan or its property are skipped on import,
+  blocked in the snapshot dialog and left out of net worth (Devin picked this over planning-only loans, 2026-11-01)
 - [ ] Back burner (Devin, 2026-11-01): import Chase CSV activity (chase.com → Download account activity, ~24 months) to get real transaction dates. Proposed: "Chase CSV" import option, skip transfers/card payments, remembered Chase-category and description rules mapped to our categories, and match sheet lines by amount within the month to set their real date (unmatched rows reviewed in a preview). Overlap approach not decided yet.
 - [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)

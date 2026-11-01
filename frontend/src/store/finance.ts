@@ -1,8 +1,9 @@
 import { reactive, watch } from 'vue'
 import seed from '@seed'
 import { loanBalanceAt, propertyValueAt } from '../lib/loan'
+import { profileCopyOf } from '../lib/net-worth-import'
 import { encodePathPart, loadProfile, loadRemote, send, sync } from '../lib/api'
-import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
+import type { Account, AccountGroup, Category, Entry, EntryDraft, EntryType, FinanceData, Loan, MonthTotals, NetWorthPoint, Plan, Subscription } from '../types'
 
 // Single in-memory store. With the API running it loads from and saves to the server (see
 // lib/api.ts); without it, it starts from the bundled seed and persists to localStorage.
@@ -355,10 +356,13 @@ export const NW_GROUPS: AccountGroup[] = ['Cash', 'Investments', 'Other assets',
 export function netWorthSeries(): NetWorthPoint[] {
   const { accounts, snapshots } = state.netWorth
   const sorted = [...snapshots].sort((a, b) => a.date.localeCompare(b.date))
+  const loanList = state.plan?.loans ?? []
+  const counted = accounts.filter((account) => !profileCopyOf(account, loanList))
   return sorted.map((s) => {
     const byGroup = Object.fromEntries(NW_GROUPS.map((g) => [g, 0])) as Record<AccountGroup, number>
-    // Debt balances count as amounts owed whichever sign they were entered with.
-    for (const a of accounts) byGroup[a.group] += a.group === 'Debt' ? Math.abs(s.values[a.id] || 0) : s.values[a.id] || 0
+    // Debt balances count as amounts owed whichever sign they were entered with. An account that
+    // repeats a profile loan (or its property) is left out: the loan below already counts it.
+    for (const a of counted) byGroup[a.group] += a.group === 'Debt' ? Math.abs(s.values[a.id] || 0) : s.values[a.id] || 0
     // Loans from the financial profile add their balance for that month, and the property they bought
     // (valued conservatively) counts under Other assets.
     const loans: Record<string, number> = {}
@@ -381,6 +385,15 @@ export function netWorthSeries(): NetWorthPoint[] {
   })
 }
 
+/** Accounts not counted because a profile loan already covers them, with the loan they repeat. */
+export function profileCopies(): { account: Account; loan: Loan }[] {
+  const loans = state.plan?.loans ?? []
+  return state.netWorth.accounts.flatMap((account) => {
+    const loan = profileCopyOf(account, loans)
+    return loan ? [{ account, loan }] : []
+  })
+}
+
 export function saveSnapshot(date: string, values: Record<string, number>): void {
   const existing = state.netWorth.snapshots.find((s) => s.date === date)
   if (existing) existing.values = { ...values }
@@ -395,7 +408,7 @@ export function deleteSnapshot(date: string): void {
 
 export function addAccount(name: string, group: AccountGroup): Account | null {
   name = name.trim()
-  if (!name) return null
+  if (!name || profileCopyOf({ name, group }, state.plan?.loans ?? [])) return null
   const a: Account = { id: uid('a'), name, group }
   state.netWorth.accounts.push(a)
   sendChange('PUT', `/net-worth/accounts/${encodePathPart(a.id)}`, a)

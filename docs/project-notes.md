@@ -203,8 +203,11 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
 - Net worth: "Net worth tracker" import reads the `Net Worth Tracker` tab of "Net Worth / Retirement Calculator"
   (month-end date headings like `Oct-31-2024`, accounts in column C under Cash / Investment Accounts / Other
   Assets / Debt or Liabilities headings in column B; subtotal and net worth rows skipped). The Retirement
-  Calculator and Misc tabs are ignored. Loans live on the financial profile, so don't also type them into the
-  sheet's debt rows before importing (they'd count twice).
+  Calculator and Misc tabs are ignored. Loans live on the financial profile, and the app makes counting them twice
+  impossible (Devin, 2026-11-01): a Debt account named like a profile loan, or an Other assets account named like a
+  loan's property (`profileCopyOf` in `lib/net-worth-import.ts`, plan check name rule), is skipped by the import (the
+  preview names it), can't be added in the snapshot dialog, and isn't counted by `netWorthSeries` if it's already in
+  the data (Net worth lists it under Accounts as "Not counted"). The server's `Summaries.netWorthSeries` does the same.
 - The net worth import merges by account name and keeps months the file doesn't cover. While the data is still
   the sample (`sample: true`), it first removes the sample's accounts (`SAMPLE_ACCOUNT_IDS` in
   `lib/net-worth-import.ts`) and their balances (2026-11-01). Before that fix, the sample "Brokerage" stayed next
