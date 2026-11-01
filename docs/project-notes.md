@@ -224,7 +224,9 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   (also the prototype reset). There is no separate Data page; `#data` links open Import & export.
 - Fields other screens read carry a small link marker (`components/UsedBy.vue`); hover or tap
   lists where they're used. The lists live in `USES` in PlanView; keep them in step when a
-  screen starts or stops reading a profile value.
+  screen starts or stops reading a profile value. The marker is a `span role="button"`, not a
+  `<button>`: it sits inside field labels, and a label forwards taps on its text (or on a Select)
+  to its first labelable child, which made "Paid" open the popover instead of the dropdown.
 
 - The app does the math. Inputs: yearly salary, pay frequency (weekly, every two weeks, twice
   a month, monthly), effective tax rate, your 401k % and company 401k %, other paycheck
