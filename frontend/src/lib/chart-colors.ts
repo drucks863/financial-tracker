@@ -6,6 +6,12 @@ const DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', 
 export const OTHER_LIGHT = '#a3a29c'
 export const OTHER_DARK = '#6b6a65'
 
+// The app's own green: the dot on the app icon. Net worth's trend line and the active nav
+// icon use it, so the one figure that sums everything up carries the brand color.
+export const BRAND_LIGHT = '#1d8f5e'
+export const BRAND_DARK = '#5fbf8f'
+export const brand = (dark: boolean): string => (dark ? BRAND_DARK : BRAND_LIGHT)
+
 export const series = (i: number, dark: boolean): string => (dark ? DARK : LIGHT)[i % 8]
 export const otherColor = (dark: boolean): string => (dark ? OTHER_DARK : OTHER_LIGHT)
 

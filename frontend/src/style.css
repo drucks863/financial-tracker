@@ -14,6 +14,8 @@
   --accent: var(--p-primary-color, #d6d5d0);
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --good: #5fbf8f;
+  --brand: #5fbf8f; /* app icon green; keep in step with BRAND_* in lib/chart-colors.ts */
+  --brand-soft: color-mix(in srgb, var(--brand) 14%, transparent);
   --bad: #ec8a76;
   --good-soft: color-mix(in srgb, var(--good) 14%, transparent);
   --bad-soft: color-mix(in srgb, var(--bad) 14%, transparent);
@@ -36,6 +38,7 @@
   --muted: #7b766b;
   --line: #e4e4e1;
   --good: #1d7a4a;
+  --brand: #1d8f5e;
   --bad: #b8432c;
   --series-income: #2a78d6;
   --series-expense: #eb6834;

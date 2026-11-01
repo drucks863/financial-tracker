@@ -12,8 +12,9 @@ import BaseChart from '../components/BaseChart.vue'
 import { state, netWorthSeries, saveSnapshot, deleteSnapshot, addAccount, profileCopies, NW_GROUPS } from '../store/finance'
 import { profileCopyOf } from '../lib/net-worth-import'
 import { money, signedMoney, pct, shortDate, ymLabel, localIso } from '../lib/format'
-import { series, ROLE } from '../lib/chart-colors'
+import { series, ROLE, brand } from '../lib/chart-colors'
 import type { ChartBuilder } from '../lib/chart-types'
+import type { ScriptableContext } from 'chart.js'
 import { loanSummary, currentYm } from '../lib/loan'
 import { planned } from '../store/plan'
 import type { AccountGroup, NetWorthPoint } from '../types'
@@ -91,11 +92,22 @@ const chart = computed<ChartBuilder>(() => {
           {
             label: 'Net worth',
             data: pts.map((p) => p.total),
-            borderColor: c.ink,
-            backgroundColor: c.ink + (dark ? '22' : '14'),
-            borderWidth: 2,
+            // Brand green line over a wash of the same green that fades out toward the axis.
+            borderColor: brand(dark),
+            backgroundColor: (context: ScriptableContext<'line'>) => {
+              const area = context.chart.chartArea
+              const green = brand(dark)
+              if (!area) return green + '22'
+              const gradient = context.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
+              gradient.addColorStop(0, green + (dark ? '5c' : '40'))
+              gradient.addColorStop(1, green + '00')
+              return gradient
+            },
+            borderWidth: 2.5,
             pointRadius: pts.map((_, i) => (i === pts.length - 1 ? 4 : 0)),
-            pointBackgroundColor: c.ink,
+            pointBackgroundColor: brand(dark),
+            pointBorderColor: c.surface,
+            pointBorderWidth: 2,
             pointHoverRadius: 5,
             tension: 0.25,
             fill: 'start' as const
@@ -447,7 +459,7 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
             <tr v-for="a in accountRows" :key="a.id">
               <td>
                 <span class="acct">{{ a.name }}</span>
-                <small class="muted">{{ a.group }} · {{ a.note }}</small>
+                <small class="muted"><i class="group-dot" :style="{ background: `var(--nw-${a.group.replace(' ', '-').toLowerCase()})` }" aria-hidden="true"></i>{{ a.group }} · {{ a.note }}</small>
               </td>
               <td class="r num" :class="{ neg: a.debt && a.value }">{{ a.debt && a.value ? `−${money(a.value)}` : money(a.value) }}</td>
               <td class="r num" :class="a.change === null || a.change === 0 ? 'muted' : a.change > 0 ? 'pos' : 'neg'">
@@ -536,6 +548,15 @@ const isMobile = () => window.matchMedia('(max-width: 640px)').matches
 </template>
 
 <style scoped>
+/* the account's group color from the chart, so the table and the Breakdown view match */
+.group-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
 .copies {
   margin: 10px 0 0;
 }

@@ -95,6 +95,8 @@ interface Kpi {
   id: string
   label: string
   icon: string
+  /** CSS color the icon tile is tinted with */
+  color: string
   value: string
   tone?: string
   badge: Badge | null
@@ -111,6 +113,7 @@ const kpis = computed<Kpi[]>(() => {
       id: 'net',
       label: 'Net cash flow',
       icon: 'pi pi-arrow-right-arrow-left',
+      color: c.net >= 0 ? 'var(--good)' : 'var(--bad)',
       value: c.count ? signedMoney(c.net) : '—',
       tone: c.net >= 0 ? 'pos' : 'neg',
       badge: c.count && b ? { text: signedMoney(c.net - b.net), tone: c.net >= b.net ? 'good' : 'bad' } : null,
@@ -121,6 +124,7 @@ const kpis = computed<Kpi[]>(() => {
       id: 'income',
       label: 'Income',
       icon: 'pi pi-arrow-down-left',
+      color: 'var(--series-income)',
       value: money(c.income),
       badge: c.count ? change(c.income, b?.income) : null,
       note: b ? `${basis} ${money(b.income)}` : '',
@@ -130,6 +134,7 @@ const kpis = computed<Kpi[]>(() => {
       id: 'expense',
       label: 'Expenses',
       icon: 'pi pi-arrow-up-right',
+      color: 'var(--series-expense)',
       value: money(c.expense),
       badge: c.count ? change(c.expense, b?.expense, false) : null,
       note: b ? `${basis} ${money(b.expense)}` : '',
@@ -139,6 +144,7 @@ const kpis = computed<Kpi[]>(() => {
       id: 'networth',
       label: 'Net worth',
       icon: 'pi pi-wallet',
+      color: 'var(--brand)', // matches the Net worth trend line
       value: nwLast.value ? moneyCompact(nwLast.value.total) : '—',
       badge: nwLast.value && nwPrev.value ? change(nwLast.value.total, nwPrev.value.total) : null,
       note: nwLast.value ? `as of ${shortDate(nwLast.value.date)}` : 'no snapshots yet',
@@ -426,7 +432,7 @@ const pageItems = computed(() => [
       >
         <div class="kpi-top">
           <span class="kpi-label">{{ k.label }}</span>
-          <span class="kpi-icon" aria-hidden="true"><i :class="k.icon"></i></span>
+          <span class="kpi-icon" :style="{ '--kpi': k.color }" aria-hidden="true"><i :class="k.icon"></i></span>
         </div>
         <span class="kpi-value num" :class="k.tone">{{ k.value }}</span>
         <div class="kpi-foot">
@@ -785,8 +791,9 @@ const pageItems = computed(() => [
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: var(--panel-2);
-  color: var(--ink-2);
+  /* tinted like the category icons: income blue, expenses orange, the rest in brand colors */
+  background: color-mix(in srgb, var(--kpi) 16%, transparent);
+  color: var(--kpi);
   flex: none;
 }
 .kpi-icon .pi {
