@@ -13,6 +13,7 @@ import { series, otherColor, ROLE, CATEGORY_COLOR_COUNT } from '../lib/chart-col
 import { isDark } from '../lib/theme-mode'
 import { useWidgetOrder } from '../lib/widget-order'
 import { useExport } from '../lib/use-export'
+import { useCloseOnScroll } from '../lib/close-on-scroll'
 import { planned } from '../store/plan'
 import { planItemSpend } from '../lib/plan-match'
 import type { ChartBuilder } from '../lib/chart-types'
@@ -34,6 +35,9 @@ const years = computed(() => {
 })
 const periodLabel = computed(() => (mode.value === 'month' ? `${MONTHS_LONG[ui.month]} ${ui.year}` : `${ui.year}`))
 const periodPicker = ref<InstanceType<typeof Popover> | null>(null)
+const periodButton = ref<HTMLElement | null>(null)
+// Close the picker on scroll, so it doesn't float over the page on a phone.
+const pickerScrollClose = useCloseOnScroll(periodButton, () => periodPicker.value?.hide())
 function pickMonth(i: number): void {
   ui.month = i
   periodPicker.value?.hide()
@@ -367,7 +371,7 @@ const pageItems = computed(() => [
       <h1 class="page-title">Overview</h1>
       <div class="period-controls">
         <SelectButton v-model="mode" :options="MODES" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Period" />
-        <button type="button" class="period" aria-haspopup="dialog" @click="periodPicker?.toggle($event)">
+        <button ref="periodButton" type="button" class="period" aria-haspopup="dialog" @click="periodPicker?.toggle($event)">
           <i class="pi pi-calendar" aria-hidden="true"></i>
           <span>{{ periodLabel }}</span>
           <i class="pi pi-chevron-down caret" aria-hidden="true"></i>
@@ -388,7 +392,7 @@ const pageItems = computed(() => [
       <Menu ref="pageMenu" :model="pageItems" popup />
     </header>
 
-    <Popover ref="periodPicker">
+    <Popover ref="periodPicker" @show="pickerScrollClose.onShow" @hide="pickerScrollClose.onHide">
       <div class="picker">
         <Select v-model="ui.year" :options="years" option-label="label" option-value="value" size="small" aria-label="Year" class="picker-year" />
         <div v-if="mode === 'month'" class="picker-months" role="group" aria-label="Month">

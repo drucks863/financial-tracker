@@ -20,6 +20,9 @@ function baseOptions(c: ChartChrome): ChartOptions {
     responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 250 },
+    // No touchstart/touchmove: a finger scrolling past a chart shouldn't pop tooltips up (they'd
+    // flicker against the close-on-scroll below). A tap still arrives as a click and opens one.
+    events: ['mousemove', 'mouseout', 'click'],
     interaction: { mode: 'index', intersect: false },
     layout: { padding: { top: 4, right: 4 } },
     plugins: {

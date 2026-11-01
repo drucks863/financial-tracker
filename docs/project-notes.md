@@ -294,6 +294,11 @@ saved in the browser only.
   breaks the Other bar down by category (Devin asked why Other was so big).
 - Chart tooltips on touch: a tap outside the chart, a scroll, or a second tap on the same bar closes it
   (`BaseChart.vue`); Chart.js alone only listens on the canvas, so the tooltip used to get stuck on phones.
+  Charts don't listen to touchstart/touchmove (`events` in `BaseChart.vue`), so a finger scrolling past a
+  chart doesn't pop tooltips; a tap arrives as a click and opens one.
+- Popovers (profile link markers, the Overview period picker) close when the page or a scroll area around
+  their anchor scrolls (`useCloseOnScroll` in `lib/close-on-scroll.ts`); PrimeVue's Popover otherwise stays
+  put and floats over the page. Scrolling inside the popover or a dropdown it opened doesn't close it.
 
 ### App icon and favicon (Devin picked "trend line", 2026-11-01)
 
