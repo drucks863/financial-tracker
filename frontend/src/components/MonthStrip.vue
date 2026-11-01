@@ -8,7 +8,19 @@ import { monthTotals, yearsAvailable } from '../store/finance'
 import { MONTHS, signedMoney } from '../lib/format'
 
 const rows = computed(() => monthTotals(ui.year))
-const max = computed(() => Math.max(1, ...rows.value.map((r) => Math.abs(r.net))))
+// The bars share one scale across the whole zone, and the baseline sits wherever the
+// data needs it: at the bottom when every month saved, in the middle when gains and
+// losses are as big as each other. That way small months still read against a big one.
+const ZONE = 84
+const scale = computed(() => {
+  const counted = rows.value.filter((r) => r.count)
+  const up = Math.max(0, ...counted.map((r) => r.net))
+  const down = Math.max(0, ...counted.map((r) => -r.net))
+  const span = Math.max(1, up + down)
+  const usable = ZONE - 2 // a pixel of headroom above and below
+  return { perDollar: usable / span, baseline: 1 + (up / span) * usable }
+})
+const barHeight = (net: number) => Math.max(3, Math.abs(net) * scale.value.perDollar)
 const years = computed(() => {
   const ys = yearsAvailable()
   if (!ys.includes(ui.year)) ys.unshift(ui.year)
@@ -40,12 +52,12 @@ watch(() => [ui.month, ui.year], scrollToActive)
         :title="r.count ? `${MONTHS[r.month]}: net ${signedMoney(r.net)}` : `${MONTHS[r.month]}: no entries yet`"
         @click="ui.month = r.month"
       >
-        <span class="bar-zone" aria-hidden="true">
+        <span class="bar-zone" aria-hidden="true" :style="{ '--zone': `${ZONE}px`, '--base': `${scale.baseline}px` }">
           <span
             v-if="r.count"
             class="bar"
             :class="r.net >= 0 ? 'up' : 'down'"
-            :style="{ height: `${Math.max(2, (Math.abs(r.net) / max) * 22)}px` }"
+            :style="{ height: `${barHeight(r.net)}px` }"
           ></span>
         </span>
         <span class="label">{{ MONTHS[r.month] }}</span>
@@ -113,32 +125,32 @@ watch(() => [ui.month, ui.year], scrollToActive)
 .bar-zone {
   position: relative;
   width: 100%;
-  height: 46px;
+  height: var(--zone);
 }
 .bar-zone::after {
   content: '';
   position: absolute;
   left: 22%;
   right: 22%;
-  top: 23px;
+  top: var(--base);
   height: 1px;
   background: var(--line);
 }
 .bar {
   position: absolute;
   left: 50%;
-  width: 14px;
-  margin-left: -7px;
+  width: 16px;
+  margin-left: -8px;
   border-radius: 4px;
 }
 .bar.up {
-  bottom: 23px;
+  bottom: calc(var(--zone) - var(--base));
   background: var(--good);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
 .bar.down {
-  top: 24px;
+  top: calc(var(--base) + 1px);
   background: var(--bad);
   border-top-left-radius: 0;
   border-top-right-radius: 0;

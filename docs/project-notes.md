@@ -275,6 +275,9 @@ saved in the browser only.
   (chart with a chart-type dropdown, recent activity, spending mix). Widget order is per browser.
 - Dark by default; light only when `data-theme="light"` is set on `<html>`.
 - The year select sits above the month scroller on every screen size.
+- Month strip bars (Cash flow tab): 84px zone, one shared scale, and the baseline moves to fit the
+  data (bottom when every month saved), so small months stay readable. Devin found the old 46px
+  split-in-half version too flat (2026-11-01).
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
 
 ### App icon and favicon (Devin picked "trend line", 2026-11-01)
