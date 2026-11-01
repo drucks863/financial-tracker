@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Popover from 'primevue/popover'
+import { useCloseOnScroll } from '../lib/close-on-scroll'
 
 // Small link marker next to a profile field that other screens read from.
 // Hover (or tap on phones) to see where the value is used.
@@ -10,6 +11,13 @@ const pop = ref<InstanceType<typeof Popover> | null>(null)
 const pinned = ref(false)
 const show = (e: Event) => pop.value?.show(e)
 const hide = () => !pinned.value && pop.value?.hide()
+// Close on scroll, so an open popover doesn't float over the page on a phone.
+const marker = ref<HTMLElement | null>(null)
+const scrollClose = useCloseOnScroll(marker, () => pop.value?.hide())
+function onHide() {
+  pinned.value = false
+  scrollClose.onHide()
+}
 function toggle(e: Event) {
   pinned.value = !pinned.value
   if (pinned.value) pop.value?.show(e)
@@ -22,6 +30,7 @@ function toggle(e: Event) {
        every tap on its text or on a non-input control (like Select) to its first
        labelable child. A button would catch those taps and open the popover. -->
   <span
+    ref="marker"
     role="button"
     tabindex="0"
     class="used-by"
@@ -37,7 +46,7 @@ function toggle(e: Event) {
   >
     <i class="pi pi-link" aria-hidden="true"></i>
   </span>
-  <Popover ref="pop" class="used-by-pop" @hide="pinned = false">
+  <Popover ref="pop" class="used-by-pop" @show="scrollClose.onShow" @hide="onHide">
     <p class="ub-title">Used elsewhere</p>
     <p v-if="note" class="ub-note">{{ note }}</p>
     <ul>
