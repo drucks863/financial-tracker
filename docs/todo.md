@@ -21,6 +21,9 @@
 - [x] Loans on My numbers (amortized); Net worth subtracts balances and shows principal vs interest
 - [x] Plan check: Rent and bills row counts spending on those items (by name), so editing them changes the check
 - [ ] Devin reviews the preview and sends tweaks
+- [x] Net worth import over the sample data removes the sample accounts (the stray −$25k Brokerage)
+- [ ] Devin: re-import the Net Worth tracker after the deploy to clear the sample Brokerage
+- [ ] Clear leftover sample cash flow entries (months no import covered) and the sample plan's Car loan
 
 ## Next
 
