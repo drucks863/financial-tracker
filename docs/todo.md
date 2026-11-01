@@ -73,3 +73,5 @@
 - [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
 - [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
 - [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
+- [x] Add entry: category icons and tap-to-pick chips, Description first and required with suggestions from past entries; icons on Cash flow, Overview, Settings
+- [ ] Maybe: let a category's icon be picked in Settings → Categories (today it's chosen from the name)

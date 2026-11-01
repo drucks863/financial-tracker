@@ -6,10 +6,10 @@ import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import Button from 'primevue/button'
 import MonthStrip from '../components/MonthStrip.vue'
-import { ui, selectedYm, openEntry, categoryColor } from '../store/ui'
+import CategoryIcon from '../components/CategoryIcon.vue'
+import { ui, selectedYm, openEntry } from '../store/ui'
 import { state, categoriesOf, monthTotals } from '../store/finance'
 import { money, money2, monthLabel, dayLabel } from '../lib/format'
-import { isDark } from '../lib/theme-mode'
 import type { Entry, EntryType } from '../types'
 
 interface SubGroup {
@@ -71,7 +71,6 @@ const groups = computed(() => {
 })
 
 const shownTotal = computed(() => groups.value.reduce((a, g) => a + g.total, 0))
-const swatch = (name: string): string => (type.value === 'expense' ? categoryColor(name, isDark.value) : 'var(--series-income)')
 </script>
 
 <template>
@@ -108,7 +107,7 @@ const swatch = (name: string): string => (type.value === 'expense' ? categoryCol
       </div>
       <div v-for="g in groups" :key="g.name" class="cat">
         <button type="button" class="cat-row" :aria-expanded="!collapsed[g.name]" @click="collapsed[g.name] = !collapsed[g.name]">
-          <span class="swatch" :style="{ background: swatch(g.name) }"></span>
+          <CategoryIcon :name="g.name" :type="type" />
           <span class="cat-name">
             {{ g.name }}
             <small v-if="g.essential" class="tag">Essential</small>

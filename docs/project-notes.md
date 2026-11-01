@@ -313,6 +313,15 @@ saved in the browser only.
   when a real category is called Other). Ranked all-time until 2026-11-01, which pushed a year's big categories
   into Other once older years were imported. Trends lists what's in Other under the chart, and its tooltip
   breaks the Other bar down by category (Devin asked why Other was so big).
+- Category icons (2026-11-01, Devin wanted repeated actions quicker to scan): every category gets a PrimeIcons
+  icon picked from the words in its name (`lib/category-icons.ts`, tag icon when nothing matches), shown on a tile
+  tinted with the category's chart color (`CategoryIcon.vue`). Icons carry the identity, since only the top five
+  categories get a color; colors stay the chart colors so a category looks the same everywhere. Shown in Add entry,
+  Cash flow, Overview (activity, category list) and Settings → Categories.
+- Add entry form (2026-11-01, Devin): Description first and required. It suggests past descriptions (newest first,
+  with their category), and picking one on a new entry fills in the type, category and subcategory from the last
+  entry with that description. Category and subcategory are tap-to-pick chips instead of dropdowns. New entries
+  focus the description, edits focus the amount.
 - Chart tooltips on touch: a tap outside the chart, a scroll, or a second tap on the same bar closes it
   (`BaseChart.vue`); Chart.js alone only listens on the canvas, so the tooltip used to get stuck on phones.
   Charts don't listen to touchstart/touchmove (`events` in `BaseChart.vue`), so a finger scrolling past a
