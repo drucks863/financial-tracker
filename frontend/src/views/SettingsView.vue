@@ -29,6 +29,7 @@ import {
   bulkChange
 } from '../store/finance'
 import { parseEntriesFile, parseCashFlowWorkbook, parseNetWorthWorkbook, yearFromFileName } from '../lib/io'
+import { mergeNetWorth, SAMPLE_ACCOUNT_IDS } from '../lib/net-worth-import'
 import { money, money2, shortDate } from '../lib/format'
 import type { ParsedEntries, ParsedNetWorth } from '../lib/io'
 import { useExport } from '../lib/use-export'
@@ -136,19 +137,8 @@ function commitImport(): void {
   bulkChange(() => {
     if (res.kind === 'networth') {
       const r = res.data
-      const accts = state.netWorth.accounts
-      for (const a of r.accounts) {
-        let acct = accts.find((x) => x.name.toLowerCase() === a.name.toLowerCase())
-        if (!acct) {
-          acct = { id: uid('a'), name: a.name, group: a.group }
-          accts.push(acct)
-        }
-        for (const [date, v] of Object.entries(a.values)) {
-          let snap = state.netWorth.snapshots.find((s) => s.date === date)
-          if (!snap) state.netWorth.snapshots.push((snap = { date, values: {} }))
-          snap.values[acct.id] = v
-        }
-      }
+      // While the data is still the sample, its made-up accounts go, so they don't sit beside the real ones.
+      state.netWorth = mergeNetWorth(state.netWorth, r, () => uid('a'), state.sample ? SAMPLE_ACCOUNT_IDS : undefined)
       toast.add({ severity: 'success', summary: 'Net worth imported', detail: `${r.accounts.length} accounts, ${r.dates.length} months`, life: 3000 })
     } else {
       const r = res.data

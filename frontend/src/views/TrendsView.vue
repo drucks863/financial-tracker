@@ -50,6 +50,16 @@ const stacked = computed<ChartBuilder>(() => {
   const grid = yearGrid('expense', ui.year)
   const top = categoryRank.value.slice(0, CATEGORY_COLOR_COUNT)
   const rest = Object.keys(grid).filter((n) => !top.includes(n))
+  const otherLabel = top.includes('Other') ? 'Everything else' : 'Other'
+  /** What makes up the grey bar in one month, biggest first, so a tap on it says what's inside. */
+  const otherBreakdown = (month: number): string[] => {
+    const parts = rest
+      .map((name) => ({ name, amount: grid[name].months[month] }))
+      .filter((part) => part.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+    const shown = parts.slice(0, 4).map((part) => `   ${part.name} ${money(part.amount)}`)
+    return parts.length > 4 ? [...shown, `   and ${parts.length - 4} more`] : shown
+  }
   return (dark, c) => ({
     type: 'bar',
     data: {
@@ -78,7 +88,7 @@ const stacked = computed<ChartBuilder>(() => {
             ]
           : []),
         {
-          label: top.includes('Other') ? 'Everything else' : 'Other',
+          label: otherLabel,
           data: MONTHS.map((_, m) => rest.reduce((a, n) => a + grid[n].months[m], 0)),
           backgroundColor: otherColor(dark),
           borderColor: c.surface,
@@ -91,7 +101,13 @@ const stacked = computed<ChartBuilder>(() => {
     options: {
       scales: { x: { stacked: true }, y: { stacked: true } },
       datasets: { bar: { categoryPercentage: 0.7, barPercentage: 0.9 } },
-      plugins: { tooltip: { filter: (item) => item.parsed.y > 0, itemSort: (a, b) => b.parsed.y - a.parsed.y } }
+      plugins: {
+        tooltip: {
+          filter: (item) => item.parsed.y > 0,
+          itemSort: (a, b) => b.parsed.y - a.parsed.y,
+          callbacks: { afterLabel: (item) => (item.dataset.label === otherLabel ? otherBreakdown(item.dataIndex) : []) }
+        }
+      }
     }
   })
 })
@@ -102,7 +118,11 @@ const stackedLegend = computed(() => {
     { name: topCategories.includes('Other') ? 'Everything else' : 'Other', rankIndex: -1 }
   ]
 })
-const otherNames = computed(() => categoryRank.value.slice(CATEGORY_COLOR_COUNT).join(', '))
+/** The categories inside Other that had spending this year, biggest first (categoryRank is ordered by this year). */
+const otherNames = computed(() => {
+  const grid = yearGrid('expense', ui.year)
+  return categoryRank.value.slice(CATEGORY_COLOR_COUNT).filter((name) => grid[name]?.months.some((amount) => amount > 0))
+})
 
 /* ---- one category over time ---- */
 const trendType = ref<EntryType>('expense')
@@ -255,16 +275,17 @@ const yoy = computed(() => {
         <div class="panel-head">
           <div>
             <h2>Spending by category, {{ ui.year }}</h2>
-            <p class="muted">Your five biggest categories; the rest are grouped as Other</p>
+            <p class="muted">Your five biggest categories this year; the rest are grouped as {{ stackedLegend.at(-1)?.name }}. Tap a bar to see what’s in it.</p>
           </div>
         </div>
         <div class="legend legend-top">
-          <span v-for="legendItem in stackedLegend" :key="legendItem.name" :title="legendItem.rankIndex < 0 ? otherNames : ''">
+          <span v-for="legendItem in stackedLegend" :key="legendItem.name">
             <i class="swatch" :style="{ background: legendItem.rankIndex < 0 ? otherColor(isDark) : categorySeries(legendItem.rankIndex, isDark) }"></i>{{ legendItem.name }}
           </span>
           <span v-if="planTakeHome > 0"><i class="swatch line" style="background: var(--ink)"></i>Take-home pay</span>
         </div>
         <BaseChart :build="stacked" height="280px" :label="`Monthly spending by category for ${ui.year}`" />
+        <p v-if="otherNames.length" class="hint muted">{{ stackedLegend.at(-1)?.name }} is {{ otherNames.join(', ') }}.</p>
       </section>
 
       <section class="panel">

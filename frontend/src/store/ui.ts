@@ -37,13 +37,16 @@ export function openEntry(entry: Entry | null = null): void {
   ui.entryDialog.open = true
 }
 
-// Expense categories ranked by all-time spend. The top five keep a fixed
-// palette slot everywhere in the app; the rest share the "Other" grey.
+// Expense categories ranked by spend in the year being viewed (ui.year), then by all-time
+// spend for the ones with nothing that year. The top five keep a fixed palette slot everywhere
+// in the app while that year is shown; the rest share the "Other" grey. Ranking by all-time
+// spend instead put a year's big categories into Other whenever older years looked different.
 export const categoryRank = computed<string[]>(() => {
-  const totals = categoryTotals('expense', () => true)
-  return Object.entries(totals)
-    .sort((a, b) => b[1].total - a[1].total)
-    .map(([name]) => name)
+  const year = String(ui.year)
+  const thisYear = categoryTotals('expense', (e) => e.date.startsWith(year))
+  const allTime = categoryTotals('expense', () => true)
+  const spent = (totals: typeof allTime, name: string) => totals[name]?.total ?? 0
+  return Object.keys(allTime).sort((a, b) => spent(thisYear, b) - spent(thisYear, a) || spent(allTime, b) - spent(allTime, a))
 })
 
 export function categoryColor(name: string, dark: boolean): string {

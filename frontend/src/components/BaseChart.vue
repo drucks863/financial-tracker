@@ -20,6 +20,9 @@ function baseOptions(c: ChartChrome): ChartOptions {
     responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 250 },
+    // No touchstart/touchmove: a finger scrolling past a chart shouldn't pop tooltips up (they'd
+    // flicker against the close-on-scroll below). A tap still arrives as a click and opens one.
+    events: ['mousemove', 'mouseout', 'click'],
     interaction: { mode: 'index', intersect: false },
     layout: { padding: { top: 4, right: 4 } },
     plugins: {
@@ -83,9 +86,47 @@ function render() {
   chart = new Chart(canvas.value, cfg)
 }
 
-onMounted(render)
+// On a phone a tap leaves the tooltip up, and Chart.js only listens on the canvas, so tapping
+// elsewhere or scrolling away never closed it. Close it on any tap outside the chart, on
+// scroll, and on a second tap on the same bar.
+function hideTooltip() {
+  if (!chart || !chart.tooltip?.getActiveElements().length) return
+  chart.setActiveElements([])
+  chart.tooltip.setActiveElements([], { x: 0, y: 0 })
+  chart.update('none')
+}
+let tooltipIndexAtTap: number | null = null
+let tapIsTouch = false
+function onPointerDown(event: PointerEvent) {
+  const insideChart = canvas.value?.contains(event.target as Node)
+  tapIsTouch = event.pointerType !== 'mouse'
+  tooltipIndexAtTap = insideChart ? (chart?.tooltip?.getActiveElements()[0]?.index ?? null) : null
+  if (!insideChart) hideTooltip()
+}
+// Chart.js handles canvas events on the next animation frame and re-shows the tapped bar's
+// tooltip then, so the check waits a frame too (frame callbacks run in the order they're asked for).
+function onClick(event: MouseEvent) {
+  const indexAtTap = tooltipIndexAtTap
+  tooltipIndexAtTap = null
+  if (!tapIsTouch || indexAtTap === null || event.target !== canvas.value) return
+  requestAnimationFrame(() => {
+    if (chart?.tooltip?.getActiveElements()[0]?.index === indexAtTap) hideTooltip()
+  })
+}
+
+onMounted(() => {
+  render()
+  document.addEventListener('pointerdown', onPointerDown, true)
+  document.addEventListener('click', onClick)
+  window.addEventListener('scroll', hideTooltip, { capture: true, passive: true })
+})
 watch([isDark, () => props.build], render)
-onBeforeUnmount(() => chart?.destroy())
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onPointerDown, true)
+  document.removeEventListener('click', onClick)
+  window.removeEventListener('scroll', hideTooltip, true)
+  chart?.destroy()
+})
 defineExpose({ render })
 </script>
 

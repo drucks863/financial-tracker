@@ -21,6 +21,9 @@
 - [x] Loans on My numbers (amortized); Net worth subtracts balances and shows principal vs interest
 - [x] Plan check: Rent and bills row counts spending on those items (by name), so editing them changes the check
 - [ ] Devin reviews the preview and sends tweaks
+- [x] Net worth import over the sample data removes the sample accounts (the stray −$25k Brokerage)
+- [ ] Devin: re-import the Net Worth tracker after the deploy to clear the sample Brokerage
+- [ ] Clear leftover sample cash flow entries (months no import covered) and the sample plan's Car loan
 
 ## Next
 
@@ -55,3 +58,6 @@
 - [ ] Decide what a brand-new user starts from in production (sample data today, replaced on first import)
 - [x] Tapping "Paid" (and other Select fields) in the profile opened the link-marker popover; fixed
 - [ ] Back burner (Devin, 2026-11-01): import Chase CSV activity (chase.com → Download account activity, ~24 months) to get real transaction dates. Proposed: "Chase CSV" import option, skip transfers/card payments, remembered Chase-category and description rules mapped to our categories, and match sheet lines by amount within the month to set their real date (unmatched rows reviewed in a preview). Overlap approach not decided yet.
+- [x] Trends: "Other" ranked by the year shown, listed under the chart and broken down in its tooltip
+- [x] Chart tooltips close on a tap outside the chart, on scroll, or on a second tap (phones)
+- [x] Popovers close on scroll, and scrolling past a chart no longer pops its tooltip (phones)
