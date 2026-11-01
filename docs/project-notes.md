@@ -293,6 +293,13 @@ saved in the browser only.
   data (bottom when every month saved), so small months stay readable. Devin found the old 46px
   split-in-half version too flat (2026-11-01).
 - Data colors in charts (income blue, expense orange, etc.) are separate from the UI chrome.
+- Expense category colors: five palette slots go to the five biggest categories **of the year being viewed**
+  (`categoryRank` in `store/ui.ts`, ties by all-time spend); everything else is grey "Other" ("Everything else"
+  when a real category is called Other). Ranked all-time until 2026-11-01, which pushed a year's big categories
+  into Other once older years were imported. Trends lists what's in Other under the chart, and its tooltip
+  breaks the Other bar down by category (Devin asked why Other was so big).
+- Chart tooltips on touch: a tap outside the chart, a scroll, or a second tap on the same bar closes it
+  (`BaseChart.vue`); Chart.js alone only listens on the canvas, so the tooltip used to get stuck on phones.
 
 ### App icon and favicon (Devin picked "trend line", 2026-11-01)
 
