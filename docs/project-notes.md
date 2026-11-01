@@ -205,6 +205,12 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   Assets / Debt or Liabilities headings in column B; subtotal and net worth rows skipped). The Retirement
   Calculator and Misc tabs are ignored. Loans live on the financial profile, so don't also type them into the
   sheet's debt rows before importing (they'd count twice).
+- The net worth import merges by account name and keeps months the file doesn't cover. While the data is still
+  the sample (`sample: true`), it first removes the sample's accounts (`SAMPLE_ACCOUNT_IDS` in
+  `lib/net-worth-import.ts`) and their balances (2026-11-01). Before that fix, the sample "Brokerage" stayed next
+  to the sheet's "Taxable": $0 in the newest month with a −$25k change, and ~$20–25k of fake balance in every
+  older month. The Cash Flow import still only replaces the months a file covers, and the sample's plan
+  (salary, rent split, "Car loan") stays until edited on the profile.
 - The year comes from the file name (`Cash Flow '23.xlsx` → 2023), or the tab name for '22/'23.
 - Known differences from the sheets, where the import is right and the sheet isn't: November '22's own
   "Total Expenses" leaves out the recurring bills; October '23 has a line typed with a decimal comma ("12,34" as text, so the
