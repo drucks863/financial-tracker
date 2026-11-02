@@ -100,7 +100,7 @@
 - [x] Retirement: easy way back to your real numbers ("Reset to my numbers" bar that follows you down the page)
 - [x] Retirement goal "Keep the nest egg" (end with what you retired with, after inflation), now the default; "Money lasts" still a toggle
 - [x] Nest-egg rule: most of the last 5 years, not just the final year (Devin, 2026-11-02)
-- [ ] Devin: review and merge the goal PR (#28)
+- [x] Devin: review and merge the goal PR (#28)
 - [ ] Maybe: more runs (500 → ~5,000) so the earliest age doesn't wobble by a year
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)
 - [x] Deployed main b06c483 (PR #28 nest egg goal, chart drag tooltips) as Lambda version 20, 2026-11-02
