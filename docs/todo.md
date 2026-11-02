@@ -98,3 +98,8 @@
 - [x] Deployed main 666aecd (PR #26 Retirement redesign, In retirement inputs back at the bottom) as Lambda version 18, 2026-11-01
 - [x] Deployed main 37fa9f4 (PR #27 Retirement chart axis fits the average-years line) as Lambda version 19, 2026-11-01
 - [x] Retirement: easy way back to your real numbers ("Reset to my numbers" bar that follows you down the page)
+- [x] Retirement goal "Keep the nest egg" (end with what you retired with, after inflation), now the default; "Money lasts" still a toggle
+- [x] Nest-egg rule: most of the last 5 years, not just the final year (Devin, 2026-11-02)
+- [ ] Devin: review and merge the goal PR (#28)
+- [ ] Maybe: more runs (500 → ~5,000) so the earliest age doesn't wobble by a year
+- [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)

@@ -120,6 +120,44 @@ function onClick(event: MouseEvent) {
   })
 }
 
+// Dragging a finger sideways across a chart moves the tooltip along (Devin, 2026-11-02). The canvas
+// has `touch-action: pan-y`, so an up/down swipe still scrolls the page (the browser takes it and
+// sends pointercancel); a sideways drag stays with us and scrubs, once it's clearly sideways.
+const SCRUB_START = 6
+let scrub: { pointerId: number; x: number; y: number; active: boolean } | null = null
+function showTooltipAt(event: PointerEvent) {
+  if (!chart) return
+  const mode = chart.options.interaction?.mode ?? 'index'
+  const elements = chart.getElementsAtEventForMode(event, mode, { intersect: false }, false)
+  if (!elements.length) return
+  const box = canvas.value!.getBoundingClientRect()
+  chart.setActiveElements(elements)
+  chart.tooltip?.setActiveElements(elements, { x: event.clientX - box.left, y: event.clientY - box.top })
+  chart.update('none')
+}
+function onScrubDown(event: PointerEvent) {
+  if (event.pointerType === 'mouse') return
+  scrub = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, active: false }
+}
+function onScrubMove(event: PointerEvent) {
+  if (!scrub || event.pointerId !== scrub.pointerId) return
+  if (!scrub.active) {
+    const dx = Math.abs(event.clientX - scrub.x)
+    const dy = Math.abs(event.clientY - scrub.y)
+    if (dx < SCRUB_START || dx < dy) return
+    scrub.active = true
+  }
+  showTooltipAt(event)
+}
+// lifting the finger leaves the tooltip up (like a tap); a scroll taking over closes it
+function onScrubEnd(event: PointerEvent) {
+  if (scrub && event.pointerId === scrub.pointerId) scrub = null
+}
+function onScrubCancel(event: PointerEvent) {
+  if (scrub && event.pointerId === scrub.pointerId && !scrub.active) hideTooltip()
+  onScrubEnd(event)
+}
+
 onMounted(() => {
   render()
   document.addEventListener('pointerdown', onPointerDown, true)
@@ -138,7 +176,15 @@ defineExpose({ render })
 
 <template>
   <div class="chart-box" :style="{ height }">
-    <canvas ref="canvas" role="img" :aria-label="label"></canvas>
+    <canvas
+      ref="canvas"
+      role="img"
+      :aria-label="label"
+      @pointerdown="onScrubDown"
+      @pointermove="onScrubMove"
+      @pointerup="onScrubEnd"
+      @pointercancel="onScrubCancel"
+    ></canvas>
   </div>
 </template>
 
@@ -147,5 +193,9 @@ defineExpose({ render })
   position: relative;
   width: 100%;
   min-width: 0;
+}
+/* up/down swipes scroll the page; sideways drags scrub the tooltip (see onScrubMove) */
+.chart-box canvas {
+  touch-action: pan-y;
 }
 </style>
