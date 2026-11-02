@@ -6,7 +6,7 @@ import SimulatorShell from '../components/SimulatorShell.vue'
 import SimField from '../components/SimField.vue'
 import BaseChart from '../components/BaseChart.vue'
 import { useScenario } from '../lib/scenario'
-import { retirement, project, budgetAt, estimateSocialSecurity, estimateWithdrawalTax, type RetirementInputs } from '../lib/retirement'
+import { retirement, project, budgetAt, estimateSocialSecurity, estimateWithdrawalTax, lifeAt, mortgagePayment, spouseSocialSecurity, type RetirementInputs } from '../lib/retirement'
 import { realFigures } from '../store/real-figures'
 import { money, moneyCompact, pct, shortDate, ymLabel } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
@@ -28,7 +28,22 @@ const DEFAULTS = {
   // Keeping it is Devin's goal (2026-11-02).
   keepNestEgg: 1,
   healthcareMonthly: 700,
-  socialSecurityAge: 67
+  socialSecurityAge: 67,
+  // Family and Home start left out (they're plans, not your numbers yet). Devin plans to marry, have
+  // kids and buy a home within about 5 years (2026-11-02), so the ages default to the next few years.
+  // The costs are US averages, each an input:
+  spouseSalary: 62_000, // median full-time pay, BLS 2025 (~$1,200 a week)
+  spouseSavingRate: 0.1,
+  kids: 2,
+  kidsApart: 2,
+  childMonthly: 1_500, // USDA: ~$233,610 to 17 for a middle-income married couple (2015 $), ~$18,000 a year in 2026 $
+  childcareMonthly: 1_100, // Child Care Aware 2024 national average, ~$13,000 a year, birth to 5
+  homePrice: 410_000, // US median existing-home price, NAR 2025
+  downPayment: 0.2,
+  closingCosts: 0.03,
+  mortgageRate: 0.065,
+  mortgageYears: 30,
+  ownershipRate: 0.025 // property tax ~1%, insurance ~0.5%, upkeep ~1% of the price a year
 }
 
 const thisYear = new Date().getFullYear()
@@ -67,7 +82,29 @@ function fromReal() {
     volatility: DEFAULTS.volatility,
     confidence: DEFAULTS.confidence,
     // Goal (shown as a toggle, stored as a number like every scenario input)
-    keepNestEgg: DEFAULTS.keepNestEgg
+    keepNestEgg: DEFAULTS.keepNestEgg,
+    // Family (left out until switched on)
+    includeFamily: 0,
+    marriedAtAge: age + 2,
+    spouseSalary: DEFAULTS.spouseSalary,
+    spouseSavingRate: DEFAULTS.spouseSavingRate,
+    // a couple spends about 1.5 times one person
+    coupleSpendingMonthly: Math.round(((recent.spending ?? real.takeHomeMonthly) * 0.5) / 10) * 10,
+    kids: DEFAULTS.kids,
+    firstKidAtAge: age + 3,
+    kidsApart: DEFAULTS.kidsApart,
+    childMonthly: DEFAULTS.childMonthly,
+    childcareMonthly: DEFAULTS.childcareMonthly,
+    // Home (left out until switched on)
+    includeHome: 0,
+    homeAtAge: age + 4,
+    homePrice: DEFAULTS.homePrice,
+    downPayment: DEFAULTS.downPayment,
+    closingCosts: DEFAULTS.closingCosts,
+    mortgageRate: DEFAULTS.mortgageRate,
+    mortgageYears: DEFAULTS.mortgageYears,
+    ownershipRate: DEFAULTS.ownershipRate,
+    rentMonthly: Math.round(real.rentMonthly)
   }
 }
 type Inputs = ReturnType<typeof fromReal>
@@ -104,7 +141,32 @@ function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInput
     socialSecurityAge: values.socialSecurityAge,
     targetAge: values.targetAge,
     planToAge: values.planToAge,
-    keepNestEgg: values.keepNestEgg >= 0.5
+    keepNestEgg: values.keepNestEgg >= 0.5,
+    family:
+      values.includeFamily >= 0.5
+        ? {
+            fromAge: values.marriedAtAge,
+            spouseSalary: values.spouseSalary,
+            spouseSavingRate: values.spouseSavingRate,
+            retiredSpending: values.coupleSpendingMonthly * 12,
+            kidsAtAge: Array.from({ length: Math.max(0, Math.round(values.kids)) }, (_, index) => values.firstKidAtAge + index * values.kidsApart),
+            childYearly: values.childMonthly * 12,
+            childcareYearly: values.childcareMonthly * 12
+          }
+        : undefined,
+    home:
+      values.includeHome >= 0.5
+        ? {
+            atAge: values.homeAtAge,
+            price: values.homePrice,
+            downPayment: values.downPayment,
+            closingCosts: values.closingCosts,
+            mortgageRate: values.mortgageRate,
+            mortgageYears: values.mortgageYears,
+            ownershipRate: values.ownershipRate,
+            rentYearly: values.rentMonthly * 12
+          }
+        : undefined
   }
 }
 
@@ -181,7 +243,9 @@ const budgetRows = computed(() => {
   return [
     { label: 'Spending target', pick: (b: (typeof columns)[number]['budget']) => b.target, show: true },
     { label: 'Loan payments gone or smaller', pick: (b: (typeof columns)[number]['budget']) => b.loanChange, show: any((b) => b.loanChange) },
-    { label: 'Health insurance until 65', pick: (b: (typeof columns)[number]['budget']) => b.healthcare, show: any((b) => b.healthcare) },
+    { label: engine.value.family ? 'Health insurance until 65, for two' : 'Health insurance until 65', pick: (b: (typeof columns)[number]['budget']) => b.healthcare, show: any((b) => b.healthcare) },
+    { label: 'Kids and spending for two', pick: (b: (typeof columns)[number]['budget']) => b.family, show: any((b) => b.family) },
+    { label: 'Owning instead of renting', pick: (b: (typeof columns)[number]['budget']) => b.home, show: any((b) => b.home) },
     { label: 'Social Security', pick: (b: (typeof columns)[number]['budget']) => -b.socialSecurity, show: any((b) => b.socialSecurity) },
     { label: 'Tax on withdrawals', pick: (b: (typeof columns)[number]['budget']) => b.tax, show: any((b) => b.tax) },
     { label: 'Taken from investments', pick: (b: (typeof columns)[number]['budget']) => b.withdrawal, show: true, total: true }
@@ -225,7 +289,52 @@ const taxHint = () => {
   return parts.length ? `Guessed from ${parts.join('; ')}. A Roth 401k counts as tax-free.` : 'Roth and HSA money comes out tax-free; pre-tax 401k and IRA money is taxed.'
 }
 
-const GROUPS: { title: string; fields: FieldSpec[] }[] = [
+/* ---- family and home ---- */
+
+const INCLUDE = [
+  { label: 'Left out', value: 0 },
+  { label: 'In the plan', value: 1 }
+]
+type ToggleKey = 'includeFamily' | 'includeHome'
+const toggleModels = Object.fromEntries(
+  (['includeFamily', 'includeHome'] as const).map((key) => {
+    const raw = scenario.field(key)
+    return [key, computed({ get: () => (raw.value >= 0.5 ? 1 : 0), set: (value: number) => (raw.value = value) })]
+  })
+) as Record<ToggleKey, WritableComputedRef<number>>
+const included = (key: ToggleKey) => values.value[key] >= 0.5
+const includeName = (value: number) => (value >= 0.5 ? 'In the plan' : 'Left out')
+
+const kidsAges = computed(() => engine.value.family?.kidsAtAge ?? [])
+/** The most the kids cost in a year, and from what age of yours. */
+const kidsPeak = computed(() => {
+  let peak = { amount: 0, age: 0 }
+  for (const born of kidsAges.value)
+    for (let age = born; age < born + 18; age++) {
+      const amount = lifeAt(engine.value, age).kids
+      if (amount > peak.amount + 0.5) peak = { amount, age }
+    }
+  return peak
+})
+const familySummary = () => {
+  const family = engine.value.family
+  if (!family) return ''
+  const spouse = `Your spouse saves about ${money((family.spouseSalary * family.spouseSavingRate) / 12)} a month from ${family.fromAge}`
+  const ss = `and adds about ${money(spouseSocialSecurity(engine.value, target.value.retireAge) / 12)} a month of Social Security`
+  if (!kidsAges.value.length) return `${spouse} ${ss}.`
+  const last = Math.max(...kidsAges.value) + 17
+  return `${spouse} ${ss}. Kids cost up to ${money(kidsPeak.value.amount / 12)} a month (at ${kidsPeak.value.age}), until you're ${last}.`
+}
+const homeSummary = () => {
+  const home = engine.value.home
+  if (!home) return ''
+  const payment = mortgagePayment(home.price * (1 - home.downPayment), home.mortgageRate, home.mortgageYears)
+  const upfront = home.price * (home.downPayment + home.closingCosts)
+  const owning = (home.price * home.ownershipRate) / 12
+  return `${money(upfront)} down and closing at ${home.atAge}, from your investments. Then ${money(payment)} a month mortgage until ${home.atAge + home.mortgageYears} plus ${money(owning)} tax, insurance and upkeep, instead of ${money(home.rentYearly / 12)} rent.`
+}
+
+const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; fields: FieldSpec[] }[] = [
   {
     title: 'You',
     fields: [
@@ -252,6 +361,55 @@ const GROUPS: { title: string; fields: FieldSpec[] }[] = [
       { key: 'deductionsYearly', label: 'Other paycheck saving (HSA...), yearly', kind: 'money', source: () => 'profile' },
       { key: 'otherSavingMonthly', label: 'Other saving a month (IRA, brokerage)', kind: 'money', source: recentSource, hint: () => 'What’s left after spending, invested.' },
       { key: 'salaryGrowth', label: 'Raise each year', kind: 'percent', min: -10, max: 20, hint: () => 'Saving grows with your pay.' }
+    ]
+  },
+  {
+    title: 'Family',
+    toggle: 'includeFamily',
+    summary: familySummary,
+    fields: [
+      { key: 'marriedAtAge', label: 'Married at', kind: 'age', min: 16, max: 90 },
+      { key: 'spouseSalary', label: 'Spouse’s gross salary, yearly', kind: 'money', hint: () => 'Today’s dollars; gets the same raises as yours. US median full-time pay is about $62,000.' },
+      { key: 'spouseSavingRate', label: 'Spouse saves', kind: 'percent', max: 100, hint: () => 'Share of their pay invested (their 401k, match, IRA).' },
+      { key: 'coupleSpendingMonthly', label: 'Extra spending in retirement for two, a month', kind: 'money', hint: () => 'Added to your spending target once retired. A couple spends about 1.5 times one person. Health insurance before 65 doubles too.' },
+      { key: 'kids', label: 'Kids', kind: 'age', min: 0, max: 8 },
+      { key: 'firstKidAtAge', label: 'First child when you’re', kind: 'age', min: 16, max: 70, hidden: () => values.value.kids < 1 },
+      { key: 'kidsApart', label: 'Years between kids', kind: 'age', min: 1, max: 10, hidden: () => values.value.kids < 2 },
+      {
+        key: 'childMonthly',
+        label: 'Cost per child a month, to 18',
+        kind: 'money',
+        hidden: () => values.value.kids < 1,
+        hint: () => 'US average for a middle-income married couple: about $18,000 a year (USDA estimate in today’s dollars). College isn’t included.'
+      },
+      {
+        key: 'childcareMonthly',
+        label: 'Child care per child a month, before school',
+        kind: 'money',
+        hidden: () => values.value.kids < 1,
+        hint: () => 'On top, birth to 5, since you both work. US average is about $13,000 a year (Child Care Aware, 2024).'
+      }
+    ]
+  },
+  {
+    title: 'Home',
+    toggle: 'includeHome',
+    summary: homeSummary,
+    fields: [
+      { key: 'homeAtAge', label: 'Buy at', kind: 'age', min: 16, max: 90 },
+      { key: 'homePrice', label: 'Home price, today’s dollars', kind: 'money', hint: () => 'The US median existing home sold for about $410,000 in 2025.' },
+      { key: 'downPayment', label: 'Down payment', kind: 'percent', max: 100, hint: () => 'Comes out of your investments the year you buy, with the closing costs. 20% avoids mortgage insurance.' },
+      { key: 'closingCosts', label: 'Closing costs', kind: 'percent', max: 10 },
+      { key: 'mortgageRate', label: 'Mortgage rate', kind: 'percent', max: 15 },
+      { key: 'mortgageYears', label: 'Mortgage length, years', kind: 'age', min: 5, max: 40, hint: () => 'A fixed payment: inflation shrinks it each year, and it stops at payoff.' },
+      { key: 'ownershipRate', label: 'Tax, insurance and upkeep, yearly', kind: 'percent', max: 10, hint: () => 'Share of the price: property tax ~1%, insurance ~0.5%, upkeep ~1%.' },
+      {
+        key: 'rentMonthly',
+        label: 'Rent that stops, a month',
+        kind: 'money',
+        source: () => (realFigures.value.rentMonthly ? 'your profile’s rent (your share)' : undefined),
+        hint: () => 'It’s in your spending today, so it comes off once you own.'
+      }
     ]
   },
   {
@@ -542,6 +700,8 @@ const chart = computed<ChartBuilder>(() => {
             <li>Tax on withdrawals is one flat rate on everything taken out. Roth and HSA money is tax-free; pre-tax 401k and IRA money is taxed like income.</li>
             <li>Ups and downs: the plan runs against {{ 500 }} sequences of yearly returns that average out to your return, with the volatility you set. Bad years early in retirement hurt most; that’s why the chance can be below 100% even when average years look fine.</li>
             <li>The goal. Money lasts: the balance never hits zero before the plan-to age. Keep the nest egg: in at least 3 of the last 5 years of the plan, you still have what you retired with, in today’s dollars (so it keeps up with inflation). Looking at 5 years means one crash in the final year doesn’t decide it. It can dip along the way; you live off the growth, not the savings. That takes a bigger balance, so the earliest age is later.</li>
+            <li>Family (when in the plan): from the age you marry, your spouse’s saving is added while you work, health insurance before 65 is for two, retirement spending rises by the extra for two, and their Social Security (their own estimate, or half of yours if more) is added. Each child costs the monthly amount until 18, plus child care until 5; while working that comes out of what you save. You both retire at the same age.</li>
+            <li>Home (when in the plan): the down payment and closing costs come out of your investments the year you buy. From then on the mortgage (fixed, so it shrinks with inflation and stops at payoff) plus tax, insurance and upkeep replace your rent. The home itself isn’t counted as money to retire on.</li>
             <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Contribution limits and required withdrawals aren’t modelled.</li>
           </ul>
         </details>
@@ -550,7 +710,18 @@ const chart = computed<ChartBuilder>(() => {
       <div class="inputs">
         <section v-for="group in GROUPS" :key="group.title" class="panel sim-panel">
           <h2>{{ group.title }}</h2>
-          <div class="grid">
+          <div v-if="group.toggle" class="grid toggle-row">
+            <SimField
+              :label="group.title === 'Family' ? 'A spouse and kids' : 'Buy a home'"
+              :changed="scenario.changed(group.toggle)"
+              :real-text="includeName(scenario.real.value[group.toggle])"
+              @reset="scenario.reset(group.toggle)"
+            >
+              <SelectButton v-model="toggleModels[group.toggle].value" :options="INCLUDE" option-label="label" option-value="value" :allow-empty="false" size="small" :aria-label="group.title" />
+            </SimField>
+          </div>
+          <p v-if="group.toggle && included(group.toggle)" class="ink2 small group-summary">{{ group.summary?.() }}</p>
+          <div v-if="!group.toggle || included(group.toggle)" class="grid">
             <SimField
               v-if="group.title === 'You'"
               label="Goal"
@@ -756,6 +927,12 @@ const chart = computed<ChartBuilder>(() => {
   }
 }
 
+.toggle-row {
+  margin-bottom: 12px;
+}
+.group-summary {
+  margin: 0 0 12px;
+}
 .assumptions summary {
   cursor: pointer;
   font-weight: 600;

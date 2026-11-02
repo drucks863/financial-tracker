@@ -21,12 +21,53 @@
 //     keep the nest egg: in most of the last 5 years of the plan (3 of 5 year-ends), you still have at
 //     least what you retired with, in today's dollars. Dips along the way are allowed; you live off the
 //     growth. "Most of the last 5" so one crash in the final year doesn't decide it (Devin, 2026-11-02).
+// - Life changes (optional; Devin plans to marry, have kids and buy a home within ~5 years, 2026-11-02):
+//     family: from the age you marry, the spouse's saving is added while working, each child costs a
+//       yearly amount until 18 (plus child care before school, both parents working), the spouse's
+//       Social Security adds to yours, and retirement spending and health insurance are for two;
+//     home: the year you buy, the down payment and closing costs come out of the investments; from then
+//       on the mortgage (fixed, so it shrinks with inflation and stops at payoff) and the costs of owning
+//       replace rent. While working these change what you save; once retired, what you spend.
 
 export interface LoanPayoff {
   /** the fixed monthly payment, in dollars of the day it's paid (it doesn't rise with inflation) */
   monthlyPayment: number
   /** age at the last payment; spending drops from the next year */
   endsAtAge: number
+}
+
+export interface Family {
+  /** your age when you marry; the spouse's saving and Social Security count from then */
+  fromAge: number
+  /** spouse's gross salary a year, today's dollars; rises with the same raises as yours */
+  spouseSalary: number
+  /** share of it the spouse saves into investments, 0–1 */
+  spouseSavingRate: number
+  /** extra spending a year in retirement for the two of you, today's dollars */
+  retiredSpending: number
+  /** your age when each child is born */
+  kidsAtAge: number[]
+  /** what a child costs a year until 18, today's dollars */
+  childYearly: number
+  /** child care a year per child before school (birth to 5), since both of you work */
+  childcareYearly: number
+}
+
+export interface Home {
+  /** your age when you buy */
+  atAge: number
+  /** price in today's dollars */
+  price: number
+  /** down payment and closing costs, shares of the price (0–1); they come out of the investments that year */
+  downPayment: number
+  closingCosts: number
+  /** mortgage rate a year (0–1) and length in years */
+  mortgageRate: number
+  mortgageYears: number
+  /** property tax, insurance and upkeep a year, share of the price (0–1); rises with inflation */
+  ownershipRate: number
+  /** rent a year today that stops once you own */
+  rentYearly: number
 }
 
 export interface RetirementInputs {
@@ -63,6 +104,10 @@ export interface RetirementInputs {
   planToAge: number
   /** the goal: false (or left out) = the money lasts; true = still have what you retired with at the end */
   keepNestEgg?: boolean
+  /** a spouse and kids; left out = just you */
+  family?: Family
+  /** buying a home instead of renting; left out = keep renting */
+  home?: Home
 }
 
 export interface ProjectionYear {
@@ -155,8 +200,87 @@ export function estimateSocialSecurity(salary: number, retireAge: number, claimA
   return fullBenefit * 12 * claimFactor(claimAge)
 }
 
-export const socialSecurityFor = (inputs: RetirementInputs, retireAge: number): number =>
+/** Your Social Security a year (today's dollars), when retiring at `retireAge`. */
+export const ownSocialSecurity = (inputs: RetirementInputs, retireAge: number): number =>
   inputs.socialSecurity ?? estimateSocialSecurity(inputs.salary, retireAge, inputs.socialSecurityAge)
+
+/**
+ * The spouse's Social Security a year: their own estimate (same ages and claiming age as you), or the
+ * spousal benefit of half of yours if that's more. 0 without a family.
+ */
+export function spouseSocialSecurity(inputs: RetirementInputs, retireAge: number): number {
+  if (!inputs.family) return 0
+  const own = estimateSocialSecurity(inputs.family.spouseSalary, retireAge, inputs.socialSecurityAge)
+  return Math.max(own, ownSocialSecurity(inputs, retireAge) / 2)
+}
+
+/** Social Security a year for the household (you, plus a spouse when there's a family). */
+export const socialSecurityFor = (inputs: RetirementInputs, retireAge: number): number =>
+  ownSocialSecurity(inputs, retireAge) + spouseSocialSecurity(inputs, retireAge)
+
+/* ---------- family and home ---------- */
+
+/** Monthly payment on a fixed-rate loan. */
+export function mortgagePayment(amount: number, yearlyRate: number, years: number): number {
+  const months = Math.max(1, Math.round(years * 12))
+  const rate = yearlyRate / 12
+  if (amount <= 0) return 0
+  if (rate <= 0) return amount / months
+  return (amount * rate) / (1 - Math.pow(1 + rate, -months))
+}
+
+export interface LifeChanges {
+  /** the spouse's saving that year (counted while working) */
+  spouseSaving: number
+  /** kids that year: their cost plus child care */
+  kids: number
+  /** extra spending for two (counted once retired) */
+  couple: number
+  /** mortgage payment that year, today's dollars (a fixed payment shrinks with inflation) */
+  mortgage: number
+  /** property tax, insurance and upkeep */
+  ownership: number
+  /** rent no longer paid, as a positive amount */
+  rentSaved: number
+  /** down payment and closing costs, only in the year you buy */
+  purchase: number
+}
+
+/** Family and home amounts at `age`, today's dollars a year. All zero when neither is in the plan. */
+export function lifeAt(inputs: RetirementInputs, age: number): LifeChanges {
+  const changes: LifeChanges = { spouseSaving: 0, kids: 0, couple: 0, mortgage: 0, ownership: 0, rentSaved: 0, purchase: 0 }
+  const family = inputs.family
+  if (family && age >= family.fromAge) {
+    const raise = realRate(inputs.salaryGrowth, inputs.inflation)
+    const years = Math.max(0, age - Math.round(inputs.currentAge))
+    changes.spouseSaving = Math.max(0, family.spouseSalary) * Math.max(0, family.spouseSavingRate) * Math.pow(1 + raise, years)
+    changes.couple = Math.max(0, family.retiredSpending)
+  }
+  if (family) {
+    for (const born of family.kidsAtAge) {
+      const childAge = age - born
+      if (childAge < 0 || childAge >= 18) continue
+      changes.kids += Math.max(0, family.childYearly) + (childAge < 5 ? Math.max(0, family.childcareYearly) : 0)
+    }
+  }
+  const home = inputs.home
+  if (home && age >= home.atAge) {
+    const price = Math.max(0, home.price)
+    const down = Math.min(1, Math.max(0, home.downPayment))
+    const owned = age - home.atAge
+    if (owned === 0) changes.purchase = price * (down + Math.max(0, home.closingCosts))
+    if (owned < Math.round(home.mortgageYears)) {
+      const payment = mortgagePayment(price * (1 - down), home.mortgageRate, home.mortgageYears) * 12
+      changes.mortgage = payment * Math.pow(1 + inputs.inflation, -owned)
+    }
+    changes.ownership = price * Math.max(0, home.ownershipRate)
+    changes.rentSaved = Math.max(0, home.rentYearly)
+  }
+  return changes
+}
+
+/** What owning costs that year compared with renting (+ more, − less), the purchase left out. */
+export const homeChange = (life: LifeChanges): number => life.mortgage + life.ownership - life.rentSaved
 
 /* ---------- withdrawals ---------- */
 
@@ -165,9 +289,13 @@ export interface YearBudget {
   target: number
   /** loan payments no longer made (paid off, or worth less after inflation), as a negative amount */
   loanChange: number
-  /** health insurance before Medicare */
+  /** health insurance before Medicare (for two once married) */
   healthcare: number
-  /** spending that year: target + loanChange + healthcare */
+  /** kids, and the extra for two */
+  family: number
+  /** owning instead of renting: mortgage and costs of owning less the rent (plus the purchase, the year you buy) */
+  home: number
+  /** spending that year: target + loanChange + healthcare + family + home */
   spending: number
   /** Social Security that year */
   socialSecurity: number
@@ -189,13 +317,28 @@ export function budgetAt(inputs: RetirementInputs, age: number, socialSecurity: 
     loanChange -= yearly - (age <= loan.endsAtAge ? yearly * deflate : 0)
   }
   loanChange = Math.max(loanChange, -target)
-  const healthcare = age < 65 ? Math.max(0, inputs.healthcareBefore65) : 0
-  const spending = target + loanChange + healthcare
+  const life = lifeAt(inputs, age)
+  const married = !!inputs.family && age >= inputs.family.fromAge
+  const healthcare = age < 65 ? Math.max(0, inputs.healthcareBefore65) * (married ? 2 : 1) : 0
+  const family = life.kids + life.couple
+  // owning can't take spending below zero
+  const home = Math.max(homeChange(life) + life.purchase, -(target + loanChange + healthcare + family))
+  const spending = target + loanChange + healthcare + family + home
   const fromSocialSecurity = age >= inputs.socialSecurityAge ? Math.min(spending, Math.max(0, socialSecurity)) : 0
   const need = spending - fromSocialSecurity
   const taxRate = Math.min(0.9, Math.max(0, inputs.withdrawalTax))
   const withdrawal = need / (1 - taxRate)
-  return { target, loanChange, healthcare, spending, socialSecurity: fromSocialSecurity, tax: withdrawal - need, withdrawal }
+  return { target, loanChange, healthcare, family, home, spending, socialSecurity: fromSocialSecurity, tax: withdrawal - need, withdrawal }
+}
+
+/**
+ * Saved (+) or taken out (−) at `age` while working, today's dollars: your saving (`saving`, already
+ * grown with raises) plus the spouse's, less the kids and owning instead of renting, less the down
+ * payment and closing costs the year you buy.
+ */
+export function workingFlowAt(inputs: RetirementInputs, age: number, saving: number): number {
+  const life = lifeAt(inputs, age)
+  return saving + life.spouseSaving - life.kids - homeChange(life) - life.purchase
 }
 
 /** Spending at `age`, today's dollars: the target, with loan payments adjusted, plus health insurance before 65. */
@@ -256,7 +399,7 @@ export function project(inputs: RetirementInputs, retireAge: number, returns?: A
     let flow: number
     if (retired) flow = -withdrawalAt(inputs, age, socialSecurity)
     else {
-      flow = saving
+      flow = workingFlowAt(inputs, age, saving)
       saving *= 1 + raise
     }
     years.push({ age, balance, flow, retired })
