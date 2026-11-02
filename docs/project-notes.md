@@ -320,6 +320,16 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   retire at 65, money lasts to 95, health insurance $700/mo before 65, Social Security estimated and claimed at 67,
   other saving = recent average left over after spending, age 30 until a birth year is on the profile.
 - The profile has a **Birth year** field (Pay section; `Plan.birthYear`, optional, on both sides) for the age.
+- **Future Retirement sections, not built yet** (Devin, 2026-11-02: plans to get married, have kids and buy a
+  home within about 5 years, which will move these numbers). Two more input sections, idea only:
+  - **Family**: a spouse (their income, saving, raises, and later their Social Security), and kids from a chosen
+    year, costed at the national average spent per child for a household where both parents work (a published
+    figure such as the USDA cost-of-raising-a-child estimate, inflated to today's dollars), until about 18.
+  - **Home**: a home purchase in a chosen year (price, down payment taken from savings, mortgage payment, property
+    tax/insurance/upkeep), with rent removed from spending from that year on; the mortgage then drops off at payoff
+    like other loans.
+  Both would follow the simulator pattern (scenario overrides, profile untouched). Ties in with the "home
+  budgeting" playground idea on the todo list.
 
 ## The Google Sheets are reference only
 

@@ -102,5 +102,10 @@
 - [x] Nest-egg rule: most of the last 5 years, not just the final year (Devin, 2026-11-02)
 - [x] Devin: review and merge the goal PR (#28)
 - [ ] Maybe: more runs (500 → ~5,000) so the earliest age doesn't wobble by a year
+- [ ] Later, not now (Devin, 2026-11-02; goal is marriage, kids and a home within ~5 years): Retirement **Family**
+  section: spouse income, saving and raises; kids from a chosen year at the national average cost per child with both
+  parents working
+- [ ] Later, not now (Devin, 2026-11-02): Retirement **Home** section: home purchase in a chosen year (down payment,
+  mortgage, tax/insurance/upkeep) with rent removed from spending from then on
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)
 - [x] Deployed main b06c483 (PR #28 nest egg goal, chart drag tooltips) as Lambda version 20, 2026-11-02
