@@ -103,3 +103,4 @@
 - [ ] Devin: review and merge the goal PR (#28)
 - [ ] Maybe: more runs (500 → ~5,000) so the earliest age doesn't wobble by a year
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)
+- [x] Deployed main b06c483 (PR #28 nest egg goal, chart drag tooltips) as Lambda version 20, 2026-11-02
