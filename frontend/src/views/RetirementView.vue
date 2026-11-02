@@ -24,6 +24,9 @@ const DEFAULTS = {
   salaryGrowth: 0.03,
   volatility: 0.15,
   confidence: 0.9,
+  // the goal: 1 = keep the nest egg (end with at least what you retired with), 0 = the money lasts.
+  // Keeping it is Devin's goal (2026-11-02).
+  keepNestEgg: 1,
   healthcareMonthly: 700,
   socialSecurityAge: 67
 }
@@ -62,7 +65,9 @@ function fromReal() {
     returnRate: DEFAULTS.returnRate,
     inflation: DEFAULTS.inflation,
     volatility: DEFAULTS.volatility,
-    confidence: DEFAULTS.confidence
+    confidence: DEFAULTS.confidence,
+    // Goal (shown as a toggle, stored as a number like every scenario input)
+    keepNestEgg: DEFAULTS.keepNestEgg
   }
 }
 type Inputs = ReturnType<typeof fromReal>
@@ -98,7 +103,8 @@ function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInput
     socialSecurity: typedSocialSecurity ? values.socialSecurityMonthly * 12 : null,
     socialSecurityAge: values.socialSecurityAge,
     targetAge: values.targetAge,
-    planToAge: values.planToAge
+    planToAge: values.planToAge,
+    keepNestEgg: values.keepNestEgg >= 0.5
   }
 }
 
@@ -110,6 +116,19 @@ const realResult = computed(() => retirement(realEngine.value, scenario.real.val
 const changed = computed(() => scenario.changedCount.value > 0)
 const target = computed(() => result.value.target)
 const varied = computed(() => values.value.volatility > 0)
+const keep = computed(() => values.value.keepNestEgg >= 0.5)
+
+/* ---- the goal ---- */
+
+const GOALS = [
+  { label: 'Keep the nest egg', value: 1 },
+  { label: 'Money lasts', value: 0 }
+]
+const goalField = scenario.field('keepNestEgg')
+const goalModel = computed({ get: () => (keep.value ? 1 : 0), set: (value: number) => (goalField.value = value) })
+const goalName = (value: number) => (value >= 0.5 ? 'Keep the nest egg' : 'Money lasts')
+/** "you keep your nest egg to 95" / "the money lasts to 95", for sentences */
+const goalPhrase = computed(() => (keep.value ? `you keep your nest egg through ${engine.value.planToAge}` : `the money lasts to ${engine.value.planToAge}`))
 
 /* ---- today's or future dollars ---- */
 
@@ -137,6 +156,13 @@ const versusReal = computed(() => {
   return `${years} ${years === 1 ? 'year' : 'years'} ${now < before ? 'sooner' : 'later'} than your real numbers`
 })
 const onTrack = computed(() => result.value.chanceAtTarget >= values.value.confidence - 1e-9)
+/** What average years do when retiring at the target age, in a few words. */
+const averageOutcome = computed(() => {
+  const plan = target.value
+  if (plan.runsOutAt !== null) return `Runs out at ${plan.runsOutAt}`
+  if (!keep.value) return `Lasts past ${engine.value.planToAge}`
+  return plan.works ? `Kept through ${engine.value.planToAge}` : `Ends ${pct(1 - plan.atEnd / plan.atRetirement)} lower`
+})
 
 // The retirement budget, monthly: the first year, and once Social Security starts if that's later.
 const budgetColumns = computed(() => {
@@ -233,7 +259,7 @@ const GROUPS: { title: string; fields: FieldSpec[] }[] = [
       { key: 'returnRate', label: 'Investment return, average year', kind: 'percent', min: -10, max: 20, hint: () => 'Before inflation. 7% is a common long-run guess for a stock-heavy mix.' },
       { key: 'inflation', label: 'Inflation, yearly', kind: 'percent', min: 0, max: 15 },
       { key: 'volatility', label: 'Ups and downs (volatility)', kind: 'percent', min: 0, max: 40, hint: () => 'How much a year swings. ~15% for mostly stocks, ~10% for a 60/40 mix. 0 turns it off.' },
-      { key: 'confidence', label: 'Chance the money should last', kind: 'percent', min: 50, max: 99, hint: () => 'The earliest age is the first one that clears this.' }
+      { key: 'confidence', label: 'Chance the plan should work', kind: 'percent', min: 50, max: 99, hint: () => `Chance ${goalPhrase.value}. The earliest age is the first one that clears this.` }
     ]
   },
   {
@@ -355,6 +381,23 @@ const chart = computed<ChartBuilder>(() => {
             pointRadius: mine.map((_, index) => (index === retireIndex ? 5 : 0)),
             pointHoverRadius: 5
           },
+          ...(keep.value
+            ? [
+                {
+                  label: 'Nest egg to keep',
+                  // flat in today's dollars from the day you retire; in future dollars it rises with inflation
+                  data: mine.map((year) => (year.age >= target.value.retireAge ? shown(target.value.atRetirement, year.age) : null)),
+                  borderColor: colors.ink2,
+                  backgroundColor: colors.ink2,
+                  borderWidth: 1.5,
+                  borderDash: [2, 3],
+                  fill: false,
+                  tension: 0,
+                  pointRadius: 0,
+                  pointHoverRadius: 4
+                }
+              ]
+            : []),
           ...(real
             ? [
                 {
@@ -400,7 +443,7 @@ const chart = computed<ChartBuilder>(() => {
     <div class="sticky-answer" aria-hidden="true">
       <span>Earliest <strong class="num">{{ headline ?? '—' }}</strong></span>
       <span>At {{ target.retireAge }}: <strong class="num">{{ moneyCompact(shown(target.atRetirement, target.retireAge)) }}</strong></span>
-      <span :class="onTrack ? 'pos' : 'neg'">{{ varied ? `${Math.round(result.chanceAtTarget * 100)}% lasts` : target.runsOutAt ? `Out at ${target.runsOutAt}` : `Lasts to ${engine.planToAge}` }}</span>
+      <span :class="onTrack ? 'pos' : 'neg'">{{ varied ? `${Math.round(result.chanceAtTarget * 100)}% ${keep ? 'kept' : 'lasts'}` : averageOutcome }}</span>
     </div>
 
     <div class="layout">
@@ -412,29 +455,30 @@ const chart = computed<ChartBuilder>(() => {
               <p class="hero-num num">{{ headline }}</p>
               <p class="muted small">
                 in {{ yearAt(headline) }}<template v-if="headline === engine.currentAge"> (you already could)</template>
-                <template v-if="varied"> · {{ pct(values.confidence) }} chance the money lasts to {{ engine.planToAge }}</template>
+                <template v-if="varied"> · {{ pct(values.confidence) }} chance {{ goalPhrase }}</template>
+                <template v-else-if="keep"> · keeping your nest egg through {{ engine.planToAge }}</template>
               </p>
               <p v-if="varied && result.earliestAge !== null && result.earliestAge !== headline" class="muted small">{{ result.earliestAge }} if every year is an average year</p>
               <p v-if="versusReal" class="ink2 small">{{ versusReal }}</p>
             </template>
             <template v-else>
               <p class="hero-num num">—</p>
-              <p class="muted small">Not with money lasting to {{ engine.planToAge }}. Try saving more or spending less.</p>
+              <p class="muted small">Not if {{ goalPhrase }}. Try saving more or spending less.</p>
             </template>
           </div>
           <dl class="kpis">
             <div>
               <dt>Retiring at {{ target.retireAge }}</dt>
               <dd :class="onTrack ? 'pos' : 'neg'">
-                <template v-if="varied">{{ Math.round(result.chanceAtTarget * 100) }}% chance it lasts</template>
-                <template v-else>{{ target.runsOutAt ? `Runs out at ${target.runsOutAt}` : `Lasts past ${engine.planToAge}` }}</template>
+                <template v-if="varied">{{ Math.round(result.chanceAtTarget * 100) }}% chance {{ keep ? 'it’s kept' : 'it lasts' }}</template>
+                <template v-else>{{ averageOutcome }}</template>
               </dd>
-              <dd class="sub muted">{{ varied && target.runsOutAt ? `average years run out at ${target.runsOutAt}` : `to age ${engine.planToAge}` }}</dd>
+              <dd class="sub muted">{{ varied && !target.works ? `average years: ${averageOutcome.toLowerCase()}` : `to age ${engine.planToAge}` }}</dd>
             </div>
             <div>
               <dt>Invested at {{ target.retireAge }}</dt>
               <dd class="num">{{ money(shown(target.atRetirement, target.retireAge)) }}</dd>
-              <dd class="sub muted">needs about {{ money(shown(result.neededAtTarget, target.retireAge)) }}</dd>
+              <dd class="sub muted">{{ Number.isFinite(result.neededAtTarget) ? `needs about ${money(shown(result.neededAtTarget, target.retireAge))}` : 'can’t be kept at this return' }}</dd>
             </div>
             <div>
               <dt>Spending target</dt>
@@ -458,6 +502,7 @@ const chart = computed<ChartBuilder>(() => {
           <div class="legend">
             <span><i class="swatch line" :style="{ background: 'var(--nw-investments)' }"></i>Average years</span>
             <span v-if="varied"><i class="swatch band"></i>Bad to good years (8 in 10 runs)</span>
+            <span v-if="keep"><i class="swatch line dotted"></i>Nest egg to keep</span>
             <span v-if="changed"><i class="swatch line dashed"></i>Your real numbers</span>
             <span><i class="swatch dot-swatch"></i>Retire at {{ target.retireAge }}</span>
           </div>
@@ -494,6 +539,7 @@ const chart = computed<ChartBuilder>(() => {
             <li>Social Security, unless you type yours: today’s salary for each year from 22 until you retire (the best 35 count), through the 2026 benefit formula, adjusted for the age you claim. It assumes today’s rules; a shortfall in the trust fund could cut it about 20% from the 2030s.</li>
             <li>Tax on withdrawals is one flat rate on everything taken out. Roth and HSA money is tax-free; pre-tax 401k and IRA money is taxed like income.</li>
             <li>Ups and downs: the plan runs against {{ 500 }} sequences of yearly returns that average out to your return, with the volatility you set. Bad years early in retirement hurt most; that’s why the chance can be below 100% even when average years look fine.</li>
+            <li>The goal. Money lasts: the balance never hits zero before the plan-to age. Keep the nest egg: after the plan-to age you still have at least what you retired with, in today’s dollars (so it keeps up with inflation). It can dip along the way; you live off the growth, not the savings. That takes a bigger balance, so the earliest age is later.</li>
             <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Contribution limits and required withdrawals aren’t modelled.</li>
           </ul>
         </details>
@@ -503,6 +549,16 @@ const chart = computed<ChartBuilder>(() => {
         <section v-for="group in GROUPS" :key="group.title" class="panel sim-panel">
           <h2>{{ group.title }}</h2>
           <div class="grid">
+            <SimField
+              v-if="group.title === 'You'"
+              label="Goal"
+              :changed="scenario.changed('keepNestEgg')"
+              :real-text="goalName(scenario.real.value.keepNestEgg)"
+              :hint="keep ? 'End with at least what you retired with, after inflation.' : 'Don’t run out before the age below.'"
+              @reset="scenario.reset('keepNestEgg')"
+            >
+              <SelectButton v-model="goalModel" :options="GOALS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Goal" />
+            </SimField>
             <template v-for="spec in group.fields" :key="spec.key">
               <SimField
                 v-if="!spec.hidden?.()"
@@ -628,6 +684,9 @@ const chart = computed<ChartBuilder>(() => {
 }
 .swatch.dashed {
   background: repeating-linear-gradient(90deg, var(--muted) 0 5px, transparent 5px 9px);
+}
+.swatch.dotted {
+  background: repeating-linear-gradient(90deg, var(--ink-2) 0 2px, transparent 2px 5px);
 }
 .swatch.band {
   background: color-mix(in srgb, var(--nw-investments) 30%, transparent);

@@ -97,6 +97,27 @@ test('needed balance matches what project() draws down', () => {
   assert.notEqual(project({ ...inputs, currentAge: 60, startBalance: needed - 1_000, yearlySaving: 0 }, 60).runsOutAt, null)
 })
 
+test('keep the nest egg: needs more, ends where it started, and retires later', () => {
+  const inputs = { ...base, socialSecurity: 20_000, keepNestEgg: true }
+  const needed = neededAt(inputs, 60)
+  assert.ok(needed > neededAt({ ...inputs, keepNestEgg: false }, 60))
+  // retiring with exactly that much ends with exactly that much, a little less ends lower
+  const exact = project({ ...inputs, currentAge: 60, startBalance: needed, yearlySaving: 0 }, 60)
+  assert.ok(exact.works)
+  near(exact.atEnd, needed, 1)
+  const short = project({ ...inputs, currentAge: 60, startBalance: needed - 1_000, yearlySaving: 0 }, 60)
+  assert.equal(short.runsOutAt, null) // it still lasts...
+  assert.ok(!short.works) // ...but the nest egg shrank
+  // a harder goal means a later earliest age, with or without ups and downs
+  assert.ok(retirement(inputs).earliestAge! > retirement({ ...inputs, keepNestEgg: false }).earliestAge!)
+  const shaky = { ...inputs, volatility: 0.15 }
+  // (here keeping it 8 in 10 times never happens before 95, so there's no earliest age at all)
+  assert.ok((retirement(shaky, 0.8).earliestConfident ?? Infinity) > retirement({ ...shaky, keepNestEgg: false }, 0.8).earliestConfident!)
+  assert.ok(chanceItLasts(shaky, 55) <= chanceItLasts({ ...shaky, keepNestEgg: false }, 55))
+  // no return after inflation: no balance can be kept while withdrawing
+  assert.equal(neededAt({ ...inputs, returnRate: 0.03 }, 60), Infinity)
+})
+
 test('never retiring in time gives no earliest age', () => {
   assert.equal(retirement({ ...base, startBalance: 0, yearlySaving: 0 }).earliestAge, null)
 })

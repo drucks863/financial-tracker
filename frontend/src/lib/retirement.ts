@@ -14,8 +14,12 @@
 //   grossed up for the tax on withdrawals.
 // - Market ups and downs: the same plan is run against many sequences of yearly returns (lognormal,
 //   median = the average return), giving the chance the money lasts and a good-years/bad-years range.
-// - "Earliest age" is the first retirement age where the money lasts through the plan-to age:
+// - "Earliest age" is the first retirement age where the plan works through the plan-to age:
 //   with average returns, and with at least the chance you ask for.
+// - What "works" means is the goal (`keepNestEgg`):
+//     money lasts: the balance never runs out before the plan-to age;
+//     keep the nest egg: at the end of the plan-to age you still have at least what you retired with,
+//     in today's dollars. Dips along the way are allowed; you live off the growth.
 
 export interface LoanPayoff {
   /** the fixed monthly payment, in dollars of the day it's paid (it doesn't rise with inflation) */
@@ -56,6 +60,8 @@ export interface RetirementInputs {
   targetAge: number
   /** plan for the money to last until this age */
   planToAge: number
+  /** the goal: false (or left out) = the money lasts; true = still have what you retired with at the end */
+  keepNestEgg?: boolean
 }
 
 export interface ProjectionYear {
@@ -74,6 +80,10 @@ export interface Projection {
   runsOutAt: number | null
   /** balance on the day you retire */
   atRetirement: number
+  /** balance after the plan-to age (the last point) */
+  atEnd: number
+  /** the goal is met: the money lasts, and with keepNestEgg it ends at least where it started */
+  works: boolean
 }
 
 export interface RangeYear {
@@ -88,15 +98,15 @@ export interface RangeYear {
 export interface RetirementResult {
   /** retiring at the target age, average returns every year */
   target: Projection
-  /** earliest age the money lasts with average returns, null when it never does */
+  /** earliest age the goal is met with average returns, null when it never is */
   earliestAge: number | null
-  /** earliest age the money lasts in at least `confidence` of the runs, null when it never does */
+  /** earliest age the goal is met in at least `confidence` of the runs, null when it never is */
   earliestConfident: number | null
-  /** share of runs where retiring at the target age lasts through the plan-to age, 0–1 */
+  /** share of runs where retiring at the target age meets the goal through the plan-to age, 0–1 */
   chanceAtTarget: number
   /** balance range by age when retiring at the target age */
   range: RangeYear[]
-  /** balance needed at the target age for the money to last with average returns (today's dollars) */
+  /** balance needed at the target age to meet the goal with average returns (today's dollars; Infinity when no balance can) */
   neededAtTarget: number
   /** Social Security a year used for the target age, today's dollars */
   socialSecurityAtTarget: number
@@ -256,22 +266,34 @@ export function project(inputs: RetirementInputs, retireAge: number, returns?: A
   }
   // a last point for the end of the plan
   years.push({ age: endAge + 1, balance, flow: 0, retired: true })
-  return { retireAge: retireAt, years, runsOutAt, atRetirement }
+  return { retireAge: retireAt, years, runsOutAt, atRetirement, atEnd: balance, works: meetsGoal(inputs, runsOutAt === null, atRetirement, balance) }
 }
 
+/** The goal check shared by project() and chanceItLasts(). A cent of rounding doesn't count. */
+const meetsGoal = (inputs: RetirementInputs, lasted: boolean, atRetirement: number, atEnd: number): boolean =>
+  lasted && (!inputs.keepNestEgg || atEnd >= atRetirement - 0.5)
+
 /**
- * What it takes for the money to last from `age` to the plan-to age with average returns: the
- * present value of the withdrawals, at the real return (today's dollars).
+ * What it takes to meet the goal from `age` to the plan-to age with average returns (today's dollars).
+ * Money lasts: the present value of the withdrawals, at the real return. Keep the nest egg: the
+ * balance B that still has B left at the end, B·(1+g)^n − withdrawals grown to the end = B, so
+ * B = present value / (1 − (1+g)^−n). Infinity when the return can't do that (zero or less after
+ * inflation, with something to withdraw).
  */
 export function neededAt(inputs: RetirementInputs, age: number): number {
   const growth = realRate(inputs.returnRate, inputs.inflation)
   const socialSecurity = socialSecurityFor(inputs, age)
+  const first = Math.round(age)
+  const last = Math.round(inputs.planToAge)
   let needed = 0
-  for (let year = Math.round(age); year <= Math.round(inputs.planToAge); year++) {
+  for (let year = first; year <= last; year++) {
     // same mid-year timing as project()
-    needed += (withdrawalAt(inputs, year, socialSecurity) * (1 + growth / 2)) / Math.pow(1 + growth, year - Math.round(age) + 1)
+    needed += (withdrawalAt(inputs, year, socialSecurity) * (1 + growth / 2)) / Math.pow(1 + growth, year - first + 1)
   }
-  return needed
+  if (!inputs.keepNestEgg) return needed
+  const kept = 1 - Math.pow(1 + growth, -(last - first + 1))
+  if (needed <= 0) return 0
+  return kept > 0 ? needed / kept : Infinity
 }
 
 /* ---------- market ups and downs ---------- */
@@ -327,15 +349,19 @@ function flows(inputs: RetirementInputs, retireAge: number): Float64Array {
   return Float64Array.from(project(inputs, retireAge).years.slice(0, -1), (year) => year.flow)
 }
 
-/** Share of runs that last through the plan-to age when retiring at `retireAge` (same math as project(), no arrays). */
+/** Share of runs that meet the goal through the plan-to age when retiring at `retireAge` (same math as project(), no arrays). */
 export function chanceItLasts(inputs: RetirementInputs, retireAge: number, paths = returnPaths(inputs)): number {
-  if (inputs.volatility <= 0) return project(inputs, retireAge).runsOutAt === null ? 1 : 0
+  if (inputs.volatility <= 0) return project(inputs, retireAge).works ? 1 : 0
   const yearly = flows(inputs, retireAge)
+  const { startAge, endAge } = ageRange(inputs)
+  const retireIndex = clampAge(retireAge, startAge, endAge) - startAge
   let lasted = 0
   for (const path of paths) {
     let balance = Math.max(0, inputs.startBalance)
+    let atRetirement = balance
     let ok = true
     for (let year = 0; year < yearly.length; year++) {
+      if (year === retireIndex) atRetirement = balance
       const next = balance * (1 + path[year]) + yearly[year] * (1 + path[year] / 2)
       if (next < -0.5) {
         ok = false
@@ -343,7 +369,7 @@ export function chanceItLasts(inputs: RetirementInputs, retireAge: number, paths
       }
       balance = next
     }
-    if (ok) lasted++
+    if (ok && meetsGoal(inputs, true, atRetirement, balance)) lasted++
   }
   return lasted / paths.length
 }
@@ -355,7 +381,7 @@ export function retirement(inputs: RetirementInputs, confidence = 0.9): Retireme
   const paths = returnPaths(inputs)
 
   let earliestAge: number | null = null
-  for (let age = startAge; age <= endAge && earliestAge === null; age++) if (project(inputs, age).runsOutAt === null) earliestAge = age
+  for (let age = startAge; age <= endAge && earliestAge === null; age++) if (project(inputs, age).works) earliestAge = age
 
   let earliestConfident: number | null = null
   for (let age = earliestAge ?? endAge + 1; age <= endAge && earliestConfident === null; age++)
@@ -369,7 +395,7 @@ export function retirement(inputs: RetirementInputs, confidence = 0.9): Retireme
     const balances = runs.map((run) => run.years[index].balance).sort((a, b) => a - b)
     return { age: year.age, low: percentile(balances, 0.1), median: percentile(balances, 0.5), high: percentile(balances, 0.9) }
   })
-  const chanceAtTarget = inputs.volatility <= 0 ? (target.runsOutAt === null ? 1 : 0) : runs.filter((run) => run.runsOutAt === null).length / runs.length
+  const chanceAtTarget = inputs.volatility <= 0 ? (target.works ? 1 : 0) : runs.filter((run) => run.works).length / runs.length
   const socialSecurityAtTarget = socialSecurityFor(inputs, target.retireAge)
 
   return {
