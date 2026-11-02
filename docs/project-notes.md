@@ -388,6 +388,9 @@ saved in the browser only.
   (`BaseChart.vue`); Chart.js alone only listens on the canvas, so the tooltip used to get stuck on phones.
   Charts don't listen to touchstart/touchmove (`events` in `BaseChart.vue`), so a finger scrolling past a
   chart doesn't pop tooltips; a tap arrives as a click and opens one.
+- Dragging a finger sideways across any chart moves the tooltip along (Devin, 2026-11-02). The canvas has
+  `touch-action: pan-y`, so up/down swipes still scroll the page; BaseChart's own pointer handlers scrub once a
+  drag is clearly sideways (6px), and lifting the finger leaves the tooltip up like a tap.
 - Popovers (profile link markers, the Overview period picker) close when the page or a scroll area around
   their anchor scrolls (`useCloseOnScroll` in `lib/close-on-scroll.ts`); PrimeVue's Popover otherwise stays
   put and floats over the page. Scrolling inside the popover or a dropdown it opened doesn't close it.

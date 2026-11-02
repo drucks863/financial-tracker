@@ -102,3 +102,4 @@
 - [x] Nest-egg rule: most of the last 5 years, not just the final year (Devin, 2026-11-02)
 - [ ] Devin: review and merge the goal PR (#28)
 - [ ] Maybe: more runs (500 → ~5,000) so the earliest age doesn't wobble by a year
+- [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)
