@@ -161,7 +161,8 @@ const averageOutcome = computed(() => {
   const plan = target.value
   if (plan.runsOutAt !== null) return `Runs out at ${plan.runsOutAt}`
   if (!keep.value) return `Lasts past ${engine.value.planToAge}`
-  return plan.works ? `Kept through ${engine.value.planToAge}` : `Ends ${pct(1 - plan.atEnd / plan.atRetirement)} lower`
+  if (plan.works) return `Kept through ${engine.value.planToAge}`
+  return plan.atEnd < plan.atRetirement ? `Ends ${pct(1 - plan.atEnd / plan.atRetirement)} lower` : 'Below it near the end'
 })
 
 // The retirement budget, monthly: the first year, and once Social Security starts if that's later.
@@ -443,7 +444,7 @@ const chart = computed<ChartBuilder>(() => {
     <div class="sticky-answer" aria-hidden="true">
       <span>Earliest <strong class="num">{{ headline ?? '—' }}</strong></span>
       <span>At {{ target.retireAge }}: <strong class="num">{{ moneyCompact(shown(target.atRetirement, target.retireAge)) }}</strong></span>
-      <span :class="onTrack ? 'pos' : 'neg'">{{ varied ? `${Math.round(result.chanceAtTarget * 100)}% ${keep ? 'kept' : 'lasts'}` : averageOutcome }}</span>
+      <span :class="onTrack ? 'pos' : 'neg'">{{ varied ? `${Math.floor(result.chanceAtTarget * 100 + 1e-9)}% ${keep ? 'kept' : 'lasts'}` : averageOutcome }}</span>
     </div>
 
     <div class="layout">
@@ -463,14 +464,15 @@ const chart = computed<ChartBuilder>(() => {
             </template>
             <template v-else>
               <p class="hero-num num">—</p>
-              <p class="muted small">Not if {{ goalPhrase }}. Try saving more or spending less.</p>
+              <p class="muted small">Not with a {{ pct(values.confidence) }} chance {{ goalPhrase }}. Try saving more, spending less<template v-if="varied">, or a lower chance</template>.</p>
+              <p v-if="varied && result.earliestAge !== null" class="muted small">{{ result.earliestAge }} if every year is an average year</p>
             </template>
           </div>
           <dl class="kpis">
             <div>
               <dt>Retiring at {{ target.retireAge }}</dt>
               <dd :class="onTrack ? 'pos' : 'neg'">
-                <template v-if="varied">{{ Math.round(result.chanceAtTarget * 100) }}% chance {{ keep ? 'it’s kept' : 'it lasts' }}</template>
+                <template v-if="varied">{{ Math.floor(result.chanceAtTarget * 100 + 1e-9) }}% chance {{ keep ? 'it’s kept' : 'it lasts' }}</template>
                 <template v-else>{{ averageOutcome }}</template>
               </dd>
               <dd class="sub muted">{{ varied && !target.works ? `average years: ${averageOutcome.toLowerCase()}` : `to age ${engine.planToAge}` }}</dd>
@@ -539,7 +541,7 @@ const chart = computed<ChartBuilder>(() => {
             <li>Social Security, unless you type yours: today’s salary for each year from 22 until you retire (the best 35 count), through the 2026 benefit formula, adjusted for the age you claim. It assumes today’s rules; a shortfall in the trust fund could cut it about 20% from the 2030s.</li>
             <li>Tax on withdrawals is one flat rate on everything taken out. Roth and HSA money is tax-free; pre-tax 401k and IRA money is taxed like income.</li>
             <li>Ups and downs: the plan runs against {{ 500 }} sequences of yearly returns that average out to your return, with the volatility you set. Bad years early in retirement hurt most; that’s why the chance can be below 100% even when average years look fine.</li>
-            <li>The goal. Money lasts: the balance never hits zero before the plan-to age. Keep the nest egg: after the plan-to age you still have at least what you retired with, in today’s dollars (so it keeps up with inflation). It can dip along the way; you live off the growth, not the savings. That takes a bigger balance, so the earliest age is later.</li>
+            <li>The goal. Money lasts: the balance never hits zero before the plan-to age. Keep the nest egg: in at least 3 of the last 5 years of the plan, you still have what you retired with, in today’s dollars (so it keeps up with inflation). Looking at 5 years means one crash in the final year doesn’t decide it. It can dip along the way; you live off the growth, not the savings. That takes a bigger balance, so the earliest age is later.</li>
             <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Contribution limits and required withdrawals aren’t modelled.</li>
           </ul>
         </details>
@@ -554,7 +556,7 @@ const chart = computed<ChartBuilder>(() => {
               label="Goal"
               :changed="scenario.changed('keepNestEgg')"
               :real-text="goalName(scenario.real.value.keepNestEgg)"
-              :hint="keep ? 'End with at least what you retired with, after inflation.' : 'Don’t run out before the age below.'"
+              :hint="keep ? 'In most of your last 5 years, still have what you retired with, after inflation.' : 'Don’t run out before the age below.'"
               @reset="scenario.reset('keepNestEgg')"
             >
               <SelectButton v-model="goalModel" :options="GOALS" option-label="label" option-value="value" :allow-empty="false" size="small" aria-label="Goal" />

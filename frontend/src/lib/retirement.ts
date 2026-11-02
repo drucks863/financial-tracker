@@ -18,8 +18,9 @@
 //   with average returns, and with at least the chance you ask for.
 // - What "works" means is the goal (`keepNestEgg`):
 //     money lasts: the balance never runs out before the plan-to age;
-//     keep the nest egg: at the end of the plan-to age you still have at least what you retired with,
-//     in today's dollars. Dips along the way are allowed; you live off the growth.
+//     keep the nest egg: in most of the last 5 years of the plan (3 of 5 year-ends), you still have at
+//     least what you retired with, in today's dollars. Dips along the way are allowed; you live off the
+//     growth. "Most of the last 5" so one crash in the final year doesn't decide it (Devin, 2026-11-02).
 
 export interface LoanPayoff {
   /** the fixed monthly payment, in dollars of the day it's paid (it doesn't rise with inflation) */
@@ -82,6 +83,8 @@ export interface Projection {
   atRetirement: number
   /** balance after the plan-to age (the last point) */
   atEnd: number
+  /** year-end balances of the last 5 years of the plan (fewer when retired for less), oldest first */
+  lastYears: number[]
   /** the goal is met: the money lasts, and with keepNestEgg it ends at least where it started */
   works: boolean
 }
@@ -266,34 +269,68 @@ export function project(inputs: RetirementInputs, retireAge: number, returns?: A
   }
   // a last point for the end of the plan
   years.push({ age: endAge + 1, balance, flow: 0, retired: true })
-  return { retireAge: retireAt, years, runsOutAt, atRetirement, atEnd: balance, works: meetsGoal(inputs, runsOutAt === null, atRetirement, balance) }
+  const lastYears = years.slice(1).filter((year) => year.age > retireAt).slice(-KEEP_WINDOW).map((year) => year.balance)
+  return { retireAge: retireAt, years, runsOutAt, atRetirement, atEnd: balance, lastYears, works: meetsGoal(inputs, runsOutAt === null, atRetirement, lastYears) }
 }
 
-/** The goal check shared by project() and chanceItLasts(). A cent of rounding doesn't count. */
-const meetsGoal = (inputs: RetirementInputs, lasted: boolean, atRetirement: number, atEnd: number): boolean =>
-  lasted && (!inputs.keepNestEgg || atEnd >= atRetirement - 0.5)
+/** Keeping the nest egg is judged on this many final year-ends; most of them must be at or above it. */
+export const KEEP_WINDOW = 5
+
+/**
+ * The goal check shared by project() and chanceItLasts(). `lastYears` are the final year-end balances
+ * after retiring (up to KEEP_WINDOW). A cent of rounding doesn't count.
+ */
+function meetsGoal(inputs: RetirementInputs, lasted: boolean, atRetirement: number, lastYears: ArrayLike<number>): boolean {
+  if (!lasted) return false
+  if (!inputs.keepNestEgg || lastYears.length === 0) return true
+  let kept = 0
+  for (let index = 0; index < lastYears.length; index++) if (lastYears[index] >= atRetirement - 0.5) kept++
+  return kept * 2 > lastYears.length
+}
 
 /**
  * What it takes to meet the goal from `age` to the plan-to age with average returns (today's dollars).
  * Money lasts: the present value of the withdrawals, at the real return. Keep the nest egg: the
- * balance B that still has B left at the end, B·(1+g)^n − withdrawals grown to the end = B, so
- * B = present value / (1 − (1+g)^−n). Infinity when the return can't do that (zero or less after
- * inflation, with something to withdraw).
+ * smallest balance that passes the goal (most of the last 5 year-ends at or above it), found by
+ * halving; more money always helps, since it grows faster than the bar rises. Infinity when the
+ * return can't keep any balance (zero or less after inflation, with something to withdraw).
  */
 export function neededAt(inputs: RetirementInputs, age: number): number {
   const growth = realRate(inputs.returnRate, inputs.inflation)
   const socialSecurity = socialSecurityFor(inputs, age)
   const first = Math.round(age)
   const last = Math.round(inputs.planToAge)
+  const withdrawals: number[] = []
+  for (let year = first; year <= last; year++) withdrawals.push(withdrawalAt(inputs, year, socialSecurity))
   let needed = 0
-  for (let year = first; year <= last; year++) {
-    // same mid-year timing as project()
-    needed += (withdrawalAt(inputs, year, socialSecurity) * (1 + growth / 2)) / Math.pow(1 + growth, year - first + 1)
+  // same mid-year timing as project()
+  withdrawals.forEach((amount, index) => (needed += (amount * (1 + growth / 2)) / Math.pow(1 + growth, index + 1)))
+  if (!inputs.keepNestEgg || needed <= 0) return Math.max(0, needed)
+  if (growth <= 0) return Infinity
+
+  const keeps = (start: number) => {
+    let balance = start
+    const ends: number[] = []
+    for (const amount of withdrawals) {
+      balance = balance * (1 + growth) - amount * (1 + growth / 2)
+      if (balance < -0.5) return false
+      ends.push(balance)
+    }
+    return meetsGoal(inputs, true, start, ends.slice(-KEEP_WINDOW))
   }
-  if (!inputs.keepNestEgg) return needed
-  const kept = 1 - Math.pow(1 + growth, -(last - first + 1))
-  if (needed <= 0) return 0
-  return kept > 0 ? needed / kept : Infinity
+  let low = needed
+  let high = needed * 2
+  for (let tries = 0; !keeps(high); tries++) {
+    if (tries > 60) return Infinity
+    low = high
+    high *= 2
+  }
+  for (let step = 0; step < 60 && high - low > 0.5; step++) {
+    const middle = (low + high) / 2
+    if (keeps(middle)) high = middle
+    else low = middle
+  }
+  return high
 }
 
 /* ---------- market ups and downs ---------- */
@@ -355,6 +392,9 @@ export function chanceItLasts(inputs: RetirementInputs, retireAge: number, paths
   const yearly = flows(inputs, retireAge)
   const { startAge, endAge } = ageRange(inputs)
   const retireIndex = clampAge(retireAge, startAge, endAge) - startAge
+  // the year-ends that count for keeping the nest egg: the last KEEP_WINDOW, and only after retiring
+  const firstCounted = Math.max(retireIndex, yearly.length - KEEP_WINDOW)
+  const lastYears = new Float64Array(Math.max(0, yearly.length - firstCounted))
   let lasted = 0
   for (const path of paths) {
     let balance = Math.max(0, inputs.startBalance)
@@ -363,13 +403,14 @@ export function chanceItLasts(inputs: RetirementInputs, retireAge: number, paths
     for (let year = 0; year < yearly.length; year++) {
       if (year === retireIndex) atRetirement = balance
       const next = balance * (1 + path[year]) + yearly[year] * (1 + path[year] / 2)
+      if (year >= firstCounted) lastYears[year - firstCounted] = next
       if (next < -0.5) {
         ok = false
         break
       }
       balance = next
     }
-    if (ok && meetsGoal(inputs, true, atRetirement, balance)) lasted++
+    if (ok && meetsGoal(inputs, true, atRetirement, lastYears)) lasted++
   }
   return lasted / paths.length
 }

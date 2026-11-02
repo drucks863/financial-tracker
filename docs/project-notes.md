@@ -309,13 +309,13 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   "Today's $ / Future $" only changes display. Only Net worth's Investments count; cash and home equity aren't drawn
   on; contribution limits and required withdrawals aren't modelled.
 - **Goal: keep the nest egg** (Devin, 2026-11-02: "I don't want my nest egg decreasing during retirement. If I can't
-  do that I can't retire"). Default goal = a run passes only if, after the plan-to age, the balance is at least what it
-  was on the day you retired, in today's dollars (dips along the way allowed). The other goal, "Money lasts", is the
+  do that I can't retire"). Default goal = a run passes only if, in at least 3 of the last 5 year-ends of the plan
+  (`KEEP_WINDOW`), the balance is at least what it was on the day you retired, in today's dollars (dips along the
+  way allowed; Devin chose "most of the last 5" over "the final year" so one late crash doesn't decide it). The other goal, "Money lasts", is the
   old never-hits-zero check; a toggle at the top of the You inputs switches (stored as scenario number `keepNestEgg`).
-  `neededAt` for keeping it is PV of withdrawals / (1 − (1+g)^−n) (Infinity at a zero real return). The chart adds a
+  `neededAt` for keeping it halves its way to the smallest balance that passes (Infinity at a zero real return). The chart adds a
   dotted "Nest egg to keep" line from the retire age. On test profiles, keeping it at 80% is ~5–8 years later than
   lasting, and the chance plateaus (retiring later raises the balance to keep), so high confidence may never be met.
-  Still open with Devin: judge on the final year, or "most of the last 5 years".
 - **Starting assumptions** (each is an input): return 7%, inflation 3%, raises 3%, volatility 15%, 90% chance,
   retire at 65, money lasts to 95, health insurance $700/mo before 65, Social Security estimated and claimed at 67,
   other saving = recent average left over after spending, age 30 until a birth year is on the profile.
