@@ -117,3 +117,4 @@
 - [x] Deployed main b06c483 (PR #28 nest egg goal, chart drag tooltips) as Lambda version 20, 2026-11-02
 - [x] Deployed main a9e0edf (PR #29 Retirement Family and Home sections) as Lambda version 21, 2026-11-02
 - [x] Deployed main 22f2656 (PR #30 Retirement accuracy round) as Lambda version 22, 2026-11-03
+- [x] Deployed main 915dd04 (PR #31 extra for two, Plan until, part-time work) as Lambda version 23, 2026-11-03
