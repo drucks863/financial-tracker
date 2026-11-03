@@ -59,6 +59,8 @@ export const realFigures = computed(() => {
     netWorth: latest ? { date: latest.date, total: latest.total, ...latest.byGroup } : null,
     investmentAccounts,
     loans,
+    /** your share of rent a month from the profile's Rent and bills (items named rent), 0 when none */
+    rentMonthly: pay.housing.filter((item) => /rent/i.test(item.name)).reduce((total, item) => total + item.mine, 0),
     recent: {
       months: months.length,
       from: months[0]?.ym ?? null,

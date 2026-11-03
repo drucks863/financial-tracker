@@ -320,6 +320,22 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   retire at 65, money lasts to 95, health insurance $700/mo before 65, Social Security estimated and claimed at 67,
   other saving = recent average left over after spending, age 30 until a birth year is on the profile.
 - The profile has a **Birth year** field (Pay section; `Plan.birthYear`, optional, on both sides) for the age.
+- **Family and Home sections** (Devin, 2026-11-02: plans to get married, have kids and buy a home within about 5
+  years). Each has a "Left out / In the plan" toggle (scenario numbers `includeFamily`, `includeHome`, default 0 so
+  "your real numbers" stay as they are; switching one on counts as a change and shows the comparison line). Engine:
+  `RetirementInputs.family` / `.home`, yearly amounts from `lifeAt()`; while working they change the year's saving
+  (`workingFlowAt`), once retired they're budget lines (`YearBudget.family`, `.home`).
+  - **Family**: married-at age (default age + 2); spouse salary (default $62,000, BLS median full-time) and saving
+    rate (10%), growing with the same raises; spouse retires with you; spouse Social Security = their own estimate
+    or half of yours, whichever is more; health insurance before 65 doubles; extra retirement spending for two
+    (default half your spending target, "a couple spends ~1.5×"). Kids: count (2), first at age + 3, 2 years apart;
+    $1,500/mo each until 18 (USDA middle-income married couple, ~$233,610 to 17 in 2015 dollars ≈ $18,000/yr today)
+    plus child care $1,100/mo each from birth to 5 since both parents work (Child Care Aware 2024 average ~$13,000/yr).
+    College not included.
+  - **Home**: buy at age + 4, price $410,000 (NAR 2025 median), 20% down + 3% closing taken out of investments that
+    year, 6.5% 30-year fixed mortgage (shrinks with inflation, stops at payoff), 2.5% of the price a year for
+    property tax, insurance and upkeep, and rent stops (default = your share of profile Rent and bills items named
+    "rent", `realFigures.rentMonthly`). Home equity still isn't counted as money to retire on.
 
 ## The Google Sheets are reference only
 

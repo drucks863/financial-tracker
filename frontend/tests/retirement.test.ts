@@ -7,6 +7,10 @@ import {
   claimFactor,
   estimateSocialSecurity,
   estimateWithdrawalTax,
+  lifeAt,
+  mortgagePayment,
+  socialSecurityFor,
+  workingFlowAt,
   neededAt,
   project,
   realRate,
@@ -206,4 +210,83 @@ test('tax guess from account names', () => {
   near(guess.rate, (20_000 * 0.05 + 20_000 * 0.12) / 100_000, 0.001)
   assert.deepEqual(guess.taxFree, ['Roth IRA', 'HSA'])
   assert.deepEqual(guess.preTax, ['401k'])
+})
+
+/* ---------- family and home ---------- */
+
+const family = {
+  fromAge: 32,
+  spouseSalary: 60_000,
+  spouseSavingRate: 0.1,
+  retiredSpending: 12_000,
+  kidsAtAge: [33, 35],
+  childYearly: 18_000,
+  childcareYearly: 13_000
+}
+const home = {
+  atAge: 34,
+  price: 400_000,
+  downPayment: 0.2,
+  closingCosts: 0.03,
+  mortgageRate: 0.065,
+  mortgageYears: 30,
+  ownershipRate: 0.025,
+  rentYearly: 18_000
+}
+
+test('mortgage payment matches the usual formula', () => {
+  near(mortgagePayment(320_000, 0.065, 30), 2022.62, 0.01)
+  near(mortgagePayment(12_000, 0, 1), 1_000, 0.001)
+})
+
+test('family: spouse saving from the wedding, kids until 18 with child care before 5', () => {
+  const inputs = { ...base, salaryGrowth: 0.03, inflation: 0.03, family }
+  assert.deepEqual(lifeAt(inputs, 31), { spouseSaving: 0, kids: 0, couple: 0, mortgage: 0, ownership: 0, rentSaved: 0, purchase: 0 })
+  const at32 = lifeAt(inputs, 32)
+  near(at32.spouseSaving, 6_000) // no raise above inflation
+  assert.equal(at32.kids, 0)
+  assert.equal(lifeAt(inputs, 33).kids, 31_000) // one baby, with child care
+  assert.equal(lifeAt(inputs, 36).kids, 62_000) // two under 5
+  assert.equal(lifeAt(inputs, 38).kids, 18_000 + 31_000) // the first is 5, in school
+  assert.equal(lifeAt(inputs, 50).kids, 18_000 + 18_000) // 17 and 15
+  assert.equal(lifeAt(inputs, 51).kids, 18_000) // the first turned 18
+  assert.equal(lifeAt(inputs, 53).kids, 0)
+  // while working the kids come out of what's saved
+  near(workingFlowAt(inputs, 33, 20_000), 20_000 + 6_000 - 31_000)
+})
+
+test('family: health insurance for two, spending for two and the spouse’s Social Security', () => {
+  const inputs = { ...base, healthcareBefore65: 8_400, socialSecurity: 24_000, family: { ...family, kidsAtAge: [] } }
+  const early = budgetAt(inputs, 60, socialSecurityFor(inputs, 60))
+  assert.equal(early.healthcare, 16_800)
+  assert.equal(early.family, 12_000)
+  // the spouse gets their own estimate or half of yours, whichever is more
+  const spouse = Math.max(estimateSocialSecurity(60_000, 60, 67), 12_000)
+  near(socialSecurityFor(inputs, 60), 24_000 + spouse)
+  assert.equal(socialSecurityFor({ ...base, socialSecurity: 24_000 }, 60), 24_000)
+})
+
+test('home: down payment the year you buy, then mortgage and owning instead of rent', () => {
+  const inputs = { ...base, inflation: 0.03, home }
+  assert.equal(lifeAt(inputs, 33).purchase, 0)
+  const bought = lifeAt(inputs, 34)
+  assert.equal(bought.purchase, 92_000) // 20% down + 3% closing
+  near(bought.mortgage, 2022.62 * 12, 0.5)
+  assert.equal(bought.ownership, 10_000)
+  assert.equal(bought.rentSaved, 18_000)
+  near(workingFlowAt(inputs, 34, 20_000), 20_000 - 92_000 - (2022.62 * 12 + 10_000 - 18_000), 0.5)
+  // a fixed payment is worth less each year, and stops after 30 years
+  near(lifeAt(inputs, 44).mortgage, (2022.62 * 12) / Math.pow(1.03, 10), 0.5)
+  assert.equal(lifeAt(inputs, 64).mortgage, 0)
+  // paid off in retirement: owning costs less than the rent did
+  const retired = budgetAt(inputs, 70, 0)
+  assert.equal(retired.home, -8_000)
+  assert.equal(retired.spending, 42_000)
+})
+
+test('family and home push the earliest age later; leaving them out changes nothing', () => {
+  const plain = retirement(base)
+  assert.deepEqual(retirement({ ...base, family: undefined, home: undefined }).earliestAge, plain.earliestAge)
+  const kids = retirement({ ...base, family: { ...family, spouseSavingRate: 0, retiredSpending: 0 } })
+  assert.ok((kids.earliestAge ?? 999) > (plain.earliestAge ?? 0))
 })
