@@ -7,6 +7,8 @@ import {
   claimFactor,
   estimateSocialSecurity,
   estimateWithdrawalTax,
+  accessAgeFor,
+  isBrokerage,
   lifeAt,
   mortgagePayment,
   socialSecurityFor,
@@ -241,7 +243,7 @@ test('mortgage payment matches the usual formula', () => {
 
 test('family: spouse saving from the wedding, kids until 18 with child care before 5', () => {
   const inputs = { ...base, salaryGrowth: 0.03, inflation: 0.03, family }
-  assert.deepEqual(lifeAt(inputs, 31), { spouseSaving: 0, kids: 0, couple: 0, mortgage: 0, ownership: 0, rentSaved: 0, purchase: 0 })
+  assert.deepEqual(lifeAt(inputs, 31), { spouseSaving: 0, kids: 0, college: 0, couple: 0, mortgage: 0, ownership: 0, rentSaved: 0, purchase: 0 })
   const at32 = lifeAt(inputs, 32)
   near(at32.spouseSaving, 6_000) // no raise above inflation
   assert.equal(at32.kids, 0)
@@ -257,7 +259,7 @@ test('family: spouse saving from the wedding, kids until 18 with child care befo
 
 test('family: health insurance for two, spending for two and the spouse’s Social Security', () => {
   const inputs = { ...base, healthcareBefore65: 8_400, socialSecurity: 24_000, family: { ...family, kidsAtAge: [] } }
-  const early = budgetAt(inputs, 60, socialSecurityFor(inputs, 60))
+  const early = budgetAt(inputs, 60, socialSecurityFor(inputs, 60), 60)
   assert.equal(early.healthcare, 16_800)
   assert.equal(early.family, 12_000)
   // the spouse gets their own estimate or half of yours, whichever is more
@@ -301,8 +303,92 @@ test('family: the spouse pays their share of the kids and the home while working
   // the down payment still comes out of the investments in full
   near(workingFlowAt(inputs, 36, 0) - workingFlowAt({ ...inputs, home: undefined }, 36, 0), -0.5 * (lifeAt(inputs, 36).mortgage + 10_000) + 18_000 - 92_000, 0.5)
   // retired: the whole cost is in the budget
-  assert.equal(budgetAt(inputs, 50, 0).family, 36_000 + 12_000)
+  assert.equal(budgetAt(inputs, 50, 0, 50).family, 36_000 + 12_000)
   // before the wedding there's no one to share with
   const early = { ...inputs, family: { ...inputs.family, fromAge: 40 } }
   near(workingFlowAt(early, 33, 20_000), 20_000 - 31_000)
+})
+
+/* ---------- getting at the money, flexible spending, later-life costs ---------- */
+
+test('retirement accounts open at 60, or at the retire age under the rule of 55', () => {
+  assert.equal(accessAgeFor(50), 60)
+  assert.equal(accessAgeFor(54), 60)
+  assert.equal(accessAgeFor(55), 55)
+  assert.equal(accessAgeFor(58), 58)
+  assert.equal(accessAgeFor(65), 60)
+  assert.ok(isBrokerage('Schwab Brokerage'))
+  assert.ok(!isBrokerage('Roth Brokerage'))
+  assert.ok(!isBrokerage('401k'))
+})
+
+test('before 60 spending comes from the brokerage first, then 401k money with a 10% penalty', () => {
+  const flat = { ...base, returnRate: 0.03, inflation: 0.03, salaryGrowth: 0.03, currentAge: 50, targetAge: 50, planToAge: 62, yearlySaving: 0, retirementSpending: 10_000, socialSecurity: 0 }
+  // all reachable: no penalty (and with no account split given, nothing changes from before)
+  const open = project({ ...flat, startBalance: 200_000 }, 50)
+  assert.equal(open.penalties, 0)
+  near(open.years.find((year) => year.age === 60)!.balance, 100_000)
+  // only $30k in the brokerage: three years from it, then 10%-penalized 401k money until 60
+  const split = project({ ...flat, startBalance: 200_000, startOpen: 30_000 }, 50)
+  assert.equal(split.years.find((year) => year.age === 52)!.penalty, 0)
+  near(split.years.find((year) => year.age === 53)!.penalty, 10_000 / 0.9 * 0.1, 0.01)
+  near(split.penalties, 7 * (10_000 / 0.9) * 0.1, 0.5)
+  assert.equal(split.years.find((year) => year.age === 60)!.penalty, 0)
+  // retiring at 55 under the rule of 55: no penalty at all
+  const at55 = project({ ...flat, currentAge: 55, targetAge: 55, startBalance: 200_000, startOpen: 0 }, 55)
+  assert.equal(at55.penalties, 0)
+})
+
+test('saving splits between the brokerage and retirement accounts', () => {
+  const flat = { ...base, returnRate: 0.03, inflation: 0.03, salaryGrowth: 0.03, currentAge: 50, targetAge: 52, planToAge: 60, startBalance: 0, startOpen: 0, yearlySaving: 10_000, openSaving: 4_000 }
+  const run = project(flat, 52)
+  assert.equal(run.years.find((year) => year.age === 52)!.open, 8_000)
+  assert.equal(run.atRetirement, 20_000)
+})
+
+test('flexible spending cuts the target only after a big drop', () => {
+  const flat = { ...base, returnRate: 0.03, inflation: 0.03, currentAge: 60, targetAge: 60, planToAge: 70, yearlySaving: 0, startBalance: 100_000, retirementSpending: 10_000, socialSecurity: 0, cutInBadYears: 0.2 }
+  const run = project(flat, 60)
+  // 100k → 90k → 80k: at 80k it's 20% down, so not yet; below that the target is 8,000
+  assert.deepEqual(
+    run.years.slice(0, 5).map((year) => [year.age, Math.round(year.balance), year.cut]),
+    [
+      [60, 100_000, false],
+      [61, 90_000, false],
+      [62, 80_000, false],
+      [63, 70_000, true],
+      [64, 62_000, true]
+    ]
+  )
+})
+
+test('spending drops from 75, Medicare is added from 65, Social Security can be cut', () => {
+  const inputs = { ...base, spendingAfter75: 0.8, healthcareAfter65: 8_400, healthcareBefore65: 10_000, socialSecurityCut: 0.2, socialSecurityCutAge: 70 }
+  assert.equal(budgetAt(inputs, 74, 0).target, 50_000)
+  assert.equal(budgetAt(inputs, 75, 0).target, 40_000)
+  assert.equal(budgetAt(inputs, 64, 0).healthcare, 10_000)
+  assert.equal(budgetAt(inputs, 65, 0).healthcare, 8_400)
+  assert.equal(budgetAt(inputs, 69, 20_000).socialSecurity, 20_000)
+  assert.equal(budgetAt(inputs, 70, 20_000).socialSecurity, 16_000)
+})
+
+test('family: college for 4 years, and a spouse who keeps working after you retire', () => {
+  const inputs = { ...base, healthcareBefore65: 8_400, family: { ...family, kidsAtAge: [30], collegeYearly: 25_000, spouseCostShare: 0.5, spouseRetireAge: 58 } }
+  assert.equal(lifeAt(inputs, 47).college, 0)
+  assert.equal(lifeAt(inputs, 48).college, 25_000)
+  assert.equal(lifeAt(inputs, 51).college, 25_000)
+  assert.equal(lifeAt(inputs, 52).college, 0)
+  // retired at 50 with the spouse still working: their plan covers you, they pay half the college, no "for two" extra yet
+  const working = budgetAt(inputs, 50, 0, 50)
+  assert.equal(working.healthcare, 0)
+  assert.equal(working.family, 25_000)
+  assert.equal(working.spousePays, 12_500)
+  // once they stop: insurance for two, the extra for two, nothing from their paycheck
+  const both = budgetAt(inputs, 58, 0, 50)
+  assert.equal(both.healthcare, 16_800)
+  assert.equal(both.family, 12_000)
+  assert.equal(both.spousePays, 0)
+  // the spouse's saving keeps going in while they work
+  const run = project({ ...inputs, salaryGrowth: 0.03, inflation: 0.03, yearlySaving: 0 }, 50)
+  assert.ok(run.years.find((year) => year.age === 55)!.flow > run.years.find((year) => year.age === 58)!.flow)
 })

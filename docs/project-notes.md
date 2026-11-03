@@ -342,6 +342,28 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
     year, 6.5% 30-year fixed mortgage (shrinks with inflation, stops at payoff), 2.5% of the price a year for
     property tax, insurance and upkeep, and rent stops (default = your share of profile Rent and bills items named
     "rent", `realFigures.rentMonthly`). Home equity still isn't counted as money to retire on.
+- **Accuracy round** (Devin, 2026-11-03: "go for it all", keep the UI simple). Engine core is now `planFor()` (per-year
+  amounts that don't depend on the market) + `step()` (one year for one run), shared by `project()` and `chanceItLasts()`.
+  - **Two pots**: `startOpen` / `openSaving` = brokerage money reachable at any age (default from Net worth account names,
+    `isBrokerage`); the rest is retirement accounts. Retired spending comes from the brokerage first; retirement-account
+    money before `accessAgeFor()` (60, or the retire age when retiring 55–59: rule of 55) is grossed up for a 10% penalty
+    (`EARLY_PENALTY`). The down payment comes from the brokerage first. Only the total running out counts as running out.
+    Without `startOpen` everything is reachable (old behaviour). Your own 401k above `LIMIT_401K_2026` ($24,500) counts
+    as brokerage saving (done in the view).
+  - **Flexible spending** `cutInBadYears` (default 10%): the target is cut in years the total is more than 20% below the
+    balance at retirement (today's $).
+  - **Spending from 75** `spendingAfter75` (default 80% of the target).
+  - **Healthcare**: before 65 default raised to $850/mo per person (KFF late-50s marketplace); Medicare and medical bills
+    from 65 `healthcareAfter65` default $700/mo per person (Fidelity 2025). Both double once married. While a spouse
+    still works, their plan covers you (no before-65 cost).
+  - **College** `collegeYearly` per child for 4 years from 18 (default $25,000, College Board public in-state), shared
+    like kids' costs while the spouse works.
+  - **Spouse's own retirement age** (`spouseRetireAge`, your age; scenario value 0 = same year as you, the field shows
+    your retire age until typed). Until then: their saving continues, they pay their share, no "extra for two" yet.
+  - **Social Security cut** `socialSecurityCut` from 2034 (default 0; ~19% if the trust fund isn't fixed).
+  - Budget table columns: retire age, Social Security/Medicare age, and 75. Notes under it explain early access and cuts.
+  - On a profile like Devin's ($350k, $31k/yr, married, 2 kids, $410k home, retire 55, money lasts): earliest 60 at 90%,
+    54 with average years. College (~$200k for two) and Medicare are the big new costs; flexible spending gives back ~1 year.
 
 ## The Google Sheets are reference only
 

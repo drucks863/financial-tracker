@@ -57,6 +57,10 @@ export interface Family {
    * investments.
    */
   spouseCostShare?: number
+  /** college a year per child for 4 years from 18, today's dollars (shared like the kids' costs) */
+  collegeYearly?: number
+  /** your age when the spouse stops working; left out = the same year as you */
+  spouseRetireAge?: number
 }
 
 export interface Home {
@@ -114,6 +118,26 @@ export interface RetirementInputs {
   family?: Family
   /** buying a home instead of renting; left out = keep renting */
   home?: Home
+  /**
+   * The part of startBalance you can take out at any age (a regular brokerage account). The rest is in
+   * retirement accounts (401k, IRA, HSA): before 59½ they pay a 10% penalty, unless you retire at 55 or
+   * later (the rule of 55). Left out = all of it can be reached, no penalty modelled.
+   */
+  startOpen?: number
+  /** the part of yearlySaving that goes to the brokerage account (grows with raises like the rest) */
+  openSaving?: number
+  /** spending target from 75 on, as a share of it (people spend less later on); left out = 1 */
+  spendingAfter75?: number
+  /**
+   * flexible spending: in years the investments are more than 20% below what you retired with (after
+   * inflation), the spending target is cut by this share (0–1). Left out = 0, never cut.
+   */
+  cutInBadYears?: number
+  /** Medicare premiums and out-of-pocket costs a year per person from 65, today's dollars */
+  healthcareAfter65?: number
+  /** Social Security paid as this much less (0–1) from `socialSecurityCutAge` (trust fund shortfall) */
+  socialSecurityCut?: number
+  socialSecurityCutAge?: number
 }
 
 export interface ProjectionYear {
@@ -123,6 +147,12 @@ export interface ProjectionYear {
   /** saved (positive) or taken out (negative) during the year */
   flow: number
   retired: boolean
+  /** of the balance, what's in the brokerage account (reachable at any age) */
+  open: number
+  /** early withdrawal penalty paid that year */
+  penalty: number
+  /** the spending target was cut that year (a bad stretch) */
+  cut: boolean
 }
 
 export interface Projection {
@@ -138,6 +168,10 @@ export interface Projection {
   lastYears: number[]
   /** the goal is met: the money lasts, and with keepNestEgg it ends at least where it started */
   works: boolean
+  /** age retirement accounts open without penalty (the retire age under the rule of 55, else 60) */
+  accessAge: number
+  /** early withdrawal penalties, total */
+  penalties: number
 }
 
 export interface RangeYear {
@@ -216,7 +250,7 @@ export const ownSocialSecurity = (inputs: RetirementInputs, retireAge: number): 
  */
 export function spouseSocialSecurity(inputs: RetirementInputs, retireAge: number): number {
   if (!inputs.family) return 0
-  const own = estimateSocialSecurity(inputs.family.spouseSalary, retireAge, inputs.socialSecurityAge)
+  const own = estimateSocialSecurity(inputs.family.spouseSalary, spouseRetireAge(inputs, retireAge), inputs.socialSecurityAge)
   return Math.max(own, ownSocialSecurity(inputs, retireAge) / 2)
 }
 
@@ -236,11 +270,13 @@ export function mortgagePayment(amount: number, yearlyRate: number, years: numbe
 }
 
 export interface LifeChanges {
-  /** the spouse's saving that year (counted while working) */
+  /** the spouse's saving that year (counted while they work) */
   spouseSaving: number
-  /** kids that year: their cost plus child care */
+  /** kids that year: their cost plus child care before 5 */
   kids: number
-  /** extra spending for two (counted once retired) */
+  /** college that year */
+  college: number
+  /** extra spending for two (counted once you're both retired) */
   couple: number
   /** mortgage payment that year, today's dollars (a fixed payment shrinks with inflation) */
   mortgage: number
@@ -254,7 +290,7 @@ export interface LifeChanges {
 
 /** Family and home amounts at `age`, today's dollars a year. All zero when neither is in the plan. */
 export function lifeAt(inputs: RetirementInputs, age: number): LifeChanges {
-  const changes: LifeChanges = { spouseSaving: 0, kids: 0, couple: 0, mortgage: 0, ownership: 0, rentSaved: 0, purchase: 0 }
+  const changes: LifeChanges = { spouseSaving: 0, kids: 0, college: 0, couple: 0, mortgage: 0, ownership: 0, rentSaved: 0, purchase: 0 }
   const family = inputs.family
   if (family && age >= family.fromAge) {
     const raise = realRate(inputs.salaryGrowth, inputs.inflation)
@@ -265,6 +301,7 @@ export function lifeAt(inputs: RetirementInputs, age: number): LifeChanges {
   if (family) {
     for (const born of family.kidsAtAge) {
       const childAge = age - born
+      if (childAge >= 18 && childAge < 22) changes.college += Math.max(0, family.collegeYearly ?? 0)
       if (childAge < 0 || childAge >= 18) continue
       changes.kids += Math.max(0, family.childYearly) + (childAge < 5 ? Math.max(0, family.childcareYearly) : 0)
     }
@@ -288,34 +325,49 @@ export function lifeAt(inputs: RetirementInputs, age: number): LifeChanges {
 /** What owning costs that year compared with renting (+ more, − less), the purchase left out. */
 export const homeChange = (life: LifeChanges): number => life.mortgage + life.ownership - life.rentSaved
 
+const married = (inputs: RetirementInputs, age: number) => !!inputs.family && age >= inputs.family.fromAge
+/** your age when the spouse stops working */
+const spouseRetireAge = (inputs: RetirementInputs, retireAge: number) => inputs.family?.spouseRetireAge ?? retireAge
+const spouseWorking = (inputs: RetirementInputs, age: number, retireAge: number) => married(inputs, age) && age < spouseRetireAge(inputs, retireAge)
+/** share of the kids, college and home the spouse's paycheck pays at `age` (0 when they aren't working) */
+const spouseShareAt = (inputs: RetirementInputs, age: number, retireAge: number) =>
+  spouseWorking(inputs, age, retireAge) ? Math.min(1, Math.max(0, inputs.family!.spouseCostShare ?? 0)) : 0
+/** the costs the spouse can share: kids, college, mortgage and costs of owning */
+const sharedCosts = (life: LifeChanges) => life.kids + life.college + life.mortgage + life.ownership
+
 /* ---------- withdrawals ---------- */
 
 export interface YearBudget {
-  /** your spending target */
+  /** your spending target (lower from 75 when spendingAfter75 is set) */
   target: number
   /** loan payments no longer made (paid off, or worth less after inflation), as a negative amount */
   loanChange: number
-  /** health insurance before Medicare (for two once married) */
+  /** health insurance before 65 (for two once married, none while a working spouse's plan covers you), Medicare after */
   healthcare: number
-  /** kids, and the extra for two */
+  /** kids, college, and the extra for two */
   family: number
   /** owning instead of renting: mortgage and costs of owning less the rent (plus the purchase, the year you buy) */
   home: number
   /** spending that year: target + loanChange + healthcare + family + home */
   spending: number
-  /** Social Security that year */
+  /** paid from a spouse's paycheck while they still work, as a positive amount */
+  spousePays: number
+  /** Social Security that year (after any cut) */
   socialSecurity: number
   /** tax on what comes out */
   tax: number
-  /** taken out of the investments */
+  /** taken out of the investments (before any early withdrawal penalty) */
   withdrawal: number
+  /** the part of the target that flexible spending can cut */
+  cuttable: number
 }
 
-/** The year's budget at `age` when retired, today's dollars. */
-export function budgetAt(inputs: RetirementInputs, age: number, socialSecurity: number): YearBudget {
+/** The year's budget at `age` when retired at `retireAge`, today's dollars. */
+export function budgetAt(inputs: RetirementInputs, age: number, socialSecurity: number, retireAge = inputs.targetAge): YearBudget {
   const yearsFromNow = age - inputs.currentAge
   const deflate = Math.pow(1 + inputs.inflation, -Math.max(0, yearsFromNow))
-  const target = Math.max(0, inputs.retirementSpending)
+  const base = Math.max(0, inputs.retirementSpending)
+  const target = base * (age >= 75 ? Math.max(0, inputs.spendingAfter75 ?? 1) : 1)
   let loanChange = 0
   for (const loan of inputs.loans) {
     const yearly = Math.max(0, loan.monthlyPayment) * 12
@@ -324,43 +376,53 @@ export function budgetAt(inputs: RetirementInputs, age: number, socialSecurity: 
   }
   loanChange = Math.max(loanChange, -target)
   const life = lifeAt(inputs, age)
-  const married = !!inputs.family && age >= inputs.family.fromAge
-  const healthcare = age < 65 ? Math.max(0, inputs.healthcareBefore65) * (married ? 2 : 1) : 0
-  const family = life.kids + life.couple
+  const adults = married(inputs, age) ? 2 : 1
+  const working = spouseWorking(inputs, age, retireAge)
+  // before 65 you buy your own insurance, unless a working spouse's plan covers you; from 65, Medicare
+  const healthcare = age < 65 ? (working ? 0 : Math.max(0, inputs.healthcareBefore65) * adults) : Math.max(0, inputs.healthcareAfter65 ?? 0) * adults
+  const family = life.kids + life.college + (working ? 0 : life.couple)
   // owning can't take spending below zero
   const home = Math.max(homeChange(life) + life.purchase, -(target + loanChange + healthcare + family))
   const spending = target + loanChange + healthcare + family + home
-  const fromSocialSecurity = age >= inputs.socialSecurityAge ? Math.min(spending, Math.max(0, socialSecurity)) : 0
-  const need = spending - fromSocialSecurity
+  const spousePays = spouseShareAt(inputs, age, retireAge) * sharedCosts(life)
+  const cutFactor = age >= (inputs.socialSecurityCutAge ?? Infinity) ? 1 - Math.min(1, Math.max(0, inputs.socialSecurityCut ?? 0)) : 1
+  const fromSocialSecurity = age >= inputs.socialSecurityAge ? Math.min(spending - spousePays, Math.max(0, socialSecurity) * cutFactor) : 0
+  const need = spending - spousePays - fromSocialSecurity
   const taxRate = Math.min(0.9, Math.max(0, inputs.withdrawalTax))
   const withdrawal = need / (1 - taxRate)
-  return { target, loanChange, healthcare, family, home, spending, socialSecurity: fromSocialSecurity, tax: withdrawal - need, withdrawal }
+  return { target, loanChange, healthcare, family, home, spending, spousePays, socialSecurity: fromSocialSecurity, tax: withdrawal - need, withdrawal, cuttable: Math.max(0, target + Math.min(0, loanChange)) }
 }
 
 /**
  * Saved (+) or taken out (−) at `age` while working, today's dollars: your saving (`saving`, already
- * grown with raises) plus the spouse's, less your part of the kids and of owning (once married the
+ * grown with raises) plus the spouse's, less your part of the kids, college and owning (once married the
  * spouse's paycheck pays `spouseCostShare` of them), plus the rent you no longer pay, less the down
  * payment and closing costs the year you buy (from the investments).
  *
  * Before 2026-11-03 the kids and the whole home came out of your saving alone, as if the spouse's pay
  * (beyond what they save) covered none of it; Devin spotted that two kids wiped out ~18 years of saving.
  */
-export function workingFlowAt(inputs: RetirementInputs, age: number, saving: number): number {
+export function workingFlowAt(inputs: RetirementInputs, age: number, saving: number, retireAge = inputs.targetAge): number {
   const life = lifeAt(inputs, age)
-  const family = inputs.family
-  const spouseShare = family && age >= family.fromAge ? Math.min(1, Math.max(0, family.spouseCostShare ?? 0)) : 0
-  const yours = 1 - spouseShare
-  return saving + life.spouseSaving - yours * (life.kids + life.mortgage + life.ownership) + life.rentSaved - life.purchase
+  const yours = 1 - spouseShareAt(inputs, age, retireAge)
+  const spouseSaving = spouseWorking(inputs, age, retireAge) ? life.spouseSaving : 0
+  return saving + spouseSaving - yours * sharedCosts(life) + life.rentSaved - life.purchase
 }
 
 /** Spending at `age`, today's dollars: the target, with loan payments adjusted, plus health insurance before 65. */
 export const spendingAt = (inputs: RetirementInputs, age: number): number => budgetAt(inputs, age, 0).spending
 
 /** What comes out of the investments at `age` when retired, today's dollars (tax included). */
-export const withdrawalAt = (inputs: RetirementInputs, age: number, socialSecurity: number): number => budgetAt(inputs, age, socialSecurity).withdrawal
+export const withdrawalAt = (inputs: RetirementInputs, age: number, socialSecurity: number, retireAge = inputs.targetAge): number =>
+  budgetAt(inputs, age, socialSecurity, retireAge).withdrawal
 
 /* ---------- tax on withdrawals ---------- */
+
+/** A regular (taxable) brokerage account, reachable at any age, judged by its name. Roth/HSA names aren't. */
+export const isBrokerage = (name: string): boolean => !/roth|hsa/i.test(name) && /taxable|brokerage|individual|joint|reit|stock|crypto|fund/i.test(name)
+
+/** 2026 401k limit on what you put in yourself (under 50); saving above it goes to a brokerage account. */
+export const LIMIT_401K_2026 = 24_500
 
 /**
  * A starting guess for the tax on withdrawals from account names: Roth and HSA money comes out
@@ -377,7 +439,7 @@ export function estimateWithdrawalTax(accounts: { name: string; balance: number 
     const balance = Math.max(0, account.balance)
     total += balance
     if (/roth|hsa/i.test(account.name)) taxFree.push(account.name)
-    else if (/taxable|brokerage|individual|reit|stock|crypto|fund/i.test(account.name)) {
+    else if (isBrokerage(account.name)) {
       taxable.push(account.name)
       tax += balance * 0.05
     } else {
@@ -390,43 +452,181 @@ export function estimateWithdrawalTax(accounts: { name: string; balance: number 
 
 /* ---------- projection ---------- */
 
+/** Early withdrawal penalty on retirement-account money taken out before it opens. */
+export const EARLY_PENALTY = 0.1
+
+/** Retirement accounts open without penalty at 59½ (taken as 60), or at the retire age under the rule of 55. */
+export const accessAgeFor = (retireAge: number): number => (retireAge >= 55 && retireAge < 60 ? retireAge : 60)
+
+/**
+ * Everything about retiring at `retireAge` that's the same in every market run, year by year (index 0 =
+ * the current age). Working years: what goes into retirement accounts (`locked`) and the brokerage
+ * (`open`, which also carries the costs), and the purchase. Retired years: what has to come out (`need`,
+ * after Social Security and a working spouse, before tax), the part of it that's cuttable, and the
+ * spouse's saving while they still work.
+ */
+interface Plan {
+  retireIndex: number
+  accessIndex: number
+  locked: Float64Array
+  open: Float64Array
+  purchase: Float64Array
+  need: Float64Array
+  cuttable: Float64Array
+  taxRate: number
+  cut: number
+}
+
+function planFor(inputs: RetirementInputs, retireAge: number): Plan {
+  const { startAge, endAge } = ageRange(inputs)
+  const retireAt = clampAge(retireAge, startAge, endAge)
+  const years = endAge - startAge + 1
+  const raise = realRate(inputs.salaryGrowth, inputs.inflation)
+  const socialSecurity = socialSecurityFor(inputs, retireAt)
+  const total = Math.max(0, inputs.yearlySaving)
+  // without account details, everything counts as reachable (no penalties)
+  const openShare = inputs.startOpen === undefined ? 1 : total > 0 ? Math.min(1, Math.max(0, inputs.openSaving ?? 0) / total) : 0
+  const plan: Plan = {
+    retireIndex: retireAt - startAge,
+    accessIndex: accessAgeFor(retireAt) - startAge,
+    locked: new Float64Array(years),
+    open: new Float64Array(years),
+    purchase: new Float64Array(years),
+    need: new Float64Array(years),
+    cuttable: new Float64Array(years),
+    taxRate: Math.min(0.9, Math.max(0, inputs.withdrawalTax)),
+    cut: Math.min(1, Math.max(0, inputs.cutInBadYears ?? 0))
+  }
+  let saving = total
+  for (let index = 0; index < years; index++) {
+    const age = startAge + index
+    const life = lifeAt(inputs, age)
+    plan.purchase[index] = life.purchase
+    if (age < retireAt) {
+      const spouseSaving = spouseWorking(inputs, age, retireAt) ? life.spouseSaving : 0
+      const costs = workingFlowAt(inputs, age, 0, retireAt) + life.purchase - spouseSaving
+      plan.locked[index] = saving * (1 - openShare) + spouseSaving
+      plan.open[index] = saving * openShare + costs
+      saving *= 1 + raise
+    } else {
+      const budget = budgetAt(inputs, age, socialSecurity, retireAt)
+      // the purchase is taken separately; the rest of the year's spending is the need
+      plan.need[index] = budget.spending - life.purchase - budget.spousePays - budget.socialSecurity
+      plan.cuttable[index] = budget.cuttable
+      if (spouseWorking(inputs, age, retireAt)) plan.locked[index] = life.spouseSaving
+    }
+  }
+  return plan
+}
+
+interface Step {
+  open: number
+  locked: number
+  flow: number
+  penalty: number
+  cut: boolean
+}
+
+/**
+ * One year: the balances earn `growth`; saving and spending happen through the year, so they earn about
+ * half of it. Retired: spending comes from the brokerage first, then retirement accounts (with the
+ * penalty before they open). Returns the year-end balances; `locked` goes negative when money runs out.
+ */
+function step(plan: Plan, index: number, open: number, locked: number, growth: number, atRetirement: number, out: Step): void {
+  const half = 1 + growth / 2
+  let openFlow = 0
+  let lockedFlow = plan.locked[index]
+  let penalty = 0
+  let cut = false
+  if (index < plan.retireIndex) openFlow = plan.open[index]
+  else {
+    let need = plan.need[index]
+    if (plan.cut > 0 && open + locked < atRetirement * 0.8) {
+      need -= plan.cuttable[index] * plan.cut
+      cut = true
+    }
+    if (need <= 0) openFlow = -need
+    else {
+      // what the brokerage can pay through the year, counting its growth until then
+      const fromOpen = Math.min(need, ((Math.max(0, open) * (1 + growth)) / half) * (1 - plan.taxRate))
+      openFlow = -fromOpen / (1 - plan.taxRate)
+      const rest = need - fromOpen
+      if (rest > 0) {
+        const penalized = index < plan.accessIndex
+        const gross = rest / Math.max(0.05, 1 - plan.taxRate - (penalized ? EARLY_PENALTY : 0))
+        if (penalized) penalty = gross * EARLY_PENALTY
+        lockedFlow -= gross
+      }
+    }
+  }
+  // the down payment comes out of the brokerage first, then retirement accounts
+  const purchase = plan.purchase[index]
+  let nextOpen = open * (1 + growth) + (openFlow - purchase) * half
+  let nextLocked = locked * (1 + growth) + lockedFlow * half
+  // one pot runs short: the other covers it (only the total running out counts)
+  if (nextOpen < 0) {
+    nextLocked += nextOpen
+    nextOpen = 0
+  } else if (nextLocked < 0) {
+    const moved = Math.min(nextOpen, -nextLocked)
+    nextOpen -= moved
+    nextLocked += moved
+  }
+  out.open = nextOpen
+  out.locked = nextLocked
+  out.flow = openFlow + lockedFlow - purchase
+  out.penalty = penalty
+  out.cut = cut
+}
+
+const startBuckets = (inputs: RetirementInputs) => {
+  const total = Math.max(0, inputs.startBalance)
+  const open = inputs.startOpen === undefined ? total : Math.min(total, Math.max(0, inputs.startOpen))
+  return { open, locked: total - open }
+}
+
 /**
  * Year-by-year balances when retiring at `retireAge`. `returns` gives each year's real return
  * (index 0 = the current age); without it every year earns the average.
  */
 export function project(inputs: RetirementInputs, retireAge: number, returns?: ArrayLike<number>): Projection {
   const { startAge, endAge } = ageRange(inputs)
-  const retireAt = clampAge(retireAge, startAge, endAge)
+  const plan = planFor(inputs, retireAge)
+  const retireAt = startAge + plan.retireIndex
   const average = realRate(inputs.returnRate, inputs.inflation)
-  const raise = realRate(inputs.salaryGrowth, inputs.inflation)
-  const socialSecurity = socialSecurityFor(inputs, retireAt)
-
   const years: ProjectionYear[] = []
-  let balance = Math.max(0, inputs.startBalance)
-  let saving = Math.max(0, inputs.yearlySaving)
+  let { open, locked } = startBuckets(inputs)
   let runsOutAt: number | null = null
-  let atRetirement = balance
+  let atRetirement = open + locked
+  let penalties = 0
+  const out: Step = { open: 0, locked: 0, flow: 0, penalty: 0, cut: false }
   for (let age = startAge; age <= endAge; age++) {
-    const retired = age >= retireAt
-    if (age === retireAt) atRetirement = balance
-    let flow: number
-    if (retired) flow = -withdrawalAt(inputs, age, socialSecurity)
-    else {
-      flow = workingFlowAt(inputs, age, saving)
-      saving *= 1 + raise
-    }
-    years.push({ age, balance, flow, retired })
-    const growth = returns ? returns[age - startAge] : average
-    // Saving and spending happen through the year, so they earn about half a year's return.
-    const next = balance * (1 + growth) + flow * (1 + growth / 2)
+    const index = age - startAge
+    if (age === retireAt) atRetirement = open + locked
+    const growth = returns ? returns[index] : average
+    step(plan, index, open, locked, growth, atRetirement, out)
+    years.push({ age, balance: open + locked, flow: out.flow, retired: age >= retireAt, open, penalty: out.penalty, cut: out.cut })
+    penalties += out.penalty
     // the first year spending can't be fully covered (a cent of rounding doesn't count)
-    if (next < -0.5 && runsOutAt === null) runsOutAt = age
-    balance = Math.max(0, next)
+    if (out.locked < -0.5 && runsOutAt === null) runsOutAt = age
+    open = out.open
+    locked = Math.max(0, out.locked)
   }
   // a last point for the end of the plan
-  years.push({ age: endAge + 1, balance, flow: 0, retired: true })
+  const balance = open + locked
+  years.push({ age: endAge + 1, balance, flow: 0, retired: true, open, penalty: 0, cut: false })
   const lastYears = years.slice(1).filter((year) => year.age > retireAt).slice(-KEEP_WINDOW).map((year) => year.balance)
-  return { retireAge: retireAt, years, runsOutAt, atRetirement, atEnd: balance, lastYears, works: meetsGoal(inputs, runsOutAt === null, atRetirement, lastYears) }
+  return {
+    retireAge: retireAt,
+    years,
+    runsOutAt,
+    atRetirement,
+    atEnd: balance,
+    lastYears,
+    works: meetsGoal(inputs, runsOutAt === null, atRetirement, lastYears),
+    accessAge: startAge + plan.accessIndex,
+    penalties
+  }
 }
 
 /** Keeping the nest egg is judged on this many final year-ends; most of them must be at or above it. */
@@ -457,7 +657,7 @@ export function neededAt(inputs: RetirementInputs, age: number): number {
   const first = Math.round(age)
   const last = Math.round(inputs.planToAge)
   const withdrawals: number[] = []
-  for (let year = first; year <= last; year++) withdrawals.push(withdrawalAt(inputs, year, socialSecurity))
+  for (let year = first; year <= last; year++) withdrawals.push(withdrawalAt(inputs, year, socialSecurity, first))
   let needed = 0
   // same mid-year timing as project()
   withdrawals.forEach((amount, index) => (needed += (amount * (1 + growth / 2)) / Math.pow(1 + growth, index + 1)))
@@ -536,35 +736,33 @@ export function returnPaths(inputs: RetirementInputs): Float64Array[] {
   })
 }
 
-/** Each year's saving (+) or withdrawal (−) when retiring at `retireAge`; the same in every run. */
-function flows(inputs: RetirementInputs, retireAge: number): Float64Array {
-  // the last entry of project() is the end-of-plan point, not a year
-  return Float64Array.from(project(inputs, retireAge).years.slice(0, -1), (year) => year.flow)
-}
-
 /** Share of runs that meet the goal through the plan-to age when retiring at `retireAge` (same math as project(), no arrays). */
 export function chanceItLasts(inputs: RetirementInputs, retireAge: number, paths = returnPaths(inputs)): number {
   if (inputs.volatility <= 0) return project(inputs, retireAge).works ? 1 : 0
-  const yearly = flows(inputs, retireAge)
-  const { startAge, endAge } = ageRange(inputs)
-  const retireIndex = clampAge(retireAge, startAge, endAge) - startAge
+  const plan = planFor(inputs, retireAge)
+  const years = plan.need.length
+  const retireIndex = plan.retireIndex
   // the year-ends that count for keeping the nest egg: the last KEEP_WINDOW, and only after retiring
-  const firstCounted = Math.max(retireIndex, yearly.length - KEEP_WINDOW)
-  const lastYears = new Float64Array(Math.max(0, yearly.length - firstCounted))
+  const firstCounted = Math.max(retireIndex, years - KEEP_WINDOW)
+  const lastYears = new Float64Array(Math.max(0, years - firstCounted))
+  const start = startBuckets(inputs)
+  const out: Step = { open: 0, locked: 0, flow: 0, penalty: 0, cut: false }
   let lasted = 0
   for (const path of paths) {
-    let balance = Math.max(0, inputs.startBalance)
-    let atRetirement = balance
+    let open = start.open
+    let locked = start.locked
+    let atRetirement = open + locked
     let ok = true
-    for (let year = 0; year < yearly.length; year++) {
-      if (year === retireIndex) atRetirement = balance
-      const next = balance * (1 + path[year]) + yearly[year] * (1 + path[year] / 2)
-      if (year >= firstCounted) lastYears[year - firstCounted] = next
-      if (next < -0.5) {
+    for (let year = 0; year < years; year++) {
+      if (year === retireIndex) atRetirement = open + locked
+      step(plan, year, open, locked, path[year], atRetirement, out)
+      if (year >= firstCounted) lastYears[year - firstCounted] = out.open + out.locked
+      if (out.locked < -0.5) {
         ok = false
         break
       }
-      balance = next
+      open = out.open
+      locked = out.locked
     }
     if (ok && meetsGoal(inputs, true, atRetirement, lastYears)) lasted++
   }
@@ -603,7 +801,7 @@ export function retirement(inputs: RetirementInputs, confidence = 0.9): Retireme
     range,
     neededAtTarget: neededAt(inputs, target.retireAge),
     socialSecurityAtTarget,
-    firstWithdrawal: withdrawalAt(inputs, target.retireAge, socialSecurityAtTarget),
+    firstWithdrawal: withdrawalAt(inputs, target.retireAge, socialSecurityAtTarget, target.retireAge),
     realReturn: realRate(inputs.returnRate, inputs.inflation)
   }
 }
