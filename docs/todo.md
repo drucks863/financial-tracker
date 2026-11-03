@@ -109,6 +109,8 @@
 - [x] Devin: review and merge the Family and Home PR (#29)
 - [x] Family fix (Devin, 2026-11-03): the spouse's paycheck pays a share of the kids and home while you both work (default 50%), child care on top of USDA lowered to $850/mo
 - [x] Accuracy round (Devin, 2026-11-03): money you can reach before 59½ (brokerage first, rule of 55, 10% penalty), 401k limit, flexible spending after market drops, spending lower from 75, Medicare from 65, family health plan through a working spouse, college, spouse's own retirement age, Social Security cut option
+- [x] Round 3 (Devin, 2026-11-03): extra for two excludes rent, raises default 4%, "Plan until" label, part-time work after retiring
+- [ ] Maybe: kids on your health plan before 65, cash counted as a bridge
 - [ ] Devin: try Family and Home with your own plans (ages, spouse pay, home price, rent)
 - Decided (Devin, 2026-11-03): home equity is never counted as money to retire on
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)

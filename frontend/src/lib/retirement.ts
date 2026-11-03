@@ -138,6 +138,9 @@ export interface RetirementInputs {
   /** Social Security paid as this much less (0–1) from `socialSecurityCutAge` (trust fund shortfall) */
   socialSecurityCut?: number
   socialSecurityCutAge?: number
+  /** part-time work after retiring, a year after tax, today's dollars, until `partTimeUntilAge` (not included) */
+  partTimeYearly?: number
+  partTimeUntilAge?: number
 }
 
 export interface ProjectionYear {
@@ -352,6 +355,8 @@ export interface YearBudget {
   spending: number
   /** paid from a spouse's paycheck while they still work, as a positive amount */
   spousePays: number
+  /** part-time pay that year, as a positive amount */
+  partTime: number
   /** Social Security that year (after any cut) */
   socialSecurity: number
   /** tax on what comes out */
@@ -387,10 +392,11 @@ export function budgetAt(inputs: RetirementInputs, age: number, socialSecurity: 
   const spousePays = spouseShareAt(inputs, age, retireAge) * sharedCosts(life)
   const cutFactor = age >= (inputs.socialSecurityCutAge ?? Infinity) ? 1 - Math.min(1, Math.max(0, inputs.socialSecurityCut ?? 0)) : 1
   const fromSocialSecurity = age >= inputs.socialSecurityAge ? Math.min(spending - spousePays, Math.max(0, socialSecurity) * cutFactor) : 0
-  const need = spending - spousePays - fromSocialSecurity
+  const partTime = age < (inputs.partTimeUntilAge ?? 0) ? Math.min(Math.max(0, inputs.partTimeYearly ?? 0), Math.max(0, spending - spousePays - fromSocialSecurity)) : 0
+  const need = spending - spousePays - fromSocialSecurity - partTime
   const taxRate = Math.min(0.9, Math.max(0, inputs.withdrawalTax))
   const withdrawal = need / (1 - taxRate)
-  return { target, loanChange, healthcare, family, home, spending, spousePays, socialSecurity: fromSocialSecurity, tax: withdrawal - need, withdrawal, cuttable: Math.max(0, target + Math.min(0, loanChange)) }
+  return { target, loanChange, healthcare, family, home, spending, spousePays, partTime, socialSecurity: fromSocialSecurity, tax: withdrawal - need, withdrawal, cuttable: Math.max(0, target + Math.min(0, loanChange)) }
 }
 
 /**
@@ -511,7 +517,7 @@ function planFor(inputs: RetirementInputs, retireAge: number): Plan {
     } else {
       const budget = budgetAt(inputs, age, socialSecurity, retireAt)
       // the purchase is taken separately; the rest of the year's spending is the need
-      plan.need[index] = budget.spending - life.purchase - budget.spousePays - budget.socialSecurity
+      plan.need[index] = budget.spending - life.purchase - budget.spousePays - budget.socialSecurity - budget.partTime
       plan.cuttable[index] = budget.cuttable
       if (spouseWorking(inputs, age, retireAt)) plan.locked[index] = life.spouseSaving
     }
