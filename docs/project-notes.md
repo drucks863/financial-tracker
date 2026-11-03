@@ -330,8 +330,14 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
     or half of yours, whichever is more; health insurance before 65 doubles; extra retirement spending for two
     (default half your spending target, "a couple spends ~1.5×"). Kids: count (2), first at age + 3, 2 years apart;
     $1,500/mo each until 18 (USDA middle-income married couple, ~$233,610 to 17 in 2015 dollars ≈ $18,000/yr today)
-    plus child care $1,100/mo each from birth to 5 since both parents work (Child Care Aware 2024 average ~$13,000/yr).
-    College not included.
+    plus child care $850/mo each from birth to 5 since both parents work (Child Care Aware 2024 average ~$13,000/yr,
+    less the ~$2,900 of child care already in the USDA figure; was $1,100 until 2026-11-03). College not included.
+  - **Spouse pays a share** (`spouseCostShare`, default 50%, added 2026-11-03): while both work, the spouse's
+    paycheck pays that share of the kids and the home (mortgage, tax, insurance, upkeep); the rest comes out of
+    your saving, and the rent you stop paying is added back. Once retired, everything comes from the investments.
+    Before this, the kids and home came out of Devin's saving alone, as if the spouse's pay beyond their 10%
+    saving covered none of it. Devin caught it ($350k invested, $31k/yr saved, married with 2 kids, and still no
+    55): two kids took the household's saving negative for years.
   - **Home**: buy at age + 4, price $410,000 (NAR 2025 median), 20% down + 3% closing taken out of investments that
     year, 6.5% 30-year fixed mortgage (shrinks with inflation, stops at payoff), 2.5% of the price a year for
     property tax, insurance and upkeep, and rent stops (default = your share of profile Rent and bills items named

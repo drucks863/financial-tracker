@@ -290,3 +290,19 @@ test('family and home push the earliest age later; leaving them out changes noth
   const kids = retirement({ ...base, family: { ...family, spouseSavingRate: 0, retiredSpending: 0 } })
   assert.ok((kids.earliestAge ?? 999) > (plain.earliestAge ?? 0))
 })
+
+test('family: the spouse pays their share of the kids and the home while working, none once retired', () => {
+  const inputs = { ...base, inflation: 0.03, salaryGrowth: 0.03, family: { ...family, spouseCostShare: 0.5 }, home: { ...home, atAge: 36 } }
+  // 33: married, one baby: half of 31,000 comes out of saving
+  near(workingFlowAt(inputs, 33, 20_000), 20_000 + 6_000 - 15_500)
+  // 37: a year after buying, two kids under 5: half of the kids and owning, the whole rent back
+  const life = lifeAt(inputs, 37)
+  near(workingFlowAt(inputs, 37, 20_000), 20_000 + 6_000 - 0.5 * (life.kids + life.mortgage + life.ownership) + 18_000)
+  // the down payment still comes out of the investments in full
+  near(workingFlowAt(inputs, 36, 0) - workingFlowAt({ ...inputs, home: undefined }, 36, 0), -0.5 * (lifeAt(inputs, 36).mortgage + 10_000) + 18_000 - 92_000, 0.5)
+  // retired: the whole cost is in the budget
+  assert.equal(budgetAt(inputs, 50, 0).family, 36_000 + 12_000)
+  // before the wedding there's no one to share with
+  const early = { ...inputs, family: { ...inputs.family, fromAge: 40 } }
+  near(workingFlowAt(early, 33, 20_000), 20_000 - 31_000)
+})

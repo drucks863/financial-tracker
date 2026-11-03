@@ -51,6 +51,12 @@ export interface Family {
   childYearly: number
   /** child care a year per child before school (birth to 5), since both of you work */
   childcareYearly: number
+  /**
+   * share of the kids and the home (mortgage, tax, insurance, upkeep) the spouse pays from their own
+   * paycheck while you both work, 0–1. Left out = 0. Once retired everything comes from the shared
+   * investments.
+   */
+  spouseCostShare?: number
 }
 
 export interface Home {
@@ -333,12 +339,19 @@ export function budgetAt(inputs: RetirementInputs, age: number, socialSecurity: 
 
 /**
  * Saved (+) or taken out (−) at `age` while working, today's dollars: your saving (`saving`, already
- * grown with raises) plus the spouse's, less the kids and owning instead of renting, less the down
- * payment and closing costs the year you buy.
+ * grown with raises) plus the spouse's, less your part of the kids and of owning (once married the
+ * spouse's paycheck pays `spouseCostShare` of them), plus the rent you no longer pay, less the down
+ * payment and closing costs the year you buy (from the investments).
+ *
+ * Before 2026-11-03 the kids and the whole home came out of your saving alone, as if the spouse's pay
+ * (beyond what they save) covered none of it; Devin spotted that two kids wiped out ~18 years of saving.
  */
 export function workingFlowAt(inputs: RetirementInputs, age: number, saving: number): number {
   const life = lifeAt(inputs, age)
-  return saving + life.spouseSaving - life.kids - homeChange(life) - life.purchase
+  const family = inputs.family
+  const spouseShare = family && age >= family.fromAge ? Math.min(1, Math.max(0, family.spouseCostShare ?? 0)) : 0
+  const yours = 1 - spouseShare
+  return saving + life.spouseSaving - yours * (life.kids + life.mortgage + life.ownership) + life.rentSaved - life.purchase
 }
 
 /** Spending at `age`, today's dollars: the target, with loan payments adjusted, plus health insurance before 65. */

@@ -107,6 +107,7 @@
 - [x] Retirement **Home** section (Devin, 2026-11-02): home purchase (down payment and closing from investments,
   mortgage, tax/insurance/upkeep) with rent removed from then on
 - [x] Devin: review and merge the Family and Home PR (#29)
+- [x] Family fix (Devin, 2026-11-03): the spouse's paycheck pays a share of the kids and home while you both work (default 50%), child care on top of USDA lowered to $850/mo
 - [ ] Devin: try Family and Home with your own plans (ages, spouse pay, home price, rent)
 - [ ] Maybe later: college costs, the spouse retiring at a different age, home equity counted in retirement
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)

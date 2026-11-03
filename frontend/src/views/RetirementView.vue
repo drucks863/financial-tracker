@@ -37,7 +37,11 @@ const DEFAULTS = {
   kids: 2,
   kidsApart: 2,
   childMonthly: 1_500, // USDA: ~$233,610 to 17 for a middle-income married couple (2015 $), ~$18,000 a year in 2026 $
-  childcareMonthly: 1_100, // Child Care Aware 2024 national average, ~$13,000 a year, birth to 5
+  // Child Care Aware 2024 national average is ~$13,000 a year, birth to 5; the USDA figure above already has
+  // ~$2,900 of child care and education in it, so ~$10,000 a year on top (lowered from $1,100/mo 2026-11-03)
+  childcareMonthly: 850,
+  // the spouse's paycheck pays half the kids and the home while you both work (added 2026-11-03)
+  spouseCostShare: 0.5,
   homePrice: 410_000, // US median existing-home price, NAR 2025
   downPayment: 0.2,
   closingCosts: 0.03,
@@ -88,6 +92,7 @@ function fromReal() {
     marriedAtAge: age + 2,
     spouseSalary: DEFAULTS.spouseSalary,
     spouseSavingRate: DEFAULTS.spouseSavingRate,
+    spouseCostShare: DEFAULTS.spouseCostShare,
     // a couple spends about 1.5 times one person
     coupleSpendingMonthly: Math.round(((recent.spending ?? real.takeHomeMonthly) * 0.5) / 10) * 10,
     kids: DEFAULTS.kids,
@@ -151,7 +156,8 @@ function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInput
             retiredSpending: values.coupleSpendingMonthly * 12,
             kidsAtAge: Array.from({ length: Math.max(0, Math.round(values.kids)) }, (_, index) => values.firstKidAtAge + index * values.kidsApart),
             childYearly: values.childMonthly * 12,
-            childcareYearly: values.childcareMonthly * 12
+            childcareYearly: values.childcareMonthly * 12,
+            spouseCostShare: values.spouseCostShare
           }
         : undefined,
     home:
@@ -323,7 +329,9 @@ const familySummary = () => {
   const ss = `and adds about ${money(spouseSocialSecurity(engine.value, target.value.retireAge) / 12)} a month of Social Security`
   if (!kidsAges.value.length) return `${spouse} ${ss}.`
   const last = Math.max(...kidsAges.value) + 17
-  return `${spouse} ${ss}. Kids cost up to ${money(kidsPeak.value.amount / 12)} a month (at ${kidsPeak.value.age}), until you're ${last}.`
+  const yours = 1 - Math.min(1, Math.max(0, family.spouseCostShare ?? 0))
+  const split = yours < 1 ? ` (your part ${money((kidsPeak.value.amount * yours) / 12)})` : ''
+  return `${spouse} ${ss}. Kids cost up to ${money(kidsPeak.value.amount / 12)} a month${split} at ${kidsPeak.value.age}, until you're ${last}.`
 }
 const homeSummary = () => {
   const home = engine.value.home
@@ -371,6 +379,13 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
       { key: 'marriedAtAge', label: 'Married at', kind: 'age', min: 16, max: 90 },
       { key: 'spouseSalary', label: 'Spouse’s gross salary, yearly', kind: 'money', hint: () => 'Today’s dollars; gets the same raises as yours. US median full-time pay is about $62,000.' },
       { key: 'spouseSavingRate', label: 'Spouse saves', kind: 'percent', max: 100, hint: () => 'Share of their pay invested (their 401k, match, IRA).' },
+      {
+        key: 'spouseCostShare',
+        label: 'Spouse pays of the kids and home',
+        kind: 'percent',
+        max: 100,
+        hint: () => 'From their own paycheck while you both work; the rest comes out of what you save. Once retired it all comes from the investments.'
+      },
       { key: 'coupleSpendingMonthly', label: 'Extra spending in retirement for two, a month', kind: 'money', hint: () => 'Added to your spending target once retired. A couple spends about 1.5 times one person. Health insurance before 65 doubles too.' },
       { key: 'kids', label: 'Kids', kind: 'age', min: 0, max: 8 },
       { key: 'firstKidAtAge', label: 'First child when you’re', kind: 'age', min: 16, max: 70, hidden: () => values.value.kids < 1 },
@@ -387,7 +402,7 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
         label: 'Child care per child a month, before school',
         kind: 'money',
         hidden: () => values.value.kids < 1,
-        hint: () => 'On top, birth to 5, since you both work. US average is about $13,000 a year (Child Care Aware, 2024).'
+        hint: () => 'On top, birth to 5, since you both work. Day care averages about $13,000 a year (Child Care Aware, 2024); the USDA figure already has about $2,900 of it.'
       }
     ]
   },
@@ -700,7 +715,7 @@ const chart = computed<ChartBuilder>(() => {
             <li>Tax on withdrawals is one flat rate on everything taken out. Roth and HSA money is tax-free; pre-tax 401k and IRA money is taxed like income.</li>
             <li>Ups and downs: the plan runs against {{ 500 }} sequences of yearly returns that average out to your return, with the volatility you set. Bad years early in retirement hurt most; that’s why the chance can be below 100% even when average years look fine.</li>
             <li>The goal. Money lasts: the balance never hits zero before the plan-to age. Keep the nest egg: in at least 3 of the last 5 years of the plan, you still have what you retired with, in today’s dollars (so it keeps up with inflation). Looking at 5 years means one crash in the final year doesn’t decide it. It can dip along the way; you live off the growth, not the savings. That takes a bigger balance, so the earliest age is later.</li>
-            <li>Family (when in the plan): from the age you marry, your spouse’s saving is added while you work, health insurance before 65 is for two, retirement spending rises by the extra for two, and their Social Security (their own estimate, or half of yours if more) is added. Each child costs the monthly amount until 18, plus child care until 5; while working that comes out of what you save. You both retire at the same age.</li>
+            <li>Family (when in the plan): from the age you marry, your spouse’s saving is added while you work, health insurance before 65 is for two, retirement spending rises by the extra for two, and their Social Security (their own estimate, or half of yours if more) is added. Each child costs the monthly amount until 18, plus child care until 5. While you both work, your spouse’s paycheck pays their share of the kids and the home and the rest comes out of what you save; once retired it all comes from the investments. You both retire at the same age.</li>
             <li>Home (when in the plan): the down payment and closing costs come out of your investments the year you buy. From then on the mortgage (fixed, so it shrinks with inflation and stops at payoff) plus tax, insurance and upkeep replace your rent. The home itself isn’t counted as money to retire on.</li>
             <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Contribution limits and required withdrawals aren’t modelled.</li>
           </ul>
