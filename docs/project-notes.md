@@ -364,6 +364,12 @@ PUT is an upsert by the client's id, so the UI can save optimistically with ids 
   - Budget table columns: retire age, Social Security/Medicare age, and 75. Notes under it explain early access and cuts.
   - On a profile like Devin's ($350k, $31k/yr, married, 2 kids, $410k home, retire 55, money lasts): earliest 60 at 90%,
     54 with average years. College (~$200k for two) and Medicare are the big new costs; flexible spending gives back ~1 year.
+- **Round 3** (Devin, 2026-11-03, after his own numbers showed no age working): "Extra for two" defaults to half of
+  spending *minus your rent* (a couple shares the home); raises default 4% (1% above inflation; was 3%); "Money should
+  last until" renamed **Plan until** with a hint per goal (keep the nest egg = checked over its last 5 years);
+  optional **part-time work after retiring** (`partTimeYearly` after tax, until `partTimeUntilAge`, a budget row).
+  His result was driven by ~$14.6k/mo needed at 55 (target + extra for two + insurance for two + college + home)
+  with Social Security only at 67 — the math was right; the extra-for-two default was the overstated input.
 
 ## The Google Sheets are reference only
 

@@ -33,7 +33,10 @@ const DEFAULTS = {
   planToAge: 95,
   returnRate: 0.07,
   inflation: 0.03,
-  salaryGrowth: 0.03,
+  // 1% above inflation: pay usually grows faster than prices over a career (was 3% until 2026-11-03)
+  salaryGrowth: 0.04,
+  partTimeMonthly: 0,
+  partTimeUntilAge: 62,
   volatility: 0.15,
   confidence: 0.9,
   // the goal: 1 = keep the nest egg (end with at least what you retired with), 0 = the money lasts.
@@ -92,6 +95,8 @@ function fromReal() {
     spendingAfter75: DEFAULTS.spendingAfter75,
     cutInBadYears: DEFAULTS.cutInBadYears,
     socialSecurityCut: DEFAULTS.socialSecurityCut,
+    partTimeMonthly: DEFAULTS.partTimeMonthly,
+    partTimeUntilAge: DEFAULTS.partTimeUntilAge,
     withdrawalTax: taxGuess.value.rate,
     socialSecurityMonthly: Math.round(estimateSocialSecurity(real.salary, DEFAULTS.targetAge, DEFAULTS.socialSecurityAge) / 12),
     socialSecurityAge: DEFAULTS.socialSecurityAge,
@@ -124,7 +129,9 @@ function fromReal() {
     spouseSavingRate: DEFAULTS.spouseSavingRate,
     spouseCostShare: DEFAULTS.spouseCostShare,
     // a couple spends about 1.5 times one person
-    coupleSpendingMonthly: Math.round(((recent.spending ?? real.takeHomeMonthly) * 0.5) / 10) * 10,
+    // half of what you spend on everything but rent: a couple spends ~1.5 times one person, but shares the
+    // home (until 2026-11-03 this was half of all spending, rent included, which Devin's numbers showed too high)
+    coupleSpendingMonthly: Math.max(0, Math.round((((recent.spending ?? real.takeHomeMonthly) - real.rentMonthly) * 0.5) / 10) * 10),
     kids: DEFAULTS.kids,
     firstKidAtAge: age + 3,
     kidsApart: DEFAULTS.kidsApart,
@@ -175,6 +182,8 @@ function toEngine(values: Inputs, typedSocialSecurity: boolean, typedSpouseRetir
     cutInBadYears: values.cutInBadYears,
     healthcareAfter65: values.medicareMonthly * 12,
     socialSecurityCut: values.socialSecurityCut,
+    partTimeYearly: values.partTimeMonthly * 12,
+    partTimeUntilAge: values.partTimeUntilAge,
     socialSecurityCutAge: values.age + (DEFAULTS.socialSecurityCutYear - thisYear),
     salaryGrowth: values.salaryGrowth,
     salary: values.salary,
@@ -303,6 +312,7 @@ const budgetRows = computed(() => {
     { label: 'Kids, college, spending for two', pick: (b: (typeof columns)[number]['budget']) => b.family, show: any((b) => b.family) },
     { label: 'Owning instead of renting', pick: (b: (typeof columns)[number]['budget']) => b.home, show: any((b) => b.home) },
     { label: 'Your spouse’s paycheck pays', pick: (b: (typeof columns)[number]['budget']) => -b.spousePays, show: any((b) => b.spousePays) },
+    { label: 'Part-time work', pick: (b: (typeof columns)[number]['budget']) => -b.partTime, show: any((b) => b.partTime) },
     { label: 'Social Security', pick: (b: (typeof columns)[number]['budget']) => -b.socialSecurity, show: any((b) => b.socialSecurity) },
     { label: 'Tax on withdrawals', pick: (b: (typeof columns)[number]['budget']) => b.tax, show: any((b) => b.tax) },
     { label: 'Taken from investments', pick: (b: (typeof columns)[number]['budget']) => b.withdrawal, show: true, total: true }
@@ -417,7 +427,17 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
         hint: () => (realFigures.value.age === null ? 'Add your birth year on the profile to start from your real age.' : undefined)
       },
       { key: 'targetAge', label: 'Retire at', kind: 'age', min: 30, max: 90 },
-      { key: 'planToAge', label: 'Money should last until', kind: 'age', min: 60, max: 110 }
+      {
+        key: 'planToAge',
+        label: 'Plan until',
+        kind: 'age',
+        min: 60,
+        max: 110,
+        hint: () =>
+          keep.value
+            ? `Your nest egg is checked over the last 5 years, ${values.value.planToAge - 4} to ${values.value.planToAge}. Later means more years to keep it.`
+            : 'The money shouldn’t run out before this age.'
+      }
     ]
   },
   {
@@ -446,7 +466,7 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
       { key: 'match', label: 'Company 401k', kind: 'percent', max: 100, source: () => 'profile' },
       { key: 'deductionsYearly', label: 'Other paycheck saving (HSA...), yearly', kind: 'money', source: () => 'profile' },
       { key: 'otherSavingMonthly', label: 'Other saving a month (brokerage)', kind: 'money', source: recentSource, hint: () => 'What’s left after spending, invested where you can reach it any time.' },
-      { key: 'salaryGrowth', label: 'Raise each year', kind: 'percent', min: -10, max: 20, hint: () => 'Saving grows with your pay.' }
+      { key: 'salaryGrowth', label: 'Raise each year', kind: 'percent', min: -10, max: 20, hint: () => 'Saving grows with your pay. 4% is about 1% above inflation, typical over a career; matching inflation means your pay never really grows.' }
     ]
   },
   {
@@ -475,7 +495,7 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
             ? 'Until then they keep saving, pay their share and their job’s health plan covers you both.'
             : 'Same year as you. Until then they keep saving, pay their share and their job’s health plan covers you both.'
       },
-      { key: 'coupleSpendingMonthly', label: 'Extra spending for two in retirement, a month', kind: 'money', hint: () => 'Added to your spending target once you’re both retired. A couple spends about 1.5 times one person.' },
+      { key: 'coupleSpendingMonthly', label: 'Extra spending for two in retirement, a month', kind: 'money', hint: () => 'Added to your spending target once you’re both retired. Starts at half of what you spend on everything but rent, since a couple spends about 1.5 times one person but shares the home.' },
       { key: 'kids', label: 'Kids', kind: 'age', min: 0, max: 8 },
       { key: 'firstKidAtAge', label: 'First child when you’re', kind: 'age', min: 16, max: 70, hidden: () => values.value.kids < 1 },
       { key: 'kidsApart', label: 'Years between kids', kind: 'age', min: 1, max: 10, hidden: () => values.value.kids < 2 },
@@ -544,6 +564,13 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
         max: 120,
         hint: () => `Share of the target. People travel and spend less later on; 100% keeps it flat. That’s ${money(values.value.spendingMonthly * values.value.spendingAfter75)} a month.`
       },
+      {
+        key: 'partTimeMonthly',
+        label: 'Part-time work after you retire, a month',
+        kind: 'money',
+        hint: () => 'After tax, today’s dollars. Even a little early on helps a lot, since it’s before Social Security starts. 0 if none.'
+      },
+      { key: 'partTimeUntilAge', label: 'Part-time work until', kind: 'age', min: 40, max: 90, hidden: () => values.value.partTimeMonthly <= 0 },
       {
         key: 'cutInBadYears',
         label: 'Spend less after a market drop',
@@ -854,6 +881,7 @@ const chart = computed<ChartBuilder>(() => {
             <li>Family (when in the plan): from the age you marry, your spouse’s saving is added while you work, health insurance before 65 is for two, retirement spending rises by the extra for two, and their Social Security (their own estimate, or half of yours if more) is added. Each child costs the monthly amount until 18, plus child care until 5. While you both work, your spouse’s paycheck pays their share of the kids and the home and the rest comes out of what you save; once retired it all comes from the investments. You both retire at the same age.</li>
             <li>Home (when in the plan): the down payment and closing costs come out of your investments the year you buy. From then on the mortgage (fixed, so it shrinks with inflation and stops at payoff) plus tax, insurance and upkeep replace your rent. The home itself isn’t counted as money to retire on.</li>
             <li>Getting at the money: until 60, spending comes from your brokerage account first. 401k, IRA and HSA money taken earlier pays a 10% penalty, unless you retire at 55 or later (the rule of 55). Your own 401k saving above the yearly limit ($24,500 in 2026) counts as brokerage saving.</li>
+            <li>Part-time work, if you add it, is after-tax pay that covers spending from the day you retire until the age you set.</li>
             <li>Spending: the target drops to the share you set from 75 on, and in years your investments are 20% or more below what you retired with, it’s cut by the share you set. Medicare and medical bills are added from 65.</li>
             <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Required minimum distributions aren’t modelled (they move money, not spend it).</li>
           </ul>

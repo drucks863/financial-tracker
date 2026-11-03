@@ -392,3 +392,13 @@ test('family: college for 4 years, and a spouse who keeps working after you reti
   const run = project({ ...inputs, salaryGrowth: 0.03, inflation: 0.03, yearlySaving: 0 }, 50)
   assert.ok(run.years.find((year) => year.age === 55)!.flow > run.years.find((year) => year.age === 58)!.flow)
 })
+
+test('part-time work covers spending until the age set', () => {
+  const inputs = { ...base, partTimeYearly: 20_000, partTimeUntilAge: 60 }
+  assert.equal(budgetAt(inputs, 59, 0).partTime, 20_000)
+  assert.equal(budgetAt(inputs, 59, 0).withdrawal, 30_000)
+  assert.equal(budgetAt(inputs, 60, 0).partTime, 0)
+  // never more than what's needed
+  assert.equal(budgetAt({ ...inputs, partTimeYearly: 80_000 }, 59, 0).withdrawal, 0)
+  assert.ok((retirement(inputs).earliestAge ?? 99) < (retirement(base).earliestAge ?? 99))
+})
