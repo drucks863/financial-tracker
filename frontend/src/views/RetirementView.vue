@@ -6,7 +6,19 @@ import SimulatorShell from '../components/SimulatorShell.vue'
 import SimField from '../components/SimField.vue'
 import BaseChart from '../components/BaseChart.vue'
 import { useScenario } from '../lib/scenario'
-import { retirement, project, budgetAt, estimateSocialSecurity, estimateWithdrawalTax, lifeAt, mortgagePayment, spouseSocialSecurity, type RetirementInputs } from '../lib/retirement'
+import {
+  retirement,
+  project,
+  budgetAt,
+  estimateSocialSecurity,
+  estimateWithdrawalTax,
+  isBrokerage,
+  lifeAt,
+  mortgagePayment,
+  spouseSocialSecurity,
+  LIMIT_401K_2026,
+  type RetirementInputs
+} from '../lib/retirement'
 import { realFigures } from '../store/real-figures'
 import { money, moneyCompact, pct, shortDate, ymLabel } from '../lib/format'
 import { series, ROLE } from '../lib/chart-colors'
@@ -27,7 +39,19 @@ const DEFAULTS = {
   // the goal: 1 = keep the nest egg (end with at least what you retired with), 0 = the money lasts.
   // Keeping it is Devin's goal (2026-11-02).
   keepNestEgg: 1,
-  healthcareMonthly: 700,
+  // per person: an unsubsidized marketplace plan for someone in their late 50s (KFF 2025, ~$850)
+  healthcareMonthly: 850,
+  // per person from 65: Medicare premiums and out-of-pocket (Fidelity 2025: ~$172,500 over retirement, ~$700/mo)
+  medicareMonthly: 700,
+  // people spend less later in retirement; from 75, 80% of the target
+  spendingAfter75: 0.8,
+  // flexible spending: 10% less in years the investments are 20%+ below where they started
+  cutInBadYears: 0.1,
+  // Social Security trust fund runs short in 2034 (2025 Trustees report); 0 = paid in full
+  socialSecurityCut: 0,
+  socialSecurityCutYear: 2034,
+  // a year of public in-state college: tuition, fees, room and board (College Board 2025, ~$25,000)
+  collegeYearly: 25_000,
   socialSecurityAge: 67,
   // Family and Home start left out (they're plans, not your numbers yet). Devin plans to marry, have
   // kids and buy a home within about 5 years (2026-11-02), so the ages default to the next few years.
@@ -37,7 +61,11 @@ const DEFAULTS = {
   kids: 2,
   kidsApart: 2,
   childMonthly: 1_500, // USDA: ~$233,610 to 17 for a middle-income married couple (2015 $), ~$18,000 a year in 2026 $
-  childcareMonthly: 1_100, // Child Care Aware 2024 national average, ~$13,000 a year, birth to 5
+  // Child Care Aware 2024 national average is ~$13,000 a year, birth to 5; the USDA figure above already has
+  // ~$2,900 of child care and education in it, so ~$10,000 a year on top (lowered from $1,100/mo 2026-11-03)
+  childcareMonthly: 850,
+  // the spouse's paycheck pays half the kids and the home while you both work (added 2026-11-03)
+  spouseCostShare: 0.5,
   homePrice: 410_000, // US median existing-home price, NAR 2025
   downPayment: 0.2,
   closingCosts: 0.03,
@@ -60,6 +88,10 @@ function fromReal() {
     spendingMonthly: Math.round((recent.spending ?? real.takeHomeMonthly) / 10) * 10,
     loanPaymentsMonthly: Math.round(realLoanPayments.value),
     healthcareMonthly: DEFAULTS.healthcareMonthly,
+    medicareMonthly: DEFAULTS.medicareMonthly,
+    spendingAfter75: DEFAULTS.spendingAfter75,
+    cutInBadYears: DEFAULTS.cutInBadYears,
+    socialSecurityCut: DEFAULTS.socialSecurityCut,
     withdrawalTax: taxGuess.value.rate,
     socialSecurityMonthly: Math.round(estimateSocialSecurity(real.salary, DEFAULTS.targetAge, DEFAULTS.socialSecurityAge) / 12),
     socialSecurityAge: DEFAULTS.socialSecurityAge,
@@ -69,6 +101,8 @@ function fromReal() {
     planToAge: DEFAULTS.planToAge,
     // Saving
     startBalance: Math.round(real.netWorth?.Investments ?? 0),
+    // the part in regular brokerage accounts, by account name
+    startOpen: Math.round(real.investmentAccounts.filter((account) => isBrokerage(account.name)).reduce((total, account) => total + account.balance, 0)),
     salary: real.salary,
     k401: real.k401,
     match: real.match,
@@ -88,6 +122,7 @@ function fromReal() {
     marriedAtAge: age + 2,
     spouseSalary: DEFAULTS.spouseSalary,
     spouseSavingRate: DEFAULTS.spouseSavingRate,
+    spouseCostShare: DEFAULTS.spouseCostShare,
     // a couple spends about 1.5 times one person
     coupleSpendingMonthly: Math.round(((recent.spending ?? real.takeHomeMonthly) * 0.5) / 10) * 10,
     kids: DEFAULTS.kids,
@@ -95,6 +130,9 @@ function fromReal() {
     kidsApart: DEFAULTS.kidsApart,
     childMonthly: DEFAULTS.childMonthly,
     childcareMonthly: DEFAULTS.childcareMonthly,
+    collegeYearly: DEFAULTS.collegeYearly,
+    // 0 = the same year as you; the field shows your retire age until another age is typed
+    spouseRetireAge: 0,
     // Home (left out until switched on)
     includeHome: 0,
     homeAtAge: age + 4,
@@ -118,13 +156,26 @@ const socialSecurityEstimate = computed(() =>
   Math.round(estimateSocialSecurity(scenario.inputs.value.salary, Math.min(scenario.inputs.value.targetAge, 90), scenario.inputs.value.socialSecurityAge) / 12)
 )
 
-function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInputs {
+// Your spouse retires when you do until you type another age.
+const spouseRetireTyped = computed(() => scenario.changed('spouseRetireAge'))
+
+function toEngine(values: Inputs, typedSocialSecurity: boolean, typedSpouseRetire: boolean): RetirementInputs {
   // loans keep their real payoff dates; a changed payment total scales them all
   const loanScale = realLoanPayments.value > 0 ? values.loanPaymentsMonthly / realLoanPayments.value : 0
+  // your own 401k money above the yearly limit is saved in a brokerage account instead
+  const yours401k = values.salary * values.k401
+  const overLimit = Math.max(0, yours401k - LIMIT_401K_2026)
   return {
     currentAge: values.age,
     startBalance: values.startBalance,
-    yearlySaving: values.salary * (values.k401 + values.match) + values.deductionsYearly + values.otherSavingMonthly * 12,
+    startOpen: Math.min(values.startBalance, values.startOpen),
+    yearlySaving: yours401k + values.salary * values.match + values.deductionsYearly + values.otherSavingMonthly * 12,
+    openSaving: values.otherSavingMonthly * 12 + overLimit,
+    spendingAfter75: values.spendingAfter75,
+    cutInBadYears: values.cutInBadYears,
+    healthcareAfter65: values.medicareMonthly * 12,
+    socialSecurityCut: values.socialSecurityCut,
+    socialSecurityCutAge: values.age + (DEFAULTS.socialSecurityCutYear - thisYear),
     salaryGrowth: values.salaryGrowth,
     salary: values.salary,
     returnRate: values.returnRate,
@@ -151,7 +202,10 @@ function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInput
             retiredSpending: values.coupleSpendingMonthly * 12,
             kidsAtAge: Array.from({ length: Math.max(0, Math.round(values.kids)) }, (_, index) => values.firstKidAtAge + index * values.kidsApart),
             childYearly: values.childMonthly * 12,
-            childcareYearly: values.childcareMonthly * 12
+            childcareYearly: values.childcareMonthly * 12,
+            spouseCostShare: values.spouseCostShare,
+            collegeYearly: values.collegeYearly,
+            spouseRetireAge: typedSpouseRetire ? values.spouseRetireAge : undefined
           }
         : undefined,
     home:
@@ -171,9 +225,9 @@ function toEngine(values: Inputs, typedSocialSecurity: boolean): RetirementInput
 }
 
 const values = computed(() => scenario.inputs.value)
-const engine = computed(() => toEngine(values.value, socialSecurityTyped.value))
+const engine = computed(() => toEngine(values.value, socialSecurityTyped.value, spouseRetireTyped.value))
 const result = computed(() => retirement(engine.value, values.value.confidence))
-const realEngine = computed(() => toEngine(scenario.real.value, false))
+const realEngine = computed(() => toEngine(scenario.real.value, false, false))
 const realResult = computed(() => retirement(realEngine.value, scenario.real.value.confidence))
 const changed = computed(() => scenario.changedCount.value > 0)
 const target = computed(() => result.value.target)
@@ -227,14 +281,16 @@ const averageOutcome = computed(() => {
   return plan.atEnd < plan.atRetirement ? `Ends ${pct(1 - plan.atEnd / plan.atRetirement)} lower` : 'Below it near the end'
 })
 
-// The retirement budget, monthly: the first year, and once Social Security starts if that's later.
+// The retirement budget, monthly: the first year, once Social Security and Medicare have started, and
+// from 75 when spending drops then.
 const budgetColumns = computed(() => {
   const retireAge = target.value.retireAge
   const socialSecurity = result.value.socialSecurityAtTarget
   const ages = [retireAge]
   const later = Math.max(values.value.socialSecurityAge, 65)
   if (later > retireAge && later <= values.value.planToAge) ages.push(later)
-  return ages.map((age) => ({ age, budget: budgetAt(engine.value, age, socialSecurity) }))
+  if (values.value.spendingAfter75 !== 1 && 75 > ages.at(-1)! && 75 <= values.value.planToAge) ages.push(75)
+  return ages.map((age) => ({ age, budget: budgetAt(engine.value, age, socialSecurity, retireAge) }))
 })
 const budgetRows = computed(() => {
   const monthly = (amount: number, age: number) => shown(amount, age) / 12
@@ -243,15 +299,26 @@ const budgetRows = computed(() => {
   return [
     { label: 'Spending target', pick: (b: (typeof columns)[number]['budget']) => b.target, show: true },
     { label: 'Loan payments gone or smaller', pick: (b: (typeof columns)[number]['budget']) => b.loanChange, show: any((b) => b.loanChange) },
-    { label: engine.value.family ? 'Health insurance until 65, for two' : 'Health insurance until 65', pick: (b: (typeof columns)[number]['budget']) => b.healthcare, show: any((b) => b.healthcare) },
-    { label: 'Kids and spending for two', pick: (b: (typeof columns)[number]['budget']) => b.family, show: any((b) => b.family) },
+    { label: 'Health insurance, then Medicare', pick: (b: (typeof columns)[number]['budget']) => b.healthcare, show: any((b) => b.healthcare) },
+    { label: 'Kids, college, spending for two', pick: (b: (typeof columns)[number]['budget']) => b.family, show: any((b) => b.family) },
     { label: 'Owning instead of renting', pick: (b: (typeof columns)[number]['budget']) => b.home, show: any((b) => b.home) },
+    { label: 'Your spouse’s paycheck pays', pick: (b: (typeof columns)[number]['budget']) => -b.spousePays, show: any((b) => b.spousePays) },
     { label: 'Social Security', pick: (b: (typeof columns)[number]['budget']) => -b.socialSecurity, show: any((b) => b.socialSecurity) },
     { label: 'Tax on withdrawals', pick: (b: (typeof columns)[number]['budget']) => b.tax, show: any((b) => b.tax) },
     { label: 'Taken from investments', pick: (b: (typeof columns)[number]['budget']) => b.withdrawal, show: true, total: true }
   ]
     .filter((row) => row.show)
     .map((row) => ({ label: row.label, total: !!row.total, cells: columns.map((column) => monthly(row.pick(column.budget), column.age)) }))
+})
+/** Getting at retirement accounts before 59½, in one sentence (null when retiring at 60 or later). */
+const earlyAccess = computed(() => {
+  const plan = target.value
+  if (plan.retireAge >= 60) return null
+  if (plan.accessAge === plan.retireAge)
+    return `Retiring at ${plan.retireAge} lets you take from your 401k without the 10% early withdrawal penalty (the rule of 55; it covers the 401k at the job you leave, not IRAs).`
+  const first = plan.years.find((year) => year.penalty > 0.5)
+  if (!first) return `Until 60, spending comes from your brokerage account, which covers it, so there’s no early withdrawal penalty.`
+  return `Until 60, spending comes from your brokerage account first. It runs short at ${first.age}, so about ${money(shown(plan.penalties, first.age))} goes to the 10% early withdrawal penalty on 401k and IRA money.`
 })
 const signedMonthly = (amount: number) => (amount < -0.5 ? `−${money(-amount)}` : money(amount))
 
@@ -323,7 +390,9 @@ const familySummary = () => {
   const ss = `and adds about ${money(spouseSocialSecurity(engine.value, target.value.retireAge) / 12)} a month of Social Security`
   if (!kidsAges.value.length) return `${spouse} ${ss}.`
   const last = Math.max(...kidsAges.value) + 17
-  return `${spouse} ${ss}. Kids cost up to ${money(kidsPeak.value.amount / 12)} a month (at ${kidsPeak.value.age}), until you're ${last}.`
+  const yours = 1 - Math.min(1, Math.max(0, family.spouseCostShare ?? 0))
+  const split = yours < 1 ? ` (your part ${money((kidsPeak.value.amount * yours) / 12)})` : ''
+  return `${spouse} ${ss}. Kids cost up to ${money(kidsPeak.value.amount / 12)} a month${split} at ${kidsPeak.value.age}, until you're ${last}.`
 }
 const homeSummary = () => {
   const home = engine.value.home
@@ -355,11 +424,28 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
     title: 'Saving',
     fields: [
       { key: 'startBalance', label: 'Invested today', kind: 'money', source: () => (net.value ? `Net worth Investments, ${shortDate(net.value.date)}` : undefined), hint: () => (net.value?.Cash ? `Cash (${money(net.value.Cash)}) and home equity aren't counted.` : undefined) },
+      {
+        key: 'startOpen',
+        label: 'Of that, in a regular brokerage account',
+        kind: 'money',
+        source: () => (realFigures.value.investmentAccounts.length ? 'your Net worth account names' : undefined),
+        hint: () => 'Money you can take out at any age. The rest (401k, IRA, HSA) pays a 10% penalty if taken before 59½.'
+      },
       { key: 'salary', label: 'Gross salary, yearly', kind: 'money', source: () => 'profile' },
-      { key: 'k401', label: 'Your 401k', kind: 'percent', max: 100, source: () => 'profile' },
+      {
+        key: 'k401',
+        label: 'Your 401k',
+        kind: 'percent',
+        max: 100,
+        source: () => 'profile',
+        hint: () =>
+          values.value.salary * values.value.k401 > LIMIT_401K_2026
+            ? `Over the ${money(LIMIT_401K_2026)} yearly limit; the extra is counted as brokerage saving.`
+            : undefined
+      },
       { key: 'match', label: 'Company 401k', kind: 'percent', max: 100, source: () => 'profile' },
       { key: 'deductionsYearly', label: 'Other paycheck saving (HSA...), yearly', kind: 'money', source: () => 'profile' },
-      { key: 'otherSavingMonthly', label: 'Other saving a month (IRA, brokerage)', kind: 'money', source: recentSource, hint: () => 'What’s left after spending, invested.' },
+      { key: 'otherSavingMonthly', label: 'Other saving a month (brokerage)', kind: 'money', source: recentSource, hint: () => 'What’s left after spending, invested where you can reach it any time.' },
       { key: 'salaryGrowth', label: 'Raise each year', kind: 'percent', min: -10, max: 20, hint: () => 'Saving grows with your pay.' }
     ]
   },
@@ -371,7 +457,25 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
       { key: 'marriedAtAge', label: 'Married at', kind: 'age', min: 16, max: 90 },
       { key: 'spouseSalary', label: 'Spouse’s gross salary, yearly', kind: 'money', hint: () => 'Today’s dollars; gets the same raises as yours. US median full-time pay is about $62,000.' },
       { key: 'spouseSavingRate', label: 'Spouse saves', kind: 'percent', max: 100, hint: () => 'Share of their pay invested (their 401k, match, IRA).' },
-      { key: 'coupleSpendingMonthly', label: 'Extra spending in retirement for two, a month', kind: 'money', hint: () => 'Added to your spending target once retired. A couple spends about 1.5 times one person. Health insurance before 65 doubles too.' },
+      {
+        key: 'spouseCostShare',
+        label: 'Spouse pays of the kids and home',
+        kind: 'percent',
+        max: 100,
+        hint: () => 'From their paycheck while they work; the rest comes out of what you save. Once they stop working it all comes from the investments.'
+      },
+      {
+        key: 'spouseRetireAge',
+        label: 'Spouse stops working when you’re',
+        kind: 'age',
+        min: 30,
+        max: 90,
+        hint: () =>
+          spouseRetireTyped.value
+            ? 'Until then they keep saving, pay their share and their job’s health plan covers you both.'
+            : 'Same year as you. Until then they keep saving, pay their share and their job’s health plan covers you both.'
+      },
+      { key: 'coupleSpendingMonthly', label: 'Extra spending for two in retirement, a month', kind: 'money', hint: () => 'Added to your spending target once you’re both retired. A couple spends about 1.5 times one person.' },
       { key: 'kids', label: 'Kids', kind: 'age', min: 0, max: 8 },
       { key: 'firstKidAtAge', label: 'First child when you’re', kind: 'age', min: 16, max: 70, hidden: () => values.value.kids < 1 },
       { key: 'kidsApart', label: 'Years between kids', kind: 'age', min: 1, max: 10, hidden: () => values.value.kids < 2 },
@@ -380,14 +484,21 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
         label: 'Cost per child a month, to 18',
         kind: 'money',
         hidden: () => values.value.kids < 1,
-        hint: () => 'US average for a middle-income married couple: about $18,000 a year (USDA estimate in today’s dollars). College isn’t included.'
+        hint: () => 'US average for a middle-income married couple: about $18,000 a year (USDA estimate in today’s dollars). College is separate, below.'
       },
       {
         key: 'childcareMonthly',
         label: 'Child care per child a month, before school',
         kind: 'money',
         hidden: () => values.value.kids < 1,
-        hint: () => 'On top, birth to 5, since you both work. US average is about $13,000 a year (Child Care Aware, 2024).'
+        hint: () => 'On top, birth to 5, since you both work. Day care averages about $13,000 a year (Child Care Aware, 2024); the USDA figure already has about $2,900 of it.'
+      },
+      {
+        key: 'collegeYearly',
+        label: 'College per child a year, for 4 years',
+        kind: 'money',
+        hidden: () => values.value.kids < 1,
+        hint: () => 'Public in-state tuition, room and board is about $25,000 a year (College Board, 2025). Shared like the kids’ costs. 0 if they’re on their own.'
       }
     ]
   },
@@ -426,6 +537,21 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
     fields: [
       { key: 'spendingMonthly', label: 'Spending target a month, today’s dollars', kind: 'money', source: recentSource, hint: () => futureMonthly('spendingMonthly') },
       {
+        key: 'spendingAfter75',
+        label: 'Spending from 75 on',
+        kind: 'percent',
+        min: 50,
+        max: 120,
+        hint: () => `Share of the target. People travel and spend less later on; 100% keeps it flat. That’s ${money(values.value.spendingMonthly * values.value.spendingAfter75)} a month.`
+      },
+      {
+        key: 'cutInBadYears',
+        label: 'Spend less after a market drop',
+        kind: 'percent',
+        max: 50,
+        hint: () => 'Cut the target by this much in years your investments are 20%+ below what you retired with. Most retirees adjust like this; 0 never cuts.'
+      },
+      {
         key: 'loanPaymentsMonthly',
         label: 'Loan payments in that spending, a month',
         kind: 'money',
@@ -433,7 +559,13 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
         hint: () => `They stop when paid off: ${loanList()}. Set 0 if your spending doesn’t include them.`,
         hidden: () => !realFigures.value.loans.length
       },
-      { key: 'healthcareMonthly', label: 'Health insurance before 65, a month', kind: 'money', hint: () => `Only if you retire before Medicare. ${futureMonthly('healthcareMonthly')}` },
+      {
+        key: 'healthcareMonthly',
+        label: 'Health insurance before 65, a month each',
+        kind: 'money',
+        hint: () => `Only if you retire before Medicare; a marketplace plan in your late 50s is about $850 each. ${futureMonthly('healthcareMonthly')}`
+      },
+      { key: 'medicareMonthly', label: 'Medicare and medical bills from 65, a month each', kind: 'money', hint: () => 'Premiums plus out-of-pocket costs; Fidelity puts it at about $700 a month each.' },
       { key: 'withdrawalTax', label: 'Tax on withdrawals', kind: 'percent', max: 50, source: taxSource, hint: taxHint },
       {
         key: 'socialSecurityMonthly',
@@ -444,21 +576,36 @@ const GROUPS: { title: string; toggle?: ToggleKey; summary?: () => string; field
             ? 'Your figure. Get yours at ssa.gov (my Social Security).'
             : `Rough estimate from your salary, working until ${target.value.retireAge}, claimed at ${values.value.socialSecurityAge}. Get yours at ssa.gov.`
       },
-      { key: 'socialSecurityAge', label: 'Social Security starts at', kind: 'age', min: 62, max: 70, hint: () => 'Claiming at 62 pays 30% less than at 67; waiting to 70 pays 24% more.' }
+      { key: 'socialSecurityAge', label: 'Social Security starts at', kind: 'age', min: 62, max: 70, hint: () => 'Claiming at 62 pays 30% less than at 67; waiting to 70 pays 24% more.' },
+      {
+        key: 'socialSecurityCut',
+        label: 'Social Security cut from 2034',
+        kind: 'percent',
+        max: 100,
+        hint: () => 'The trust fund runs short in 2034; without a fix, benefits drop about 19%. 0 assumes Congress fixes it.'
+      }
     ]
   }
 ]
 
-// Percents are stored 0–1 and edited as 0–100. Social Security shows the live estimate until you type your own.
+// Fields that follow something else until you type your own value: what they show meanwhile, and how
+// "yours" reads next to them.
+const FOLLOWING: Partial<Record<Key, { typed: () => boolean; shown: () => number; realText: () => string; realSource: string }>> = {
+  socialSecurityMonthly: { typed: () => socialSecurityTyped.value, shown: () => socialSecurityEstimate.value, realText: () => money(socialSecurityEstimate.value), realSource: 'the estimate' },
+  spouseRetireAge: { typed: () => spouseRetireTyped.value, shown: () => values.value.targetAge, realText: () => 'same year as you', realSource: '' }
+}
+
+// Percents are stored 0–1 and edited as 0–100.
 const models = Object.fromEntries(
   GROUPS.flatMap((group) => group.fields).map((spec) => {
     const raw = scenario.field(spec.key)
+    const following = FOLLOWING[spec.key]
     const model: WritableComputedRef<number | null> =
       spec.kind === 'percent'
         ? computed({ get: () => Math.round(raw.value * 10000) / 100, set: (value) => (raw.value = value === null ? NaN : value / 100) })
-        : spec.key === 'socialSecurityMonthly'
+        : following
           ? computed({
-              get: () => (socialSecurityTyped.value ? raw.value : socialSecurityEstimate.value),
+              get: () => (following.typed() ? raw.value : following.shown()),
               set: (value) => (raw.value = value === null ? NaN : value)
             })
           : computed({ get: () => raw.value, set: (value) => (raw.value = value === null ? NaN : value) })
@@ -467,10 +614,12 @@ const models = Object.fromEntries(
 ) as Record<Key, WritableComputedRef<number | null>>
 
 const realText = (spec: FieldSpec) => {
-  const value = spec.key === 'socialSecurityMonthly' ? socialSecurityEstimate.value : scenario.real.value[spec.key]
+  const following = FOLLOWING[spec.key]
+  if (following) return following.realText()
+  const value = scenario.real.value[spec.key]
   return spec.kind === 'money' ? money(value) : spec.kind === 'percent' ? pct(value) : String(value)
 }
-const realSource = (spec: FieldSpec) => (spec.key === 'socialSecurityMonthly' ? 'the estimate' : spec.source?.())
+const realSource = (spec: FieldSpec) => FOLLOWING[spec.key]?.realSource || spec.source?.()
 const inputProps = (spec: FieldSpec) =>
   spec.kind === 'money'
     ? { mode: 'currency', currency: 'USD', locale: 'en-US', maxFractionDigits: 0, min: 0 }
@@ -688,6 +837,8 @@ const chart = computed<ChartBuilder>(() => {
               </tr>
             </tbody>
           </table>
+          <p v-if="earlyAccess" class="muted small budget-note">{{ earlyAccess }}</p>
+          <p v-if="values.cutInBadYears > 0" class="muted small budget-note">After a market drop (20%+ below what you retired with), the spending target is {{ pct(values.cutInBadYears) }} lower until it recovers.</p>
         </section>
 
         <details class="panel assumptions">
@@ -695,14 +846,16 @@ const chart = computed<ChartBuilder>(() => {
           <ul>
             <li>Everything runs in today’s dollars: growth is the return minus inflation, and saving grows with raises above inflation. “Future $” just adds inflation back for display.</li>
             <li>Until you retire, each year’s saving is added and the balance earns the return. After, saving stops and the budget above comes out each year.</li>
-            <li>Loan payments are fixed, so inflation shrinks them each year, and they stop at payoff. Health insurance is added until Medicare at 65.</li>
+            <li>Loan payments are fixed, so inflation shrinks them each year, and they stop at payoff. Health insurance is added until Medicare at 65 (for two once married, none while a working spouse’s plan covers you).</li>
             <li>Social Security, unless you type yours: today’s salary for each year from 22 until you retire (the best 35 count), through the 2026 benefit formula, adjusted for the age you claim. It assumes today’s rules; a shortfall in the trust fund could cut it about 20% from the 2030s.</li>
             <li>Tax on withdrawals is one flat rate on everything taken out. Roth and HSA money is tax-free; pre-tax 401k and IRA money is taxed like income.</li>
             <li>Ups and downs: the plan runs against {{ 500 }} sequences of yearly returns that average out to your return, with the volatility you set. Bad years early in retirement hurt most; that’s why the chance can be below 100% even when average years look fine.</li>
             <li>The goal. Money lasts: the balance never hits zero before the plan-to age. Keep the nest egg: in at least 3 of the last 5 years of the plan, you still have what you retired with, in today’s dollars (so it keeps up with inflation). Looking at 5 years means one crash in the final year doesn’t decide it. It can dip along the way; you live off the growth, not the savings. That takes a bigger balance, so the earliest age is later.</li>
-            <li>Family (when in the plan): from the age you marry, your spouse’s saving is added while you work, health insurance before 65 is for two, retirement spending rises by the extra for two, and their Social Security (their own estimate, or half of yours if more) is added. Each child costs the monthly amount until 18, plus child care until 5; while working that comes out of what you save. You both retire at the same age.</li>
+            <li>Family (when in the plan): from the age you marry, your spouse’s saving is added while you work, health insurance before 65 is for two, retirement spending rises by the extra for two, and their Social Security (their own estimate, or half of yours if more) is added. Each child costs the monthly amount until 18, plus child care until 5. While you both work, your spouse’s paycheck pays their share of the kids and the home and the rest comes out of what you save; once retired it all comes from the investments. You both retire at the same age.</li>
             <li>Home (when in the plan): the down payment and closing costs come out of your investments the year you buy. From then on the mortgage (fixed, so it shrinks with inflation and stops at payoff) plus tax, insurance and upkeep replace your rent. The home itself isn’t counted as money to retire on.</li>
-            <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Contribution limits and required withdrawals aren’t modelled.</li>
+            <li>Getting at the money: until 60, spending comes from your brokerage account first. 401k, IRA and HSA money taken earlier pays a 10% penalty, unless you retire at 55 or later (the rule of 55). Your own 401k saving above the yearly limit ($24,500 in 2026) counts as brokerage saving.</li>
+            <li>Spending: the target drops to the share you set from 75 on, and in years your investments are 20% or more below what you retired with, it’s cut by the share you set. Medicare and medical bills are added from 65.</li>
+            <li>Only invested money counts (Net worth’s Investments group). Cash, home equity and other assets aren’t drawn on. Required minimum distributions aren’t modelled (they move money, not spend it).</li>
           </ul>
         </details>
       </div>
@@ -927,6 +1080,9 @@ const chart = computed<ChartBuilder>(() => {
   }
 }
 
+.budget-note {
+  margin-top: 8px;
+}
 .toggle-row {
   margin-bottom: 12px;
 }

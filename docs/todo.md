@@ -81,7 +81,7 @@
 - [x] Realistic Retirement (Devin, 2026-11-01): spending target in today's dollars up front, loans dropping off at payoff,
   health insurance before 65, tax on withdrawals, Social Security estimate, market ups and downs (chance it lasts,
   range on the chart), today's/future dollars, monthly retirement budget
-- [ ] Maybe later: Retirement with home equity or cash counted, separate Roth/pre-tax balances, contribution limits,
+- [ ] Maybe later: Retirement with cash counted, separate Roth/pre-tax tax rates,
   required minimum distributions, a spouse
 - [x] Make double counting loans impossible: rows repeating a profile loan or its property are skipped on import,
   blocked in the snapshot dialog and left out of net worth (Devin picked this over planning-only loans, 2026-11-01)
@@ -107,8 +107,10 @@
 - [x] Retirement **Home** section (Devin, 2026-11-02): home purchase (down payment and closing from investments,
   mortgage, tax/insurance/upkeep) with rent removed from then on
 - [x] Devin: review and merge the Family and Home PR (#29)
+- [x] Family fix (Devin, 2026-11-03): the spouse's paycheck pays a share of the kids and home while you both work (default 50%), child care on top of USDA lowered to $850/mo
+- [x] Accuracy round (Devin, 2026-11-03): money you can reach before 59½ (brokerage first, rule of 55, 10% penalty), 401k limit, flexible spending after market drops, spending lower from 75, Medicare from 65, family health plan through a working spouse, college, spouse's own retirement age, Social Security cut option
 - [ ] Devin: try Family and Home with your own plans (ages, spouse pay, home price, rent)
-- [ ] Maybe later: college costs, the spouse retiring at a different age, home equity counted in retirement
+- Decided (Devin, 2026-11-03): home equity is never counted as money to retire on
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)
 - [x] Deployed main b06c483 (PR #28 nest egg goal, chart drag tooltips) as Lambda version 20, 2026-11-02
 - [x] Deployed main a9e0edf (PR #29 Retirement Family and Home sections) as Lambda version 21, 2026-11-02
