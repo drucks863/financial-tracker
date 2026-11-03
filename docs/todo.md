@@ -106,7 +106,9 @@
   income, saving and Social Security; kids at the US average cost per child plus child care while both parents work
 - [x] Retirement **Home** section (Devin, 2026-11-02): home purchase (down payment and closing from investments,
   mortgage, tax/insurance/upkeep) with rent removed from then on
-- [ ] Devin: try Family and Home with your own plans (ages, spouse pay, home price, rent) and review the PR
+- [x] Devin: review and merge the Family and Home PR (#29)
+- [ ] Devin: try Family and Home with your own plans (ages, spouse pay, home price, rent)
 - [ ] Maybe later: college costs, the spouse retiring at a different age, home equity counted in retirement
 - [x] Charts: drag a finger sideways to move the tooltip (all charts; up/down still scrolls)
 - [x] Deployed main b06c483 (PR #28 nest egg goal, chart drag tooltips) as Lambda version 20, 2026-11-02
+- [x] Deployed main a9e0edf (PR #29 Retirement Family and Home sections) as Lambda version 21, 2026-11-02
